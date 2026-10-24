@@ -38,13 +38,17 @@ Read `CLAUDE.md`, `docs/plan.md` (definition of done, tiers),
    runs, check:
    - least-privilege `permissions:`;
    - no `pull_request_target` or `workflow_run`;
+   - jobs with an environment only on `schedule`, `workflow_dispatch`
+     without code-selecting inputs, or tag pushes; no event text in `run:`;
+   - `release.yml` has no `workflow_call` or `workflow_dispatch`, and fails
+     if a release already exists for its tag;
    - secrets only through an environment (`nightly`, `release`,
      `branch-run`);
-   - nothing users get is published with `GITHUB_TOKEN`;
+   - only the release job publishes anything users get;
    - the release job restores no caches and downloads artifacts only from
      its own run;
-   - signatures are verified against the exact `release.yml@refs/tags/v…`
-     identity.
+   - signatures are verified against the exact identity, with repository,
+     `vX.Y.Z` ref and `push` trigger pinned, never via "latest".
 7. **Pinning.** New dependencies, images, Actions and CDN scripts pinned
    (versions, digests, commit SHAs).
 8. **Correctness.** Bugs you can show with a concrete input.

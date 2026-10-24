@@ -68,19 +68,20 @@ follow the same checklist.
 Agents may write workflows and code. Nothing merges, reaches a secret or
 ships without the maintainer:
 
-- **Every PR needs the maintainer's approving review.** New pushes dismiss
-  an approval. CODEOWNERS also names them for `.github/`, `CLAUDE.md`,
-  `.claude/` and `docs/decisions/`.
+- **Every PR needs the maintainer's approving review.** CODEOWNERS names
+  them for every path, so no one else's approval counts, and new pushes
+  dismiss it.
 - **Secrets live only in GitHub environments:**
   - `nightly` runs from `main`;
   - `release` runs from `v*` tags and needs the maintainer's approval;
   - `branch-run` serves any branch, and the maintainer approves every run,
     after reading the branch's diff against `main`, workflows first.
 - **PR tiers run on headscale**, with no secrets.
-- **A branch workflow can raise its `GITHUB_TOKEN`**, so nothing users get
-  is published with it.
-- **Releases are immutable once published**, tags are the maintainer's,
-  and signatures are verified against the exact release-workflow identity.
+- **A branch workflow can raise its `GITHUB_TOKEN`**, so only the approved
+  release job publishes anything users get.
+- **Every tag is the maintainer's.** Releases are immutable once
+  published, and signatures are verified against the exact release-workflow
+  identity.
 
 See [decision 0013](decisions/0013-ci-trust-model.md).
 

@@ -146,7 +146,7 @@ ready starts the heavy tiers. Any branch can run them by hand
    - #17, the engine interface and capability matrix.
 2. **Run the #3 spike**, as soon as the test organization exists.
 3. **Build:**
-   - #1, the Go module and the flake: Go first, CI once the token exists;
+   - #1, the Go module and the flake: Go first, CI once #39 is in place;
    - #4, the Docker sandbox;
    - #5, headscale;
    - #7, the node agent;

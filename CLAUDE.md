@@ -52,11 +52,17 @@ are in [`docs/decisions/`](docs/decisions/README.md).
    - **Workflows:**
      - every workflow declares least-privilege `permissions:`;
      - never use `pull_request_target` or `workflow_run`;
-     - never publish anything users get with `GITHUB_TOKEN`; use
-       `release`'s credentials.
+     - jobs with an environment run only on `schedule`, `workflow_dispatch`
+       (no input that picks code) or a tag push, and no event text goes
+       into `run:`;
+     - `release.yml` has no `workflow_call` or `workflow_dispatch`;
+     - only the release job publishes anything users get.
    - **The release job** restores no caches.
-   - **Signatures are verified against the exact `release.yml@refs/tags/v…`
-     identity.**
+   - **Signatures are verified against the exact identity:**
+     `release.yml@refs/tags/vX.Y.Z`, with repository, ref and trigger
+     pinned; never "latest".
+   - Never create a tag or a release by hand, and never approve another
+     PR.
    - Never approve a fork's workflow run.
    - Never change rulesets, environments or Actions settings. They are the
      maintainer's.

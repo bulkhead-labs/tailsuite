@@ -34,9 +34,10 @@ reaches `main`, the secrets or users without the maintainer.**
    - It blocks force pushes and deletion.
    - A PR's author can't approve it, so an agent never approves its own.
    - The maintainer's own PRs bypass through the Repository admin role.
-   - CODEOWNERS also names the maintainer for `.github/`, `CLAUDE.md`,
-     `.claude/` and `docs/decisions/`, so those always need their review,
-     even if other collaborators join.
+   - **CODEOWNERS names the maintainer for every path (`*`)**, and the
+     ruleset requires code-owner review. Any collaborator with write access
+     counts toward "1 approval", the agent (Maintain) included. Code-owner
+     review is what makes the approval the maintainer's.
 
    This only formalizes rule 6: every merge was already the maintainer's
    call.
@@ -53,7 +54,7 @@ reaches `main`, the secrets or users without the maintainer.**
    | Environment | Deployment refs | Approval | Holds |
    |---|---|---|---|
    | `nightly` | `main` | none (scheduled) | the test organization's OAuth client |
-   | `release` | `v*` tags only | the maintainer | the Homebrew tap credential and the container-registry credential |
+   | `release` | `v*` tags only | the maintainer | the tap and container-registry credentials (the GitHub release uses the job's own token) |
    | `branch-run` | no restriction | **the maintainer, every run** | the test organization's OAuth client |
 
    - The environments, with their protections, exist before any workflow
@@ -69,16 +70,23 @@ reaches `main`, the secrets or users without the maintainer.**
    - The repo default for `GITHUB_TOKEN` is read-only, but anyone with write
      access can raise it in a workflow file. A branch workflow can therefore
      take any `GITHUB_TOKEN` scope except workflows; it gets no secrets.
-   - **So nothing that reaches users is published with `GITHUB_TOKEN`:**
-     - images are pushed with the registry credential in `release`, never
-       `packages: write`;
-     - the Homebrew formula is pushed with the tap credential in `release`.
+   - **So nothing users get is published by any job but the release job.**
+     - **The container package and `bulkhead-labs/homebrew-tap` are
+       created by the maintainer.**
+     - The package doesn't inherit the repo's access, and no workflow gets
+       write to it by default.
+     - The agent account has no write on either.
+     - **The agent account's role on each repo that ships is the real
+       boundary**, because it also holds a classic `repo` token.
    - **Actions may not create or approve pull requests.**
 5. **Releases can't be changed after they're published:**
    - **Immutable releases** are on, which locks a published release's
      assets and tag.
    - goreleaser drafts the release, uploads the assets and publishes, all
-     inside the approved `release` job.
+     inside the approved `release` job. That job alone publishes. It uses
+     its own `GITHUB_TOKEN` (`contents: write`) for the GitHub release, and
+     `release`'s credentials for the tap and the registry.
+   - **The release job fails if a release already exists for its tag.**
    - The release job restores no caches (`cache: false` on setup-go, no
      `actions/cache`) and downloads artifacts only from its own run.
 6. **Signatures are trusted by their exact identity, not by a gate.**
@@ -91,10 +99,22 @@ reaches `main`, the secrets or users without the maintainer.**
        `https://github.com/bulkhead-labs/tailsuite/.github/workflows/release.yml@refs/tags/v…`.
 
      They never use a repo-wide pattern.
-   - The `v*` tag ruleset is what makes that identity meaningful.
-7. **Only the maintainer creates release tags.**
-   - A tag ruleset on `v*` blocks creating, updating and deleting them,
-     with a bypass for the Repository admin role.
+   - **Verifiers also pin:**
+     - the repository (`--certificate-github-workflow-repository`);
+     - the ref, which must be a `vX.Y.Z` tag
+       (`--certificate-github-workflow-ref`);
+     - the trigger, `push` (`--certificate-github-workflow-trigger`).
+
+     They never take the tag from "latest".
+   - **`release.yml` has no `workflow_call` or `workflow_dispatch`.** A
+     workflow that calls it would otherwise get signed under its identity
+     with the caller's code.
+   - The tag ruleset is what makes the pinned identity meaningful.
+7. **Only the maintainer creates tags, any tag.**
+   - A tag ruleset on **all tags** blocks creating, updating and deleting
+     them, with a bypass for the Repository admin role.
+   - A tag like `evil` would otherwise give a rewritten `release.yml` a
+     signing identity.
    - That holds while the maintainer is the only admin (organization owners
      aside).
    - Tested once #39 is applied, including tags created through the
@@ -105,6 +125,11 @@ reaches `main`, the secrets or users without the maintainer.**
      policy also enforces;
    - no `pull_request_target` and no `workflow_run` triggers: they run in
      `main`'s context, with `main`'s environments, on anyone's PR;
+   - **a job that uses an environment runs only on `schedule`,
+     `workflow_dispatch` or a tag push.** Other events (`issue_comment`,
+     `issues`…) run in `main`'s context too. Such jobs take no
+     `workflow_dispatch` input that chooses which code to run, and no
+     event text ever goes into `run:`;
    - only the maintainer approves workflow runs from forks, which need
      approval for all external contributors.
 9. **Nothing that verifies tailsuite is served from GitHub Pages.** Not the
@@ -152,6 +177,15 @@ and branch workflows need explicit permission.
   The status page is informational, and nothing that verifies tailsuite is
   served there (item 9).
 - **Running real Tailscale on a branch needs a click each time.**
+- **Releases can be tampered with, but not signed.** The agent's
+  Contents: write, or a branch workflow's `GITHUB_TOKEN`, can:
+  - publish a release on an existing tag before the release job runs;
+  - mark an older release as latest;
+  - probably delete a release (uncertain).
+
+  None of these can carry a signature that verifiers accept, and the
+  release job refuses to run over an existing release. The maintainer
+  removes a rogue release by hand.
 
 ## Sources (checked 2026-10-24)
 

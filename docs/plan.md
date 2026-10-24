@@ -1,7 +1,7 @@
 # Plan
 
-**Last checked against the repo: 2026-10-24.** Current milestone: **M1, not
-started.**
+**Last checked against the repo: 2026-10-24.** Current milestone: **M1, in
+progress.**
 
 This file is the plan of record. It changes in the same pull request as the
 work it describes, and is checked again after every merge
@@ -52,7 +52,7 @@ Live progress is on the
 
 | | Milestone | Status | What ships | How a user starts here |
 |---|---|---|---|---|
-| **M1** | [Walking skeleton](https://github.com/bulkhead-labs/tailsuite/milestone/1) | Not started | 3 nodes (laptop, server, db), a policy, 3 tests (allow, deny, positive control), both engines, the local UI, the OpenTofu module that configures the lab, the round-trip check, the release pipeline, the user-journey suite | `brew install` → `tailsuite init` → `tailsuite up`, about 5 minutes |
+| **M1** | [Walking skeleton](https://github.com/bulkhead-labs/tailsuite/milestone/1) | In progress | 3 nodes (laptop, server, db), a policy, 3 tests (allow, deny, positive control), both engines, the local UI, the OpenTofu module that configures the lab, the round-trip check, the release pipeline, the user-journey suite | `brew install` → `tailsuite init` → `tailsuite up`, about 5 minutes |
 | **M2** | [Tags, grants and the diff](https://github.com/bulkhead-labs/tailsuite/milestone/2) | Not started | Tags, grants and ports; the reachability matrix; the blast-radius diff; the headline (#33); the baseline pack (#32); test file v1; the GitHub Action; the generated quick-start repo; the first sample configs | Add tailsuite to their repo's CI |
 | **M3** | [SSH, subnets and exit nodes](https://github.com/bulkhead-labs/tailsuite/milestone/3) | Not started | Tailscale SSH (root vs nonroot, check mode); subnet routers with fake LANs; exit nodes with a fake internet; **engine scorecard #1** | The scenarios people get burned by |
 | **M4** | [Users and posture](https://github.com/bulkhead-labs/tailsuite/milestone/4) | Not started | Users and groups; posture (OS mimicked, real client versions); equivalence classes; **engine scorecard #2**. The lab is feature complete | |

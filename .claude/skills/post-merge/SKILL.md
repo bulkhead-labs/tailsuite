@@ -45,6 +45,9 @@ Read each against the code on `main`:
 
 ## 4. The status page
 
+- If Pages was pointed at a PR branch for a preview
+  (`gh api repos/bulkhead-labs/tailsuite/pages --jq .source`), point it back:
+  `gh api -X PUT repos/bulkhead-labs/tailsuite/pages -f build_type=legacy -f 'source[branch]=main' -f 'source[path]=/docs'`.
 - `gh api repos/bulkhead-labs/tailsuite/pages/builds/latest --jq '[.status, .commit] | @tsv'`:
   it must be `built` for the merge commit (Pages serves `docs/` from `main`).
 - Fetch https://bulkhead-labs.github.io/tailsuite/. Check that it loads and

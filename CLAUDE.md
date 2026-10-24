@@ -27,8 +27,8 @@ are in [`docs/decisions/`](docs/decisions/README.md).
    ([0007](docs/decisions/0007-read-only-by-default.md)). Tests touch only
    lab engines and the dedicated Tailscale test organization.
 4. **All work is a GitHub issue** in this repo
-   ([0010](docs/decisions/0010-public-tracking-in-issues.md)), on a
-   milestone, with a `type:` and `area:` label.
+   ([0010](docs/decisions/0010-public-tracking-in-issues.md)), with a
+   `type:` and `area:` label, and on a milestone when it belongs to one.
 5. **The docs stay true.** The PR that changes behaviour updates
    `docs/plan.md`, `docs/architecture.md`, the README and the decision
    records. A choice with trade-offs gets a new decision record, dated, with

@@ -42,6 +42,15 @@
 
   function flag(why) { return el("span", { class: "flag", title: why, text: "check" }); }
 
+  // The plan contradicts itself when "Current milestone" isn't the lowest one it doesn't call done.
+  function checkCurrent(plan) {
+    var expected = Object.keys(plan.status).filter(function (id) { return !isDone(plan.status[id]); })
+      .sort(function (a, b) { return idNum(a) - idNum(b); })[0] || "";
+    if (expected === plan.currentId) return;
+    $("now-milestone").appendChild(document.createTextNode(" "));
+    $("now-milestone").appendChild(flag("The plan names " + (plan.currentId || "nothing") + ", but the lowest milestone not done is " + (expected || "none")));
+  }
+
   // A list showing one message and a link to the same data on GitHub.
   function fallback(listId, message, path) {
     var target = $(listId);
@@ -56,14 +65,19 @@
   // Render markdown from a repo path into a container. Relative links point at
   // the file on GitHub; in-page anchors point at the rendered headings. If the
   // renderer didn't load (a blocked CDN), show the raw markdown instead.
+  function rawDoc(md, container, why) {
+    container.innerHTML = "";
+    container.appendChild(el("p", { class: "muted", text: why + ", so this is the raw file." }));
+    container.appendChild(el("pre", { text: md }));
+  }
+
   function renderDoc(md, path, container, prefix) {
-    if (!window.marked || !window.DOMPurify) {
-      container.innerHTML = "";
-      container.appendChild(el("p", { class: "muted", text: "The markdown renderer didn't load, so this is the raw file." }));
-      container.appendChild(el("pre", { text: md }));
-      return;
+    if (!window.marked || !window.DOMPurify) return rawDoc(md, container, "The markdown renderer didn't load");
+    try {
+      container.innerHTML = window.DOMPurify.sanitize(window.marked.parse(md, { gfm: true }));
+    } catch (e) {
+      return rawDoc(md, container, "The markdown renderer failed");
     }
-    container.innerHTML = window.DOMPurify.sanitize(window.marked.parse(md, { gfm: true }));
     container.querySelectorAll("h2, h3").forEach(function (h) { h.id = prefix + slug(h.textContent); });
     container.querySelectorAll("table").forEach(function (t) {
       var wrap = el("div", { class: "table-scroll" });
@@ -149,16 +163,6 @@
       ]));
     });
     $("now-issues").textContent = closed + " / " + total;
-
-    // The current milestone should be the lowest one the plan doesn't call done.
-    if (plan.loaded) {
-      var expected = Object.keys(plan.status).filter(function (id) { return !isDone(plan.status[id]); })
-        .sort(function (a, b) { return idNum(a) - idNum(b); })[0] || "";
-      if (expected !== plan.currentId) {
-        $("now-milestone").appendChild(document.createTextNode(" "));
-        $("now-milestone").appendChild(flag("The plan names " + (plan.currentId || "nothing") + ", but the lowest milestone not done is " + (expected || "none")));
-      }
-    }
   }
 
   function renderQuestions(issues) {
@@ -190,6 +194,7 @@
       var plan = readPlan(md);
       $("now-milestone").textContent = plan.current || "—";
       $("now-checked").textContent = plan.checked || "—";
+      checkCurrent(plan);
       renderDoc(md, "docs/plan.md", $("plan-doc"), "plan-");
       return plan;
     }).catch(function (err) {

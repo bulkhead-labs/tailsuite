@@ -12,7 +12,7 @@ thing right now is a view on the
 2. Open your pull request **as a draft**, with `Closes #n`, and fill in the
    template's checklist.
 3. Mark it ready when the checklist is done. The heavier test tiers run
-   then.
+   then, once CI exists (#1, #13).
 4. Maintainers squash-merge.
 
 ## Sign your commits off (DCO)

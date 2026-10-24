@@ -15,7 +15,9 @@ what each step found.
 - The issues it closes (works on any `gh` version):
   `gh api graphql -f query='query{repository(owner:"bulkhead-labs",name:"tailsuite"){pullRequest(number:<n>){closingIssuesReferences(first:20){nodes{number title state}}}}}'`
 - It must be a draft linked to an issue (`Closes #n`). If not, fix the body,
-  or stop and ask.
+  or stop and ask. If `gh pr edit` fails on an older `gh` (GitHub retired
+  classic Projects), use
+  `gh api -X PATCH repos/bulkhead-labs/tailsuite/pulls/<n> -F body=@<file>`.
 - Read the issue's "Done when" list. Every item is either done in this PR
   or moved to a new issue (linked in the PR).
 

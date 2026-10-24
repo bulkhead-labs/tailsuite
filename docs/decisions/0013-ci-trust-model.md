@@ -195,6 +195,12 @@ and branch workflows need explicit permission.
   The status page is informational, and nothing that verifies tailsuite is
   served there (item 9).
 - **Running real Tailscale on a branch needs a click each time.**
+- **Agents may create repos in the organization** (the maintainer's
+  choice, 2026-10-24).
+  - GitHub makes a repo's creator its admin, and no setting changes that.
+  - So the maintainer demotes the agent to Maintain on any repo it creates,
+    and creates `homebrew-tap` themselves, checking who created it before
+    putting a credential in `release`.
 - **Releases can be tampered with, but not signed.** The agent's
   Contents: write, or a branch workflow's `GITHUB_TOKEN`, can:
   - publish a release on an existing tag before the release job runs;
@@ -212,7 +218,7 @@ and branch workflows need explicit permission.
   - Jobs with an environment never read `vars`, so this can't become code
     execution.
   - It could break the nightly or release runs, or point the nightly at
-    another Tailscale organization. That's detectable and recoverable, not
+    another Tailscale organization. That's recoverable once noticed, not
     prevented.
 
 ## Sources (checked 2026-10-24)

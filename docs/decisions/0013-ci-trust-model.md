@@ -1,7 +1,16 @@
 # 0013: Agents write CI; nothing merges or ships without the maintainer
 
-Status: **accepted** (2026-10-24). The maintainer's settings: **in place**, verified
-2026-10-24 (#39). The Homebrew tap and the container package come with #2. Amends the context
+Status: **accepted** (2026-10-24). The maintainer's settings: **in place** (2026-10-24, #39):
+
+- **Read from the API:** the rulesets, the environments, and that the agent
+  can't bypass either ruleset.
+- **Proven by test runs:** the read-only `GITHUB_TOKEN` and SHA pinning.
+- **Refused when tried:** the fine-grained token's environment writes.
+- **Confirmed by the maintainer:** the bypass lists and the admin-only
+  settings.
+- **Still to exercise:** the tag ruleset (#41).
+- **With #2:** the Homebrew tap and the container package.
+ Amends the context
 of [0012](0012-status-page-hosting.md): the agent's token can now push
 workflow files.
 
@@ -133,8 +142,8 @@ reaches `main`, the secrets or users without the maintainer.**
      signing identity.
    - That holds while the maintainer is the only admin (organization owners
      aside).
-   - Tested once #39 is applied, including tags created through the
-     Releases API.
+   - Read from the API (the agent can't bypass it). Exercising it with
+     `git push` and the Releases API is #41.
 8. **Workflow rules** (CLAUDE.md rule 8):
    - every workflow declares least-privilege `permissions:`;
    - every action is pinned to a full commit SHA, which the repo's Actions

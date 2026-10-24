@@ -1,0 +1,24 @@
+# Build output
+/dist/
+/bin/
+/tailsuite
+
+# Nix
+/result
+/result-*
+.direnv/
+
+# OpenTofu / Terraform working state
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Local project folders and lab output
+/.lab/
+*.local.yaml
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/

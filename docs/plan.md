@@ -107,6 +107,10 @@ this list, and the `pr-ready` skill checks it before review
 | Upstream canary | Nightly | Latest headscale and Tailscale client images |
 | Release | On a tag | All tiers, then install from the **published** channels (Homebrew, script, container) on Linux and macOS runners, with signatures verified |
 
+**Not running yet.** CI arrives with #1 (lint, unit, the docs link check)
+and #13 (integration and the user journey). Until then, the `pr-ready`
+skill and the reviewer agent are the checks.
+
 **PRs open as drafts.** Drafts get lint and unit tests only. Marking a PR
 ready starts the heavy tiers. Any branch can run them by hand
 (`workflow_dispatch`) before it's ready

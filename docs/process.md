@@ -26,8 +26,9 @@ not what was intended. Three things keep them that way:
    the milestones after every merge, and fixes what drifted in a docs-only
    PR.
 
-The [status page](https://bulkhead-labs.github.io/tailsuite/) renders
-these files from `main` and reads milestone progress live from GitHub, so
+The [status page](https://bulkhead-labs.github.io/tailsuite/)
+(`docs/index.html`, served by GitHub Pages from `docs/` on `main`)
+renders these files and reads milestone progress live from GitHub, so
 it can't drift on its own.
 
 ## A pull request, start to finish

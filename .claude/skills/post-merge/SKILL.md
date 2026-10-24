@@ -44,8 +44,8 @@ Read each against the code on `main`:
 
 ## 4. The status page
 
-- `gh run list --workflow pages.yml --branch main --limit 1`: it must have
-  succeeded for the merge commit.
+- `gh api repos/bulkhead-labs/tailsuite/pages/builds/latest --jq '[.status, .commit] | @tsv'`:
+  it must be `built` for the merge commit (Pages serves `docs/` from `main`).
 - Fetch https://bulkhead-labs.github.io/tailsuite/. Check that it loads and
   shows the milestones and the plan.
 

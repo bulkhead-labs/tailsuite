@@ -49,5 +49,6 @@ are in [`docs/decisions/`](docs/decisions/README.md).
 
 - **Go.** `nix develop` for the toolchain; plain `go build` must also work.
 - **Lab tests use Docker with unique names**, and always tear down.
-- **The status page** (`site/`) renders `docs/` from `main` and reads
-  milestones live from GitHub. Don't copy plan text into it.
+- **The status page** is `docs/index.html` with `docs/assets/`, served by
+  GitHub Pages from `docs/` on `main`. It renders the docs beside it and
+  reads milestones live from GitHub. Don't copy plan text into it.

@@ -1,4 +1,4 @@
-// tailsuite status page. Renders docs/ as deployed from main, and reads
+// tailsuite status page, served by GitHub Pages from docs/ on main. Renders the docs beside it, and reads
 // milestones and design questions live from the GitHub API. Holds no plan text of its own.
 (function () {
   "use strict";
@@ -153,14 +153,15 @@
   }
 
   function start() {
-    getText("build.json").then(JSON.parse).then(function (b) {
+    // GitHub Pages republishes docs/ on every push to main; show which commit that is.
+    getJSON(API + "/commits/main").then(function (c) {
       var a = $("build-sha");
-      a.textContent = b.sha.slice(0, 7);
-      a.href = "https://github.com/" + REPO + "/commit/" + b.sha;
-      $("build-time").textContent = " on " + b.time;
+      a.textContent = c.sha.slice(0, 7);
+      a.href = c.html_url;
+      $("build-time").textContent = ", " + c.commit.committer.date.slice(0, 10);
     }).catch(function () {});
 
-    var planP = getText("docs/plan.md").then(function (md) {
+    var planP = getText("plan.md").then(function (md) {
       renderDoc(md, "docs/plan.md", $("plan-doc"), "plan-");
       var plan = readPlan(md);
       $("now-milestone").textContent = plan.current || "—";
@@ -171,7 +172,7 @@
       return readPlan("");
     });
 
-    getText("docs/decisions/README.md").then(function (md) {
+    getText("decisions/README.md").then(function (md) {
       renderDoc(md, "docs/decisions/README.md", $("decisions-doc"), "dec-");
     }).catch(function (err) {
       $("decisions-doc").textContent = "Couldn't load the decisions (" + err.message + ").";

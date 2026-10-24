@@ -1,5 +1,5 @@
-// tailsuite status page, served by GitHub Pages from docs/ on main. Renders the docs beside it, and reads
-// milestones and design questions live from the GitHub API. Holds no plan text of its own.
+// tailsuite status page, served by GitHub Pages from docs/ on main. Renders the docs beside it,
+// and reads milestones and design questions live from the GitHub API. Holds no plan text of its own.
 (function () {
   "use strict";
 
@@ -29,7 +29,7 @@
 
   function getJSON(url) {
     return fetch(url, { headers: { Accept: "application/vnd.github+json" } }).then(function (r) {
-      if (!r.ok) throw new Error(url + ": " + r.status);
+      if (!r.ok) throw new Error("GitHub API " + r.status);
       return r.json();
     });
   }
@@ -38,11 +38,32 @@
     return text.toLowerCase().trim().replace(/[^\w\s-]/g, "").replace(/\s+/g, "-");
   }
 
+  function idNum(id) { return parseInt(String(id).replace(/\D/g, ""), 10) || 0; }
+
+  function flag(why) { return el("span", { class: "flag", title: why, text: "check" }); }
+
+  // A list showing one message and a link to the same data on GitHub.
+  function fallback(listId, message, path) {
+    var target = $(listId);
+    target.innerHTML = "";
+    target.appendChild(el("li", { class: "muted" }, [
+      document.createTextNode(message + " See "),
+      el("a", { href: "https://github.com/" + REPO + "/" + path, text: "GitHub" }),
+      document.createTextNode(".")
+    ]));
+  }
+
   // Render markdown from a repo path into a container. Relative links point at
-  // the file on GitHub; in-page anchors point at the rendered headings.
+  // the file on GitHub; in-page anchors point at the rendered headings. If the
+  // renderer didn't load (a blocked CDN), show the raw markdown instead.
   function renderDoc(md, path, container, prefix) {
-    var html = window.DOMPurify.sanitize(window.marked.parse(md, { gfm: true }));
-    container.innerHTML = html;
+    if (!window.marked || !window.DOMPurify) {
+      container.innerHTML = "";
+      container.appendChild(el("p", { class: "muted", text: "The markdown renderer didn't load, so this is the raw file." }));
+      container.appendChild(el("pre", { text: md }));
+      return;
+    }
+    container.innerHTML = window.DOMPurify.sanitize(window.marked.parse(md, { gfm: true }));
     container.querySelectorAll("h2, h3").forEach(function (h) { h.id = prefix + slug(h.textContent); });
     container.querySelectorAll("table").forEach(function (t) {
       var wrap = el("div", { class: "table-scroll" });
@@ -71,52 +92,73 @@
       var m = line.match(/^\|\s*\*\*(M\d+)\*\*\s*\|[^|]*\|\s*([^|]+?)\s*\|/);
       if (m) status[m[1]] = m[2];
     });
-    return { current: current, currentId: (current.match(/M\d+/) || [""])[0], checked: checked, status: status };
+    return { loaded: !!md, current: current, currentId: (current.match(/M\d+/) || [""])[0], checked: checked, status: status };
   }
 
-  // The plan and GitHub disagree when the plan says "Not started" but issues are closed,
-  // or says "Done" while issues are open or the milestone is still open.
+  function isDone(s) { return /^done\b/i.test((s || "").trim()); }
+
+  // Where the plan and GitHub disagree about one milestone. Empty when they agree.
   function disagrees(planStatus, ms) {
-    var s = (planStatus || "").toLowerCase();
-    if (s === "not started" && ms.closed_issues > 0) return "Issues are closed, but the plan says not started";
-    if (s === "done" && (ms.open_issues > 0 || ms.state !== "closed")) return "The plan says done, but the milestone is open";
-    if (ms.state === "closed" && s !== "done") return "The milestone is closed, but the plan doesn't say done";
+    var s = (planStatus || "").trim().toLowerCase();
+    if (!s) return "This milestone is on GitHub but not in the plan";
+    if (/^not started\b/.test(s) && ms.closed_issues > 0) return "Issues are closed, but the plan says not started";
+    if (isDone(s) && ms.open_issues > 0) return "The plan says done, but issues are still open";
+    if (isDone(s) && ms.state !== "closed") return "The plan says done, but the GitHub milestone is still open";
+    if (ms.state === "closed" && !isDone(s)) return "The GitHub milestone is closed, but the plan doesn't say done";
     return "";
+  }
+
+  function pillFor(status) {
+    var c = "pill" + (/progress/i.test(status) ? " pill--progress" : isDone(status) ? " pill--done" : "");
+    return el("span", { class: c, text: status || "Not in plan" });
   }
 
   function renderMilestones(list, plan) {
     var ol = $("milestone-list");
     ol.innerHTML = "";
-    var closed = 0, total = 0;
+    var closed = 0, total = 0, seen = {};
     list.sort(function (a, b) { return a.number - b.number; }).forEach(function (ms) {
       var id = (ms.title.match(/^M\d+/) || [""])[0];
-      var name = ms.title.replace(/^M\d+\s*/, "");
+      seen[id] = true;
       var count = ms.open_issues + ms.closed_issues;
       closed += ms.closed_issues; total += count;
       var pct = count ? Math.round((ms.closed_issues / count) * 100) : 0;
-      var planStatus = plan.status[id] || "Not in plan";
-      var pillClass = "pill" + (/progress/i.test(planStatus) ? " pill--progress" : /done/i.test(planStatus) ? " pill--done" : "");
-      var why = disagrees(planStatus, ms);
+      var planStatus = plan.status[id];
+      var why = plan.loaded ? disagrees(planStatus, ms) : "";
       var fill = el("div", { class: "bar__fill" });
-      var li = el("li", { class: "ms" + (id === plan.currentId ? " ms--current" : "") }, [
+      ol.appendChild(el("li", { class: "ms" + (id === plan.currentId ? " ms--current" : "") }, [
         el("div", { class: "ms__id", text: id }),
         el("div", {}, [
-          el("h3", { class: "ms__title" }, [el("a", { href: ms.html_url, text: name })]),
+          el("h3", { class: "ms__title" }, [el("a", { href: ms.html_url, text: ms.title.replace(/^M\d+\s*/, "") })]),
           el("p", { class: "ms__desc", text: ms.description || "" })
         ]),
         el("div", { class: "ms__side" }, [
-          el("div", { class: "ms__status" }, [
-            el("span", { class: pillClass, text: planStatus }),
-            why ? el("span", { class: "flag", title: why, text: "check" }) : null
-          ]),
+          el("div", { class: "ms__status" }, [pillFor(plan.loaded ? planStatus : "Plan not loaded"), why ? flag(why) : null]),
           el("div", { class: "bar", role: "img", "aria-label": pct + "% of issues closed" }, [fill]),
           el("span", { class: "ms__count", text: ms.closed_issues + " of " + count + " issues closed" })
         ])
-      ]);
-      ol.appendChild(li);
+      ]));
       requestAnimationFrame(function () { fill.style.width = pct + "%"; });
     });
+    // Milestones the plan lists that GitHub doesn't have.
+    Object.keys(plan.status).filter(function (id) { return !seen[id]; }).sort(function (a, b) { return idNum(a) - idNum(b); }).forEach(function (id) {
+      ol.appendChild(el("li", { class: "ms" }, [
+        el("div", { class: "ms__id", text: id }),
+        el("div", {}, [el("p", { class: "ms__desc", text: "In docs/plan.md, but there is no GitHub milestone for it." })]),
+        el("div", { class: "ms__side" }, [el("div", { class: "ms__status" }, [pillFor(plan.status[id]), flag("In the plan but not on GitHub")])])
+      ]));
+    });
     $("now-issues").textContent = closed + " / " + total;
+
+    // The current milestone should be the lowest one the plan doesn't call done.
+    if (plan.loaded) {
+      var expected = Object.keys(plan.status).filter(function (id) { return !isDone(plan.status[id]); })
+        .sort(function (a, b) { return idNum(a) - idNum(b); })[0] || "";
+      if (expected !== plan.currentId) {
+        $("now-milestone").appendChild(document.createTextNode(" "));
+        $("now-milestone").appendChild(flag("The plan names " + (plan.currentId || "nothing") + ", but the lowest milestone not done is " + (expected || "none")));
+      }
+    }
   }
 
   function renderQuestions(issues) {
@@ -129,31 +171,14 @@
       var am = a.milestone ? a.milestone.number : 99, bm = b.milestone ? b.milestone.number : 99;
       return am - bm || a.number - b.number;
     }).forEach(function (i) {
-      var title = i.title.replace(/^Design:\s*/i, "");
       ul.appendChild(el("li", { class: "q" }, [
-        el("a", { href: i.html_url, text: title }),
-        el("span", { class: "q__meta", text: "#" + i.number + " · " + (i.milestone ? i.milestone.title.split(" ")[0] + " " : "later ") + "· " + i.comments + " comments" })
+        el("a", { href: i.html_url, text: i.title.replace(/^Design:\s*/i, "") }),
+        el("span", { class: "q__meta", text: "#" + i.number + " · " + (i.milestone ? i.milestone.title.split(" ")[0] : "later") + " · " + i.comments + " comments" })
       ]));
     });
-  }
-
-  function liveFailed(err) {
-    var msg = "Live data unavailable (" + err.message + "). See ";
-    [["milestone-list", "milestones"], ["question-list", "issues?q=is%3Aopen+label%3Atype%3Adesign"]].forEach(function (pair) {
-      var target = $(pair[0]);
-      target.innerHTML = "";
-      target.appendChild(el("li", { class: "muted" }, [
-        document.createTextNode(msg),
-        el("a", { href: "https://github.com/" + REPO + "/" + pair[1], text: "GitHub" }),
-        document.createTextNode(".")
-      ]));
-    });
-    $("now-issues").textContent = "—";
-    $("now-questions").textContent = "—";
   }
 
   function start() {
-    // GitHub Pages republishes docs/ on every push to main; show which commit that is.
     getJSON(API + "/commits/main").then(function (c) {
       var a = $("build-sha");
       a.textContent = c.sha.slice(0, 7);
@@ -162,13 +187,15 @@
     }).catch(function () {});
 
     var planP = getText("plan.md").then(function (md) {
-      renderDoc(md, "docs/plan.md", $("plan-doc"), "plan-");
       var plan = readPlan(md);
       $("now-milestone").textContent = plan.current || "—";
       $("now-checked").textContent = plan.checked || "—";
+      renderDoc(md, "docs/plan.md", $("plan-doc"), "plan-");
       return plan;
     }).catch(function (err) {
       $("plan-doc").textContent = "Couldn't load docs/plan.md (" + err.message + ").";
+      $("now-milestone").textContent = "—";
+      $("now-checked").textContent = "—";
       return readPlan("");
     });
 
@@ -180,11 +207,17 @@
 
     Promise.all([planP, getJSON(API + "/milestones?state=all&per_page=100")])
       .then(function (r) { renderMilestones(r[1], r[0]); })
-      .catch(liveFailed);
+      .catch(function (err) {
+        fallback("milestone-list", "Live milestones are unavailable (" + err.message + ").", "milestones");
+        $("now-issues").textContent = "—";
+      });
 
     getJSON(API + "/issues?state=open&labels=type:design&per_page=100")
       .then(renderQuestions)
-      .catch(function () {});
+      .catch(function (err) {
+        fallback("question-list", "Live design questions are unavailable (" + err.message + ").", "issues?q=is%3Aopen+label%3Atype%3Adesign");
+        $("now-questions").textContent = "—";
+      });
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);

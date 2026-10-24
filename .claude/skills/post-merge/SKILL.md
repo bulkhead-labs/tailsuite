@@ -12,7 +12,8 @@ This skill finds where they don't, and fixes it.
 ## 1. What merged
 
 - `git fetch origin main && git log --oneline -5 origin/main`
-- `gh pr view <n> --json title,body,closingIssuesReferences,mergedAt`
+- `gh pr view <n> --json title,body,mergedAt`, and the issues it closed:
+  `gh api graphql -f query='query{repository(owner:"bulkhead-labs",name:"tailsuite"){pullRequest(number:<n>){closingIssuesReferences(first:20){nodes{number title state}}}}}'`
 - The issues it closed must be closed. If one was only partly done, reopen
   it, or file the rest as a new issue on the same milestone.
 

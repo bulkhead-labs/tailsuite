@@ -31,8 +31,9 @@ There is no CLA. Contributions are under the project's
 
 ## Development environment
 
-The repo has a Nix flake. `nix develop` gives the toolchain CI uses. Plain
-`go build` will work without Nix once there is code.
+The repo has a Nix flake. `nix develop` gives the toolchain that CI will
+use once it exists (#1). Plain `go build` will work without Nix once there
+is code.
 
 ## Never commit
 

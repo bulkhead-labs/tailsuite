@@ -9,7 +9,15 @@ Please don't open a public issue.
 You'll get an acknowledgement within 3 working days. We'll agree a fix and
 a disclosure date with you, and credit you unless you'd rather not be named.
 
-## In scope
+## In scope today
+
+tailsuite has no code or releases yet. What exists:
+
+- this repository;
+- its docs;
+- the [status page](https://bulkhead-labs.github.io/tailsuite/).
+
+## In scope once there is a release (#2)
 
 - **The tailsuite binary, its releases and its signatures.**
 - **Anything that could make tailsuite:**
@@ -18,8 +26,8 @@ a disclosure date with you, and credit you unless you'd rather not be named.
   - send traffic outside its lab;
   - report a path as blocked when it is open.
 
-## What tailsuite does with credentials
+## What tailsuite will do with credentials (planned)
 
-Read-only credentials are kept in the OS keychain. A write credential is
-held in memory for a single deploy and never stored
+Read-only credentials will be kept in the OS keychain. A write credential
+will be held in memory for a single deploy and never stored
 ([decision 0007](docs/decisions/0007-read-only-by-default.md)).

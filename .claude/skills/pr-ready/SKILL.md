@@ -11,7 +11,9 @@ what each step found.
 
 ## 1. Find the PR and its issue
 
-- `gh pr view --json number,title,body,isDraft,files,headRefName,closingIssuesReferences`
+- `gh pr view <n> --json number,title,body,isDraft,files,headRefName`
+- The issues it closes (works on any `gh` version):
+  `gh api graphql -f query='query{repository(owner:"bulkhead-labs",name:"tailsuite"){pullRequest(number:<n>){closingIssuesReferences(first:20){nodes{number title state}}}}}'`
 - It must be a draft linked to an issue (`Closes #n`). If not, fix the body,
   or stop and ask.
 - Read the issue's "Done when" list. Every item is either done in this PR
@@ -76,11 +78,13 @@ for it.
 
 ## 6. Mark ready
 
-`gh pr ready <n>`. The heavy test tiers start. Report:
+`gh pr ready <n>`. Once CI exists (#1, #13), the heavy test tiers start
+here. Until then there is no run to link: say so in the report rather than
+linking anything. Report:
 
 - the checklist result;
 - the doc changes made;
 - the reviewer's findings and what happened to each;
-- the CI run link.
+- the CI run link, or "no CI yet".
 
 Merging is the maintainer's call. Don't merge unless asked.

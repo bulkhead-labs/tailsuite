@@ -8,7 +8,7 @@ Closes #
 
 ## Definition of done
 
-Tick each, or write N/A with the reason. See [the plan](../blob/main/docs/plan.md#definition-of-done).
+Tick each, or write N/A with the reason. See [the plan](https://github.com/bulkhead-labs/tailsuite/blob/main/docs/plan.md#definition-of-done).
 
 - [ ] **Lab**: runs on **both engines**, or the engine that can't do it reports REFUSED
 - [ ] **Tests**: unit tests; a lab integration test; a user-journey step if users touch it
@@ -16,7 +16,7 @@ Tick each, or write N/A with the reason. See [the plan](../blob/main/docs/plan.m
 - [ ] **OpenTofu**: expressed in the module; the round trip still gives the same results
 - [ ] **Release**: ships in the binary; works when installed from the release artifacts
 - [ ] **Docs**: `docs/plan.md`, `docs/architecture.md` and the README are true after this merge
-- [ ] **Decision**: a record in `docs/decisions/` for any trade-off (and added to its index)
+- [ ] **Decision**: a record in `docs/decisions/` for any trade-off, added to its index
 
 ## Safety (this repo is public)
 

@@ -9,8 +9,9 @@ Status: **accepted** (2026-10-24).
 - **Open design questions are issues**, settled into decision records.
 - **The plan, architecture and decisions live in `docs/`** and are kept true
   after every merge ([process](../process.md)).
-- **The status page** renders those docs and reads milestone progress live
-  from GitHub.
+- **The status page** renders `docs/plan.md` and the decision index, and
+  reads milestone progress and design questions live from GitHub
+  ([0012](0012-status-page-hosting.md)).
 
 ## Why
 

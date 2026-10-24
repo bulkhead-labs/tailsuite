@@ -9,7 +9,9 @@ the design questions.
   (feature, bug, design, chore, spike), one or more `area:` labels, and a
   milestone when it belongs to one.
 - **Milestones** M1–M7 are the plan's milestones ([plan](plan.md)).
-- **Open design questions** are `type:design` issues. A settled question
+- **Open design questions** are `type:design` issues. The design form files
+  them as `needs-triage`; a maintainer adds `type:design`, which puts them
+  on the status page. A settled question
   becomes a decision record in [`decisions/`](decisions/README.md), and the
   issue closes with a link to it.
 - **Research and measurements**, dated, go in [`research/`](research/).
@@ -28,8 +30,8 @@ not what was intended. Three things keep them that way:
 
 The [status page](https://bulkhead-labs.github.io/tailsuite/)
 (`docs/index.html`, served by GitHub Pages from `docs/` on `main`)
-renders these files and reads milestone progress live from GitHub, so
-it can't drift on its own.
+renders `plan.md` and the decision index, and reads milestone progress
+and design questions live from GitHub, so it can't drift on its own.
 
 ## A pull request, start to finish
 

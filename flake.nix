@@ -11,7 +11,7 @@
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
     in
     {
-      # The toolchain CI and contributors share. Plain `go build` must also work without it.
+      # The toolchain for contributors, and for CI once it exists (#1). Plain `go build` must also work without it.
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShell {
           packages = with pkgs; [

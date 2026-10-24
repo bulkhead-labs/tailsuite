@@ -89,8 +89,10 @@ its pull request:
    gives the same results.
 5. **Release:** it ships in the binary and works when installed from the
    release artifacts.
-6. **Docs:** this plan, the README, the architecture, and a decision record
-   for any trade-off are true after the merge.
+6. **Docs:** this plan, the architecture and the README are true after the
+   merge.
+7. **Decision:** a record in [`decisions/`](decisions/README.md) for any
+   trade-off, added to its index.
 
 The [pull request template](../.github/pull_request_template.md) carries
 this list, and the `pr-ready` skill checks it before review

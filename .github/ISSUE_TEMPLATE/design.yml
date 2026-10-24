@@ -1,6 +1,6 @@
 name: Design question
 description: An open question to settle before or while building
-labels: ["type:design"]
+labels: ["needs-triage"]
 body:
   - type: textarea
     id: question
@@ -21,4 +21,4 @@ body:
       label: Options known so far
   - type: markdown
     attributes:
-      value: When this is settled, the answer becomes a record in docs/decisions/ and this issue closes with a link to it.
+      value: A maintainer adds the `type:design` label after triage, which puts the question on the status page. When it is settled, the answer becomes a record in docs/decisions/ and this issue closes with a link to it.

@@ -53,10 +53,10 @@ reaches `main`, the secrets or users without the maintainer.**
      secrets and variables, environments' included, through the REST API
      with a classic `repo` token.** The fine-grained token has no Secrets or
      Variables permission, so it can't.
-   - **So the organization restricts classic tokens** ("Restrict personal
-     access tokens (classic) from accessing your organizations"). The
-     agent reaches `bulkhead-labs` only through fine-grained tokens. Its
-     classic token keeps working for repos outside the organization.
+   - **The agent also keeps a classic `repo` token**, for repos outside the
+     organization. That's the maintainer's choice (2026-10-24), with the
+     risk under "Given up". Restricting classic tokens in the organization
+     closes it, if it's ever worth the cost.
 3. **Secrets live only in environments.** There are no repo-level secrets,
    and no organization secrets or variables are visible to this repo.
 
@@ -207,8 +207,13 @@ and branch workflows need explicit permission.
 - **A rogue release burns its version.** With immutable releases, a
   deleted release's tag name can't be reused, so the next version is
   published instead.
-- **Classic tokens are blocked for the whole organization.** Every agent
-  and tool that touches `bulkhead-labs` needs fine-grained tokens.
+- **The agent's classic token can overwrite or delete environment secrets
+  and variables.**
+  - Jobs with an environment never read `vars`, so this can't become code
+    execution.
+  - It could break the nightly or release runs, or point the nightly at
+    another Tailscale organization. That's detectable and recoverable, not
+    prevented.
 
 ## Sources (checked 2026-10-24)
 

@@ -105,7 +105,7 @@ this list, and the `pr-ready` skill checks it before review
 | Lint and unit | Every push | Go tests, linters, docs link check |
 | Integration | Every push to a ready PR | The lab on headscale |
 | **User journey** | When a PR is marked ready, on every push to a ready PR, on demand for any branch | Installs the binary **from the built artifacts**, the way a user would: `init --template startup` → `up` headless → `test` → `import` from a recorded "prod" → `tofu plan` shows zero changes → a scripted policy change → `test` shows the blast-radius diff → `deploy` to a second headscale → re-import → zero changes → teardown. Plus a Playwright smoke test of the UI. Steps that land in later milestones are stubbed until then |
-| Real Tailscale | Nightly, and on demand | The same journey with "prod" as a throwaway Tailscale tailnet and import over the real API. It re-records the API fixtures the per-PR run uses |
+| Real Tailscale | Nightly, and on demand: on a branch, through `branch-run`, with the maintainer's approval each run | The same journey with "prod" as a throwaway Tailscale tailnet and import over the real API. It re-records the API fixtures the per-PR run uses |
 | Upstream canary | Nightly | Latest headscale and Tailscale client images |
 | Release | On a tag | All tiers, then install from the **published** channels (Homebrew, script, container) on Linux and macOS runners, with signatures verified |
 
@@ -133,9 +133,9 @@ ready starts the heavy tiers. Any branch can run them by hand
 
 | Prerequisite | Blocks |
 |---|---|
-| A GitHub token for the agent that can push workflow files (`workflow` scope), or the maintainer pushes them | CI in #1; #2, #13, #14; #30's CI step |
-| A dedicated Tailscale test organization, and an OAuth client with the `tailnets` scope stored as a GitHub secret | #3, #6, #13's nightly tier |
-| `bulkhead-labs/homebrew-tap`, and a credential goreleaser can push with | #2 |
+| The CI trust model's settings (#39, [0013](decisions/0013-ci-trust-model.md)): the agent's fine-grained token and Maintain role; the `main` ruleset (an approval on every PR); the `nightly`, `release` and `branch-run` environments; the all-tags ruleset; immutable releases; Actions settings | CI in #1; #2, #13, #14; #30's CI step |
+| A dedicated Tailscale test organization, and an OAuth client with the `tailnets` scope, stored in the `nightly` and `branch-run` environments | #3, #6, #13's nightly tier |
+| `bulkhead-labs/homebrew-tap`, and the credentials goreleaser publishes with (the tap, the container registry), stored in the `release` environment | #2 |
 
 **Order:**
 
@@ -146,7 +146,7 @@ ready starts the heavy tiers. Any branch can run them by hand
    - #17, the engine interface and capability matrix.
 2. **Run the #3 spike**, as soon as the test organization exists.
 3. **Build:**
-   - #1, the Go module and the flake: Go first, CI once the token exists;
+   - #1, the Go module and the flake: Go first, CI once #39 is in place;
    - #4, the Docker sandbox;
    - #5, headscale;
    - #7, the node agent;

@@ -1,7 +1,7 @@
 # 0013: Agents write CI; main is trusted; branches need explicit approval for secrets
 
-Status: **accepted** (2026-10-24). The maintainer's settings: **pending**
-([plan](../plan.md#m1-order-and-prerequisites)).
+Status: **accepted** (2026-10-24). The maintainer's settings: **pending** (#39;
+[plan](../plan.md#m1-order-and-prerequisites)).
 
 ## Context
 

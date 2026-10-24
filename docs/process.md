@@ -75,10 +75,12 @@ ships without the maintainer:
   - `nightly` runs from `main`;
   - `release` runs from `v*` tags and needs the maintainer's approval;
   - `branch-run` serves any branch, and the maintainer approves every run,
-    after reading the branch's diff against `main`, workflows first.
+    after reading the run's own commit (`headSha`) against `main`,
+    workflows first.
 - **PR tiers run on headscale**, with no secrets.
-- **A branch workflow can raise its `GITHUB_TOKEN`**, so only the approved
-  release job publishes anything users get.
+- **A branch workflow can raise its `GITHUB_TOKEN`.** A release is trusted
+  because of its tag, immutability and signature, never because of a
+  token's scope.
 - **Every tag is the maintainer's.** Releases are immutable once
   published, and signatures are verified against the exact release-workflow
   identity.

@@ -33,7 +33,9 @@ reaches `main`, the secrets or users without the maintainer.**
      approval of the most recent push.
    - It blocks force pushes and deletion.
    - A PR's author can't approve it, so an agent never approves its own.
-   - The maintainer's own PRs bypass through the Repository admin role.
+   - The maintainer's own PRs bypass through the Repository admin role,
+     but only on branches nobody else has pushed to. A bypass skips the
+     review of other people's commits.
    - **CODEOWNERS names the maintainer for every path (`*`)**, and the
      ruleset requires code-owner review. Any collaborator with write access
      counts toward "1 approval", the agent (Maintain) included. Code-owner
@@ -46,8 +48,15 @@ reaches `main`, the secrets or users without the maintainer.**
      only: Contents, Workflows, Pull requests, Issues, Actions and Pages read
      and write; Metadata read (always included); nothing else.
    - **Its role on the repo is Maintain, not Admin**, so it can't change
-     rulesets, environments, secrets or Actions settings (environments
-     need admin).
+     rulesets, environment protections or Actions settings.
+   - **But any collaborator role (Write, Maintain, Admin) can write Actions
+     secrets and variables, environments' included, through the REST API
+     with a classic `repo` token.** The fine-grained token has no Secrets or
+     Variables permission, so it can't.
+   - **So the organization restricts classic tokens** ("Restrict personal
+     access tokens (classic) from accessing your organizations"). The
+     agent reaches `bulkhead-labs` only through fine-grained tokens. Its
+     classic token keeps working for repos outside the organization.
 3. **Secrets live only in environments.** There are no repo-level secrets,
    and no organization secrets or variables are visible to this repo.
 
@@ -62,11 +71,13 @@ reaches `main`, the secrets or users without the maintainer.**
      unprotected.
    - **PR tiers** (integration and the user journey) run on headscale and
      need no secrets. A real-Tailscale run on a branch goes through
-     `branch-run`. Before approving one, the maintainer reads the branch's
-     diff against `main`, workflows first. "Prevent self-review" stays off,
+     `branch-run`. Before approving one, the maintainer reads the diff of
+     **the run's own commit** against `main`, workflows first
+     (`gh run view <id> --json headSha`). Not the branch's tip: the branch
+     may have moved since the run was queued. "Prevent self-review" stays off,
      so the maintainer can approve a run they dispatched themselves.
-4. **Branch workflows get no secrets, and nothing that reaches users
-   depends on `GITHUB_TOKEN`.**
+4. **Branch workflows get no secrets. A release's integrity rests on the
+   tags, immutability and the signer pin, not on token scopes.**
    - The repo default for `GITHUB_TOKEN` is read-only, but anyone with write
      access can raise it in a workflow file. A branch workflow can therefore
      take any `GITHUB_TOKEN` scope except workflows; it gets no secrets.
@@ -88,7 +99,10 @@ reaches `main`, the secrets or users without the maintainer.**
      `release`'s credentials for the tap and the registry.
    - **The release job fails if a release already exists for its tag.**
    - The release job restores no caches (`cache: false` on setup-go, no
-     `actions/cache`) and downloads artifacts only from its own run.
+     `actions/cache`).
+   - **Only the release job has `id-token: write`.**
+   - **Every job that uses an environment uses only its own run's
+     artifacts**, and no image built on a branch.
 6. **Signatures are trusted by their exact identity, not by a gate.**
    - Keyless cosign issues a certificate to any job with `id-token: write`,
      on any ref, so environments don't gate signing.
@@ -105,7 +119,9 @@ reaches `main`, the secrets or users without the maintainer.**
        (`--certificate-github-workflow-ref`);
      - the trigger, `push` (`--certificate-github-workflow-trigger`).
 
-     They never take the tag from "latest".
+     They never take the tag from "latest". The version comes from the
+     Homebrew formula, the version embedded in the install script, or the
+     README on `main`.
    - **`release.yml` has no `workflow_call` or `workflow_dispatch`.** A
      workflow that calls it would otherwise get signed under its identity
      with the caller's code.
@@ -125,6 +141,8 @@ reaches `main`, the secrets or users without the maintainer.**
      policy also enforces;
    - no `pull_request_target` and no `workflow_run` triggers: they run in
      `main`'s context, with `main`'s environments, on anyone's PR;
+   - **a job that uses an environment never reads `vars`, and no secret is
+     used as configuration.** Configuration lives in reviewed files;
    - **a job that uses an environment runs only on `schedule`,
      `workflow_dispatch` or a tag push.** Other events (`issue_comment`,
      `issues`…) run in `main`'s context too. Such jobs take no
@@ -143,8 +161,8 @@ reaches `main`, the secrets or users without the maintainer.**
 - **Branch workflows:** a branch's workflow gets runner minutes and a
   `GITHUB_TOKEN` that can touch the repo, but no secrets, no signed
   identity that verifiers accept, and no route to users.
-- **Releases:** they need the maintainer's tag and approval, and can't be
-  altered afterwards.
+- **Signed releases:** they need the maintainer's tag and approval, and
+  can't be altered afterwards.
 
 The maintainer's view (2026-10-24): denying agents workflow access entirely
 is wrong; they're needed for CI/CD. Workflows from `main` can run freely,
@@ -185,7 +203,12 @@ and branch workflows need explicit permission.
 
   None of these can carry a signature that verifiers accept, and the
   release job refuses to run over an existing release. The maintainer
-  removes a rogue release by hand.
+  checks for an existing release before approving `release`.
+- **A rogue release burns its version.** With immutable releases, a
+  deleted release's tag name can't be reused, so the next version is
+  published instead.
+- **Classic tokens are blocked for the whole organization.** Every agent
+  and tool that touches `bulkhead-labs` needs fine-grained tokens.
 
 ## Sources (checked 2026-10-24)
 

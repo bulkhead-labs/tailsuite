@@ -43,7 +43,9 @@ Read `CLAUDE.md`, `docs/plan.md` (definition of done, tiers),
    - `release.yml` has no `workflow_call` or `workflow_dispatch`, and fails
      if a release already exists for its tag;
    - secrets only through an environment (`nightly`, `release`,
-     `branch-run`);
+     `branch-run`), and jobs with an environment never read `vars`;
+   - only the release job has `id-token: write`, and jobs with an
+     environment use only their own run's artifacts;
    - only the release job publishes anything users get;
    - the release job restores no caches and downloads artifacts only from
      its own run;

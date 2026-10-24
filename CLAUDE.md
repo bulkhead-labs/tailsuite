@@ -64,8 +64,9 @@ are in [`docs/decisions/`](docs/decisions/README.md).
    - Never create a tag or a release by hand, and never approve another
      PR.
    - Never approve a fork's workflow run.
-   - Never change rulesets, environments or Actions settings. They are the
-     maintainer's.
+   - Never write secrets or variables, and never change rulesets,
+     environments or Actions settings. They are the maintainer's.
+   - Jobs with an environment never read `vars`.
 9. **Pin everything**: Go modules, images by digest, GitHub Actions by commit
    SHA, vendored scripts by exact version with SRI. Pin a release only once
    it is two weeks old, unless a fix that applies to us can't wait (say so

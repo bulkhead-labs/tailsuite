@@ -1,9 +1,9 @@
 # 0013: Agents write CI; nothing merges or ships without the maintainer
 
-Status: **accepted** (2026-10-24). The maintainer's settings: **pending**
-(#39; [plan](../plan.md#m1-order-and-prerequisites)). Amends the context
-of [0012](0012-status-page-hosting.md): once #39 is applied, the agent's
-token can push workflow files.
+Status: **accepted** (2026-10-24). The maintainer's settings: **in place**, verified
+2026-10-24 (#39). The Homebrew tap and the container package come with #2. Amends the context
+of [0012](0012-status-page-hosting.md): the agent's token can now push
+workflow files.
 
 ## Context
 

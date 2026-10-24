@@ -133,9 +133,9 @@ ready starts the heavy tiers. Any branch can run them by hand
 
 | Prerequisite | Blocks |
 |---|---|
-| The CI trust model's settings (#39, [0013](decisions/0013-ci-trust-model.md)): the agent's fine-grained token and Maintain role; the `main` ruleset (an approval on every PR); the `nightly`, `release` and `branch-run` environments; the all-tags ruleset; immutable releases; Actions settings | CI in #1; #2, #13, #14; #30's CI step |
+| **Done (2026-10-24):** the CI trust model's settings (#39, [0013](decisions/0013-ci-trust-model.md)) | CI in #1; #2, #13, #14; #30's CI step |
 | A dedicated Tailscale test organization, and an OAuth client with the `tailnets` scope, stored in the `nightly` and `branch-run` environments | #3, #6, #13's nightly tier |
-| `bulkhead-labs/homebrew-tap`, and the credentials goreleaser publishes with (the tap, the container registry), stored in the `release` environment | #2 |
+| `bulkhead-labs/homebrew-tap` and the container package, created by the maintainer, and the credentials goreleaser publishes with, stored in the `release` environment | #2 |
 
 **Order:**
 
@@ -146,7 +146,7 @@ ready starts the heavy tiers. Any branch can run them by hand
    - #17, the engine interface and capability matrix.
 2. **Run the #3 spike**, as soon as the test organization exists.
 3. **Build:**
-   - #1, the Go module and the flake: Go first, CI once #39 is in place;
+   - #1, the Go module and the flake: Go first, then CI (#39 is in place);
    - #4, the Docker sandbox;
    - #5, headscale;
    - #7, the node agent;

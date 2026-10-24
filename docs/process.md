@@ -63,6 +63,21 @@ the checks.
 Humans can do every step by hand. The skills exist so agents and people
 follow the same checklist.
 
+## CI and secrets
+
+Agents may write workflows. Changes under `.github/` need the maintainer's
+review (CODEOWNERS and the `main` ruleset).
+
+- **Workflows on `main` are trusted.**
+- **A workflow on a branch** runs with a read-only token and no secrets.
+- **Secrets live only in GitHub environments:**
+  - `nightly` and `release` take runs from `main` (and `v*` tags for
+    `release`), and `release` needs the maintainer's approval;
+  - `branch-run` serves any branch, and the maintainer approves every run.
+- **Only the maintainer creates release tags.**
+
+See [decision 0013](decisions/0013-ci-trust-model.md).
+
 ## Decisions
 
 A choice with trade-offs gets a record in

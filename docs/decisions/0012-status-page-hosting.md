@@ -33,7 +33,7 @@ and GitHub Pages can serve a folder on a branch directly.
 - **Design questions reach the page only after triage**: the issue form
   files them as `needs-triage`, and a maintainer adds `type:design`.
 - **A library is pinned only once its release is two weeks old**
-  (CLAUDE.md rule 8).
+  (CLAUDE.md rule 9).
 
 ## Evidence (checked 2026-10-24)
 

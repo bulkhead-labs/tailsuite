@@ -42,7 +42,15 @@ are in [`docs/decisions/`](docs/decisions/README.md).
 
    **After every merge, run the `post-merge` skill.**
 7. **Sign off every commit** (`git commit -s`, DCO).
-8. **Pin everything**: Go modules, images by digest, GitHub Actions by commit
+8. **CI follows [0013](docs/decisions/0013-ci-trust-model.md).**
+   - Workflows from `main` are trusted.
+   - Never add a repo-level secret: every secret goes in an environment.
+     Use `nightly` or `release` from `main`; on a branch, only through
+     `branch-run`, which the maintainer approves each time.
+   - Every workflow declares least-privilege `permissions:`.
+   - Never try to change rulesets, environments or Actions settings. They
+     are the maintainer's.
+9. **Pin everything**: Go modules, images by digest, GitHub Actions by commit
    SHA, vendored scripts by exact version with SRI. Pin a release only once
    it is two weeks old, unless a fix that applies to us can't wait (say so
    in the PR).

@@ -19,3 +19,4 @@ table in the same PR.
 | [0010](0010-public-tracking-in-issues.md) | All work tracked in public GitHub issues | Accepted 2026-10-24 |
 | [0011](0011-name-tailsuite.md) | The name is tailsuite | Accepted 2026-10-24 |
 | [0012](0012-status-page-hosting.md) | The status page: GitHub Pages from `docs/`, no build | Accepted 2026-10-24 |
+| [0013](0013-ci-trust-model.md) | Agents write CI; `main` is trusted; branches need approval for secrets | Accepted 2026-10-24; settings pending |

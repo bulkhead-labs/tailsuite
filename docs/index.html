@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; connect-src 'self' https://api.github.com; style-src 'self'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+  <meta name="description" content="tailsuite's plan, milestones and open design questions, rendered from the repo and read live from GitHub.">
+  <title>tailsuite status</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <script src="assets/theme.js"></script>
+  <link rel="stylesheet" href="assets/fonts/fonts.css">
+  <link rel="stylesheet" href="assets/tokens.css">
+  <link rel="stylesheet" href="assets/style.css">
+  <script defer src="assets/vendor/marked-12.0.2.min.js" integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi"></script>
+  <script defer src="assets/vendor/purify-3.4.16.min.js" integrity="sha384-a7SzOxErzJ3ZpQz0zJ32d67dSitNzPcbfybc/ykU9KJhMgZkwqfSxlhhdJRS+XGL"></script>
+  <script defer src="assets/app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="top">
+    <div class="wrap top__row">
+      <a class="brand" href="https://github.com/bulkhead-labs/tailsuite" aria-label="tailsuite on GitHub">
+        <img src="assets/favicon.svg" alt="" width="28" height="28">
+        <span class="brand__name">tailsuite</span>
+      </a>
+      <nav class="nav" aria-label="Sections">
+        <a href="#milestones">Milestones</a>
+        <a href="#questions">Questions</a>
+        <a href="#plan">Plan</a>
+        <a href="#decisions">Decisions</a>
+      </nav>
+      <div class="theme" role="group" aria-label="Theme">
+        <button type="button" data-theme-set="auto" aria-pressed="true">Auto</button>
+        <button type="button" data-theme-set="light" aria-pressed="false">Light</button>
+        <button type="button" data-theme-set="dark" aria-pressed="false">Dark</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero wrap">
+      <p class="eyebrow">Project status</p>
+      <h1 class="hero__title">Prove what your tailnet allows.</h1>
+      <p class="hero__lede">tailsuite rebuilds a tailnet in a local lab on real Tailscale clients, sends real traffic between them, and deploys the fix through OpenTofu. Open source, Apache-2.0.</p>
+      <div class="now" id="now" aria-live="polite">
+        <div class="now__cell"><span class="label">Current milestone</span><span class="now__value" id="now-milestone">…</span></div>
+        <div class="now__cell"><span class="label">Issues closed</span><span class="now__value" id="now-issues">…</span></div>
+        <div class="now__cell"><span class="label">Open design questions</span><span class="now__value" id="now-questions">…</span></div>
+        <div class="now__cell"><span class="label">Plan last checked</span><span class="now__value" id="now-checked">…</span></div>
+      </div>
+    </section>
+
+    <section id="milestones" class="wrap block">
+      <div class="block__head">
+        <h2>Milestones</h2>
+        <p class="block__note">Issue counts are live from GitHub. The status column is what <code>docs/plan.md</code> says; a <span class="flag flag--inline">check</span> mark means the two disagree.</p>
+      </div>
+      <ol class="milestones" id="milestone-list"><li class="muted">Loading…</li></ol>
+    </section>
+
+    <section id="questions" class="wrap block">
+      <div class="block__head">
+        <h2>Open design questions</h2>
+        <p class="block__note">Each one is a <code>type:design</code> issue, settled into a decision record. Weigh in on GitHub.</p>
+      </div>
+      <ul class="questions" id="question-list"><li class="muted">Loading…</li></ul>
+    </section>
+
+    <section id="plan" class="wrap block">
+      <div class="block__head">
+        <h2>The plan</h2>
+        <p class="block__note">Rendered from <a href="https://github.com/bulkhead-labs/tailsuite/blob/main/docs/plan.md"><code>docs/plan.md</code></a> on main.</p>
+      </div>
+      <article class="doc" id="plan-doc"><p class="muted">Loading…</p></article>
+    </section>
+
+    <section id="decisions" class="wrap block">
+      <div class="block__head">
+        <h2>Decisions</h2>
+        <p class="block__note">Rendered from <a href="https://github.com/bulkhead-labs/tailsuite/blob/main/docs/decisions/README.md"><code>docs/decisions/</code></a> on main.</p>
+      </div>
+      <article class="doc" id="decisions-doc"><p class="muted">Loading…</p></article>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap foot__row">
+      <p>main is at <a id="build-sha" href="https://github.com/bulkhead-labs/tailsuite/commits/main">the latest commit</a><span id="build-time"></span>. The docs in the repo are the source of truth; this page only renders them.</p>
+      <p>Maintained by <a href="https://bulkheadlabs.com">Bulkhead Labs</a>. Not affiliated with or endorsed by Tailscale Inc.</p>
+    </div>
+  </footer>
+</body>
+</html>

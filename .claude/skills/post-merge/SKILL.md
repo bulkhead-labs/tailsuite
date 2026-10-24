@@ -9,6 +9,14 @@ The plan, the architecture, the README, the decisions, the milestones and
 the status page must agree with `main` and with GitHub after every merge.
 This skill finds where they don't, and fixes it.
 
+## 0. Pages first
+
+If Pages was pointed at the PR branch for a preview, the merge just
+deleted that branch. Point it back before anything else:
+
+- `gh api repos/bulkhead-labs/tailsuite/pages --jq .source`
+- `gh api -X PUT repos/bulkhead-labs/tailsuite/pages -f build_type=legacy -f 'source[branch]=main' -f 'source[path]=/docs'`
+
 ## 1. What merged
 
 - `git fetch origin main && git log --oneline -5 origin/main`
@@ -45,9 +53,7 @@ Read each against the code on `main`:
 
 ## 4. The status page
 
-- If Pages was pointed at a PR branch for a preview
-  (`gh api repos/bulkhead-labs/tailsuite/pages --jq .source`), point it back:
-  `gh api -X PUT repos/bulkhead-labs/tailsuite/pages -f build_type=legacy -f 'source[branch]=main' -f 'source[path]=/docs'`.
+- Pages points at `main` (step 0 did that); check the build:
 - `gh api repos/bulkhead-labs/tailsuite/pages/builds/latest --jq '[.status, .commit] | @tsv'`:
   it must be `built` for the merge commit (Pages serves `docs/` from `main`).
 - Fetch https://bulkhead-labs.github.io/tailsuite/. Check that it loads and

@@ -43,7 +43,9 @@ are in [`docs/decisions/`](docs/decisions/README.md).
    **After every merge, run the `post-merge` skill.**
 7. **Sign off every commit** (`git commit -s`, DCO).
 8. **Pin everything**: Go modules, images by digest, GitHub Actions by commit
-   SHA, CDN scripts by exact version.
+   SHA, vendored scripts by exact version with SRI. Pin a release only once
+   it is two weeks old, unless a fix that applies to us can't wait (say so
+   in the PR).
 
 ## Working here
 

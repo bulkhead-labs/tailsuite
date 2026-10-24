@@ -16,7 +16,8 @@ admin-console page:
 - `devices:posture_attributes:read`, `users:read`, `services:read`;
 - `networking_settings:read`, `feature_settings:read`.
 
-The secret is kept in the OS keychain.
+Working assumption until #24 settles it: the secret is kept in the OS
+keychain.
 
 **Apply only on `deploy`,** with a separate write credential (`policy_file`,
 plus `devices:core` or `devices:routes` only when needed). It is held in

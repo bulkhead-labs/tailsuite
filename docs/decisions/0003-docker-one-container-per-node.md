@@ -15,6 +15,12 @@ Status: **accepted** (2026-10-23). Evidence:
 - **headscale in the lab runs with TLS** from a per-run lab CA, and so does
   its DERP server. Its policy is set in database mode from the start, so the
   control server never restarts mid-run.
+- **Addresses are real, never translated.** Tailscale IPs are pinned to the
+  real tailnet's (`POST /device/{id}/ip` on Tailscale; allocation on
+  headscale, #5). LAN ranges behind subnet routers are recreated as they
+  are, inside the lab's networks. A translation layer would test the
+  mapping, not the tailnet. Tailscale IPv6 addresses can't be pinned, so
+  rules that name them are flagged.
 - **Agents are controlled over a separate network**, never over the tailnet.
   Otherwise a deny rule would cut off the test's own control traffic.
 

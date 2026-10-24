@@ -52,8 +52,9 @@ the checks.
    against the code, and posts its findings on the PR.
 4. **Fix the findings, then mark it ready.** The integration and
    user-journey tiers run, and must pass.
-5. **Squash-merge.** The PR title becomes the commit title. The branch is
-   deleted.
+5. **Squash-merge.** The PR title becomes the commit title, and the
+   branch's commit messages its body, so every `Signed-off-by` is kept. The
+   branch is deleted.
 6. **After the merge, run the `post-merge` skill**
    (`.claude/skills/post-merge`). It checks that the status page deployed,
    that the milestone and issue state matches `plan.md`, and that nothing

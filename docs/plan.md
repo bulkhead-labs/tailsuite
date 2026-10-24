@@ -53,11 +53,11 @@ Live progress is on the
 | | Milestone | Status | What ships | How a user starts here |
 |---|---|---|---|---|
 | **M1** | [Walking skeleton](https://github.com/bulkhead-labs/tailsuite/milestone/1) | Not started | 3 nodes (laptop, server, db), a policy, 3 tests (allow, deny, positive control), both engines, the local UI, the OpenTofu module that configures the lab, the round-trip check, the release pipeline, the user-journey suite | `brew install` → `tailsuite init` → `tailsuite up`, about 5 minutes |
-| **M2** | [Tags, grants and the diff](https://github.com/bulkhead-labs/tailsuite/milestone/2) | Not started | Tags, grants and ports; the reachability matrix; the blast-radius diff; test file v1; the GitHub Action; the generated quick-start repo; the first sample configs | Add tailsuite to their repo's CI |
+| **M2** | [Tags, grants and the diff](https://github.com/bulkhead-labs/tailsuite/milestone/2) | Not started | Tags, grants and ports; the reachability matrix; the blast-radius diff; the headline (#33); the baseline pack (#32); test file v1; the GitHub Action; the generated quick-start repo; the first sample configs | Add tailsuite to their repo's CI |
 | **M3** | [SSH, subnets and exit nodes](https://github.com/bulkhead-labs/tailsuite/milestone/3) | Not started | Tailscale SSH (root vs nonroot, check mode); subnet routers with fake LANs; exit nodes with a fake internet; **engine scorecard #1** | The scenarios people get burned by |
 | **M4** | [Users and posture](https://github.com/bulkhead-labs/tailsuite/milestone/4) | Not started | Users and groups; posture (OS mimicked, real client versions); equivalence classes; **engine scorecard #2**. The lab is feature complete | |
-| **M5** | [Import](https://github.com/bulkhead-labs/tailsuite/milestone/5) | Not started | Read-only import of a real tailnet; a library of synthetic sample configs; import to OpenTofu with a zero-change plan as the proof | Connect read-only: their tailnet in 2 minutes, on IaC in 10 |
-| **M6** | [Deploy](https://github.com/bulkhead-labs/tailsuite/milestone/6) | Not started | `tailsuite deploy` with the apply gates; PR mode for GitOps or Terraform-managed tailnets; deploy from the Action | Ship a change safely |
+| **M5** | [Import](https://github.com/bulkhead-labs/tailsuite/milestone/5) | Not started | Read-only import from the Tailscale API or an OpenTofu plan (#36); onboarding with no credentials: a pasted policy or a demo (#35); a library of synthetic sample configs (a wide-open startup, a homelab, a segmented startup, contractors, subnet-heavy); import to OpenTofu with a zero-change plan as the proof | Connect read-only: their tailnet in 2 minutes, on IaC in 10 |
+| **M6** | [Deploy](https://github.com/bulkhead-labs/tailsuite/milestone/6) | Not started | Editing the policy in the UI (#34); `tailsuite deploy` with the apply gates; PR mode for GitOps or Terraform-managed tailnets; deploy from the Action | Ship a change safely |
 | **M7** | [Public launch](https://github.com/bulkhead-labs/tailsuite/milestone/7) | Not started | Docs site, the in-browser paste page, the launch post | Zero install |
 
 Status values: Not started, In progress, Done. A milestone is Done when
@@ -127,6 +127,42 @@ ready starts the heavy tiers. Any branch can run them by hand
 - a flaky test goes on a quarantine list with an issue, never silently
   retried.
 
+## M1: order and prerequisites
+
+**Maintainer prerequisites.** Each one blocks the issues listed.
+
+| Prerequisite | Blocks |
+|---|---|
+| A GitHub token for the agent that can push workflow files (`workflow` scope), or the maintainer pushes them | CI in #1; #2, #13, #14; #30's CI step |
+| A dedicated Tailscale test organization, and an OAuth client with the `tailnets` scope stored as a GitHub secret | #3, #6, #13's nightly tier |
+| `bulkhead-labs/homebrew-tap`, and a credential goreleaser can push with | #2 |
+
+**Order:**
+
+1. **Settle the design questions that shape everything:**
+   - #15, the tailnet model, together with #18 (the project layout, and
+     explicit services in `lab.yaml` for M1);
+   - #16, the test format;
+   - #17, the engine interface and capability matrix.
+2. **Run the #3 spike**, as soon as the test organization exists.
+3. **Build:**
+   - #1, the Go module and the flake: Go first, CI once the token exists;
+   - #4, the Docker sandbox;
+   - #5, headscale;
+   - #7, the node agent;
+   - #8, the test runner;
+   - #12, the CLI;
+   - #19 (settles the UI stack), then #11, the UI;
+   - #9, the OpenTofu module;
+   - #10, the round trip.
+4. **#6**, the Tailscale engine, after #3. M1 needs only the minimal
+   rewrite (one user becomes one tag, and the rewrite is recorded); the
+   hard cases are #21, on M3.
+5. **#2 and #13** (releases and the journey suite), then #14.
+6. **#31** from 2026-10-26.
+
+Issues say "Depends on #n" where an order matters.
+
 ## Open design questions
 
 Each is a [`type:design` issue](https://github.com/bulkhead-labs/tailsuite/issues?q=is%3Aopen+label%3Atype%3Adesign),
@@ -142,12 +178,33 @@ becomes a decision record and the issue closes.
   credentials. A threat model comes first (#27).
 - **Writes to a real tailnet outside `deploy`.**
 
+## Next, after M7: open source
+
+These stay open, and get issues as their milestone is planned:
+
+- **A graph view** of the matrix; **explain a path** ("why can A reach
+  B?", from Tailscale's `/acl/preview` and the probe evidence); **dead,
+  shadowed and redundant rules**.
+- **Agent-written tests** from plain English, reviewed before they're saved.
+- **An MCP server**, with tools: `ingest`, `run_suite`, `explain_path`,
+  `propose_change`, `write_tests`, `diff`.
+- **Segments and templates**: work, home, prod, lab, compiled to tags and
+  grants. Warn before suggesting tags for personal devices, because tags
+  remove user identity and change key expiry and SSH.
+- **A filter-conformance report**: where headscale and Tailscale compile
+  the same policy differently, shown to users and reported upstream.
+- **Engine migration**, proven equivalent in the lab first.
+- **Config hygiene checks** through Tailsnitch, as a plugin.
+- **GitLab CI.**
+- **Other mesh VPNs**: NetBird, ZeroTier.
+
 ## Later
 
-Ideas that are deliberately after M7. Some may become a paid edition:
+Deliberately after M7. Some may become a paid edition:
 
 - **Learn mode**: propose the tightest policy that still carries real
-  traffic, from Tailscale's network flow logs.
+  traffic, from Tailscale's network flow logs (needs the
+  `logs:network:read` scope).
 - **Drift detection**: the live tailnet vs the repo.
 - **Hosted runs**, and more parallelism than 10 throwaway tailnets.
 - **A fleet view inside a company**: client versions, routes, exit-node use
@@ -155,7 +212,5 @@ Ideas that are deliberately after M7. Some may become a paid edition:
 - **Multi-tailnet views** for MSPs.
 - **SOC 2 evidence exports.**
 - **An in-UI chat** that proposes changes from intent; it never applies them.
-- **An MCP server.**
-- **Segments and templates**: work, home, prod, lab.
-- **Engine migration**, proven equivalent in the lab first.
-- **Other mesh VPNs**: NetBird, ZeroTier.
+- **A hosted mode**: a way of deploying the same binary, not a rewrite, and
+  only after a threat model (#27).

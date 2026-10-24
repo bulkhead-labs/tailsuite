@@ -1,0 +1,27 @@
+name: Bug
+description: Something is wrong. A wrong PASS or a wrong deny is always a bug.
+labels: ["type:bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Security issue?** Don't file it here; see SECURITY.md.
+        **Never paste a real tailnet's policy, device names, IPs or keys.** Reduce it to a synthetic example.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: Commands, a synthetic policy, tailsuite and engine versions.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: tailsuite version
+      placeholder: tailsuite version

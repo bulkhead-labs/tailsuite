@@ -1,0 +1,71 @@
+---
+name: post-merge
+description: After a tailsuite pull request merges, check that main, the issues, the milestones, the docs and the status page all agree, and fix any drift in a docs-only PR. Use when asked to "post-merge", "sync the docs", "check the plan is current", after any merge to main, or at the start of a session to confirm the plan is true.
+---
+
+# post-merge
+
+The plan, the architecture, the README, the decisions, the milestones and
+the status page must agree with `main` and with GitHub after every merge.
+This skill finds where they don't, and fixes it.
+
+## 1. What merged
+
+- `git fetch origin main && git log --oneline -5 origin/main`
+- `gh pr view <n> --json title,body,closingIssuesReferences,mergedAt`
+- The issues it closed must be closed. If one was only partly done, reopen
+  it, or file the rest as a new issue on the same milestone.
+
+## 2. Milestones vs the plan
+
+- `gh api repos/bulkhead-labs/tailsuite/milestones?state=all --jq '.[] | [.title, .open_issues, .closed_issues, .state] | @tsv'`
+- **Each milestone's Status in `docs/plan.md`:**
+  - "Not started" if no issue in it is closed and no work is merged;
+  - "In progress" otherwise;
+  - "Done" only when every issue is closed **and** the user-journey suite
+    passed on a release built from it.
+
+  When a milestone is Done, close the GitHub milestone too.
+- **"Current milestone"** at the top of `plan.md` is the lowest one that
+  isn't Done.
+
+## 3. The docs vs main
+
+Read each against the code on `main`:
+
+- **`README.md`**: the status line; are the commands shown real yet, or
+  marked planned?
+- **`docs/architecture.md`**: do the layers, interfaces, commands and the
+  project layout match the code?
+- **`docs/decisions/README.md`**: every record listed; statuses right.
+- **Open design questions**: every settled one has a record, and its issue
+  is closed.
+- **Dates**: bump `plan.md`'s "Last checked" to today.
+
+## 4. The status page
+
+- `gh run list --workflow pages.yml --branch main --limit 1`: it must have
+  succeeded for the merge commit.
+- Fetch https://bulkhead-labs.github.io/tailsuite/. Check that it loads and
+  shows the milestones and the plan.
+
+## 5. Fix the drift
+
+- **Nothing drifted:** say so, with what was checked.
+- **Otherwise:**
+  - open a **docs-only** draft PR named `docs: sync after #<n>` with every
+    fix;
+  - run `pr-ready` on it;
+  - report each drift found and its fix.
+
+Never change behaviour in this PR.
+
+## 6. Report
+
+A short list:
+
+- what merged;
+- issue and milestone state;
+- what was checked;
+- the drift found and fixed, with the docs PR link;
+- the status page's state.

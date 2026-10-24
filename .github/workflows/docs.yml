@@ -1,0 +1,31 @@
+name: Docs
+
+# Lightweight: runs on every push, drafts included (docs/plan.md, test tiers).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  links:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Check links in the docs
+        uses: lycheeverse/lychee-action@7cd0af4c74a61395d455af97419279d86aafaede # v2.0.2
+        with:
+          args: >-
+            --no-progress
+            --include-fragments
+            --exclude '^https://bulkhead-labs\.github\.io/tailsuite'
+            --exclude '/security/advisories/new$'
+            --exclude '^https://github\.com/bulkhead-labs/tailsuite/(issues|milestones?|pulls)'
+            --exclude-path .github
+            '**/*.md'
+          fail: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,25 @@
+name: Feature
+description: A capability users will see
+labels: ["type:feature"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What a user can do afterwards
+      description: One or two sentences, from the user's side.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: A checklist. The definition of done in docs/plan.md applies on top.
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Related issues, decisions, research.

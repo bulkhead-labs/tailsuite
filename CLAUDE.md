@@ -38,18 +38,28 @@ are in [`docs/decisions/`](docs/decisions/README.md).
    - opens as a draft;
    - runs the `pr-ready` skill before it's marked ready (that skill starts
      the `pr-reviewer` agent);
-   - is squash-merged only when the maintainer asks.
+   - is squash-merged only after the maintainer's approving review, and
+     when they ask.
 
    **After every merge, run the `post-merge` skill.**
 7. **Sign off every commit** (`git commit -s`, DCO).
 8. **CI follows [0013](docs/decisions/0013-ci-trust-model.md).**
-   - Workflows from `main` are trusted.
-   - Never add a repo-level secret: every secret goes in an environment.
-     Use `nightly` or `release` from `main`; on a branch, only through
-     `branch-run`, which the maintainer approves each time.
-   - Every workflow declares least-privilege `permissions:`.
-   - Never try to change rulesets, environments or Actions settings. They
-     are the maintainer's.
+   - Every PR needs the maintainer's approving review.
+   - Secrets live only in environments, never at the repo level:
+     - `nightly` from `main`;
+     - `release` from `v*` tags;
+     - `branch-run`, which the maintainer approves each time.
+   - **Workflows:**
+     - every workflow declares least-privilege `permissions:`;
+     - never use `pull_request_target` or `workflow_run`;
+     - never publish anything users get with `GITHUB_TOKEN`; use
+       `release`'s credentials.
+   - **The release job** restores no caches.
+   - **Signatures are verified against the exact `release.yml@refs/tags/v…`
+     identity.**
+   - Never approve a fork's workflow run.
+   - Never change rulesets, environments or Actions settings. They are the
+     maintainer's.
 9. **Pin everything**: Go modules, images by digest, GitHub Actions by commit
    SHA, vendored scripts by exact version with SRI. Pin a release only once
    it is two weeks old, unless a fix that applies to us can't wait (say so

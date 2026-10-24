@@ -1,3 +1,7 @@
-# Changes here need the maintainer's review (decision 0013): workflows,
-# this file, and the templates every contributor sees.
+# Every PR already needs the maintainer's approval (decision 0013). These
+# paths name them explicitly, so they stay theirs even if other
+# collaborators join: CI, the agents' own rules and reviewer, and decisions.
 /.github/ @abdulrabbani00
+/CLAUDE.md @abdulrabbani00
+/.claude/ @abdulrabbani00
+/docs/decisions/ @abdulrabbani00

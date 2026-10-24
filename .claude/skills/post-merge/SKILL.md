@@ -65,7 +65,7 @@ Read each against the code on `main`:
 - **Otherwise:**
   - open a **docs-only** draft PR named `docs: sync after #<n>` with every
     fix;
-  - run `pr-ready` on it;
+  - run `pr-ready` on it. It needs the maintainer's approval like any PR;
   - report each drift found and its fix.
 
 Never change behaviour in this PR.

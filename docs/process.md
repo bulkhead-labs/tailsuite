@@ -52,7 +52,7 @@ the checks.
    against the code, and posts its findings on the PR.
 4. **Fix the findings, then mark it ready.** The integration and
    user-journey tiers run, and must pass.
-5. **Squash-merge.** The PR title becomes the commit title, and the
+5. **The maintainer approves, then it's squash-merged.** The PR title becomes the commit title, and the
    branch's commit messages its body, so every `Signed-off-by` is kept. The
    branch is deleted.
 6. **After the merge, run the `post-merge` skill**
@@ -65,16 +65,22 @@ follow the same checklist.
 
 ## CI and secrets
 
-Agents may write workflows. Changes under `.github/` need the maintainer's
-review (CODEOWNERS and the `main` ruleset).
+Agents may write workflows and code. Nothing merges, reaches a secret or
+ships without the maintainer:
 
-- **Workflows on `main` are trusted.**
-- **A workflow on a branch** runs with a read-only token and no secrets.
+- **Every PR needs the maintainer's approving review.** New pushes dismiss
+  an approval. CODEOWNERS also names them for `.github/`, `CLAUDE.md`,
+  `.claude/` and `docs/decisions/`.
 - **Secrets live only in GitHub environments:**
-  - `nightly` and `release` take runs from `main` (and `v*` tags for
-    `release`), and `release` needs the maintainer's approval;
-  - `branch-run` serves any branch, and the maintainer approves every run.
-- **Only the maintainer creates release tags.**
+  - `nightly` runs from `main`;
+  - `release` runs from `v*` tags and needs the maintainer's approval;
+  - `branch-run` serves any branch, and the maintainer approves every run,
+    after reading the branch's diff against `main`, workflows first.
+- **PR tiers run on headscale**, with no secrets.
+- **A branch workflow can raise its `GITHUB_TOKEN`**, so nothing users get
+  is published with it.
+- **Releases are immutable once published**, tags are the maintainer's,
+  and signatures are verified against the exact release-workflow identity.
 
 See [decision 0013](decisions/0013-ci-trust-model.md).
 
@@ -93,8 +99,8 @@ This repo is public.
 - **No real tailnet data**: no policies, device names, IPs, keys or user
   names from any real tailnet, the maintainers' own included. Sample
   configs are synthetic.
-- **No secrets.** CI credentials live in GitHub secrets for the test
-  organization only.
+- **No secrets.** CI credentials live only in GitHub environments
+  ([0013](decisions/0013-ci-trust-model.md)).
 - **No names of companies or people** whose networks were looked at.
 
 ## Sign-off

@@ -89,4 +89,5 @@ linking anything. Report:
 - the reviewer's findings and what happened to each;
 - the CI run link, or "no CI yet".
 
-Merging is the maintainer's call. Don't merge unless asked.
+Merging needs the maintainer's approving review (decision 0013), and their
+say-so. Don't merge unless asked.

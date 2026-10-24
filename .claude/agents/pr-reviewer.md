@@ -33,9 +33,21 @@ Read `CLAUDE.md`, `docs/plan.md` (definition of done, tiers),
 5. **Public-repo safety.** Real tailnet data (non-synthetic `100.x` or
    `fd7a:` addresses, `tskey-`, `.ts.net` names, emails), secrets, or names
    of companies or people. Commits without `Signed-off-by`.
-6. **Pinning.** New dependencies, images, Actions and CDN scripts pinned
+6. **CI ([0013](../../docs/decisions/0013-ci-trust-model.md)).** For any change
+   under `.github/`, the goreleaser config, or code a workflow on `main`
+   runs, check:
+   - least-privilege `permissions:`;
+   - no `pull_request_target` or `workflow_run`;
+   - secrets only through an environment (`nightly`, `release`,
+     `branch-run`);
+   - nothing users get is published with `GITHUB_TOKEN`;
+   - the release job restores no caches and downloads artifacts only from
+     its own run;
+   - signatures are verified against the exact `release.yml@refs/tags/v…`
+     identity.
+7. **Pinning.** New dependencies, images, Actions and CDN scripts pinned
    (versions, digests, commit SHAs).
-7. **Correctness.** Bugs you can show with a concrete input.
+8. **Correctness.** Bugs you can show with a concrete input.
 
 Use `gh pr view <n> --json ...`, `gh pr diff <n>`, `git log`, and read-only
 commands. Run unit tests only if they need no network or Docker.

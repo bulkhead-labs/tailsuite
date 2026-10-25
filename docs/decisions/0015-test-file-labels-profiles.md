@@ -139,6 +139,9 @@ tests:
 - **A policy test whose identity matches no lab device is UNKNOWN**,
   naming the identity. The user didn't write it for the lab, so it
   doesn't stop the suite from loading.
+- **A policy test aimed at a port where nothing listens is UNKNOWN**, for
+  the same reason, and says which `listen:` entry to add. Once UDP probes
+  exist, that also applies to each protocol half.
 - **Engines never run the policy's tests.** The engines' copies of the
   policy leave them out, because tailsuite runs them itself (0016).
 - **Copying tests into the policy happens only when the user asks.**

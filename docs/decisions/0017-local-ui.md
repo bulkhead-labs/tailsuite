@@ -55,6 +55,10 @@ out, and the UI doesn't use one.
     port and per tab, so a reload keeps working.
   - **Every data, stream and POST request** carries the session secret as
     a header, and the server refuses any without it.
+  - **The trade is the one exception.** It carries the link's secret
+    instead, and still has to pass the Origin check.
+  - **A used link traded again ends the session the first trade made**,
+    and the page asks for a fresh link.
   - **The page's shell and its embedded scripts and styles hold no tailnet
     data**, so they're served without the secret. A navigation can't carry
     a custom header.
@@ -150,8 +154,10 @@ out, and the UI doesn't use one.
 - **A new browser tab needs a fresh link.** `sessionStorage` isn't shared
   between tabs.
 - **A race of a few seconds.** A local user who reads the link before the
-  page loads could trade it first. The real page then can't, and says the
-  link was already used, so the attempt is visible.
+  page loads could trade it first. When the real page then tries, the
+  server ends that user's session, and the page asks for a fresh link. If
+  the real page traded first and the other user came second, the real
+  page's session ends too, which costs only a fresh link.
 - **Until esbuild is wired, only libraries that ship ES modules** can be
   used, and vendoring has to rewrite their imports.
 - **Vendored libraries are updated by hand**, as on the status page.

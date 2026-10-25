@@ -52,15 +52,26 @@ type Lab interface {
   - the control plane is up;
   - the nodes have joined through the sandbox (0003);
   - the configuration is applied;
-  - every node shows the applied policy, in its packet filter, its SSH
-    policy and its list of peers.
+  - every node shows the applied policy, in its packet filter and its list
+    of peers, and from M3 in its SSH policy.
 
   How it waits:
-  - **A marker shows a node has the new policy.** Each apply's patch adds
-    a rule from an address no node holds, on a port unique to that apply,
-    and the same marker as an SSH rule.
-  - **tailsuite waits** until every node's compiled filter and SSH policy
-    hold the marker, and its peer list has every peer the plan expects.
+  - **A marker shows a node has the new policy.**
+    - `Start` adds one rule to each apply: from an address no node holds,
+      on a port unique to that apply.
+    - The patch shown to the user labels it as tailsuite's.
+    - `Lower` stays pure, because the marker isn't part of it.
+  - **A policy with neither `acls` nor `grants` gets its default made
+    explicit first.**
+    - Both engines allow everything for such a policy. With the marker
+      alone, they'd allow only the marker.
+    - So the patch first adds `{"src": ["*"], "dst": ["*"], "ip": ["*"]}`,
+      which is exact, and then the marker.
+  - **tailsuite waits** until every node's compiled filter holds the
+    marker, and its peer list has every peer the plan expects.
+  - **The SSH policy gets its own marker from M3**, when SSH ships. M3
+    settles its shape, because Tailscale's SSH rules can't take an address
+    as their source.
   - **The wait is bounded.** It's the plan's one allowed kind of wait, only
     for policy propagation. At the bound the run stops with exit 3, and no
     probe starts.
@@ -107,26 +118,33 @@ prints it, and the docs page is generated from the same data, so the two
 can't drift.
 
 **A capability is refused until the milestone that builds it ships.** The
-table shows each one's target. In M1, these are built:
+table shows each one's target, and its milestone where that's after M1:
 
-- grants, ACLs, ports, hosts and tags;
-- users and groups, lowered to tags on the Tailscale engine;
-- pinned IPv4 addresses;
-- the compiled filter.
+- **M1, the walking skeleton**, builds what the three-node lab needs:
+  - grants and ACLs on TCP ports between tags, hosts, users and groups,
+    with users lowered to tags on the Tailscale engine;
+  - pinned IPv4 addresses;
+  - the compiled filter.
+- **M2** completes tags, grants and ports: every port and protocol form,
+  and IP sets.
+- **M3** adds SSH, `via`, subnet routes, exit nodes, `autogroup:internet`
+  and session recording.
+- **M4** completes users and groups (`autogroup:member`, `self` and
+  `tagged`, and role autogroups), and adds posture and `attrConfig`.
 
 Here's the table as of headscale 0.29.5 and Tailscale's docs (checked
 2026-10-25):
 
 | Capability | headscale | Tailscale engine |
 |---|---|---|
-| Grants, ACLs, ports, hosts, tags | native | native |
+| Grants, ACLs, ports, hosts, tags | native (M1's basics; in full from M2) | native (M1's basics; in full from M2) |
 | Users and groups | native (matched by email) | lowered: one user becomes one tag (#6). Rules whose meaning depends on the source's login are refused until #21 (rows below) |
-| `autogroup:member`, `autogroup:self` | native | refused in M1; #21 decides |
-| `autogroup:tagged` | native | refused while users are lowered to tags, since every device is then tagged (#21) |
+| `autogroup:member`, `autogroup:self` | native from M4 | refused; #21 (M3) decides |
+| `autogroup:tagged` | native from M4 | refused while users are lowered to tags, since every device is then tagged (#21) |
 | `autogroup:shared`, groups synced from an identity provider | refused | refused |
-| Role autogroups (`autogroup:admin`…) | lowered: as tag owners, to the lab's admin, which can't change who reaches what because tags come from `tofu/`; in rules, to the users with that role in `lab.yaml`, else refused | refused: no human users (Tailscale says users are coming) |
+| Role autogroups (`autogroup:admin`…) | lowered from M4: as tag owners, to the lab's admin, which can't change who reaches what because tags come from `tofu/`; in rules, to the users with that role in `lab.yaml`, else refused | refused: no human users (Tailscale says users are coming) |
 | Posture (`postures`, `srcPosture`, `defaultSrcPosture`) | refused; declined upstream ([headscale#2458](https://github.com/juanfont/headscale/issues/2458)) | native from M4, with `node:os` mimicked |
-| IP sets | lowered: expanded to addresses; refused when a set includes an autogroup or a host | native |
+| IP sets | lowered from M2: expanded to addresses; refused when a set includes an autogroup or a host | native from M2 |
 | `via`, `autogroup:internet`, subnet routes, exit nodes | native from M3 | native from M3 |
 | SSH accept and deny | native from M3 | native from M3 |
 | SSH logins tied to the source's login (`localpart:*@<domain>`) | refused; headscale's support isn't verified | refused: a tagged device has no login (#21) |
@@ -177,8 +195,9 @@ Here's the table as of headscale 0.29.5 and Tailscale's docs (checked
   - a removal that isn't about a rule's source or destination (Funnel in
     `nodeAttrs`, `attrConfig`) refuses every test on the devices it
     targets;
-  - if the removals leave no `grants` or `acls`, the whole run is
-    REFUSED, because both engines would then allow everything;
+  - if the user's policy had `grants` or `acls`, and the removals leave
+    none of them, the whole run is REFUSED, because both engines would then
+    allow everything. The readiness marker doesn't count as one;
   - `defaultSrcPosture` applies to every rule, so a policy that uses it is
     REFUSED on headscale entirely;
   - the rest of the suite still runs.

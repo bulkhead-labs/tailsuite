@@ -10,9 +10,9 @@ Status: **accepted** (2026-10-24). The maintainer's settings: **in place** (2026
   settings.
 - **Still to exercise:** the tag ruleset (#41).
 - **With #2:** the Homebrew tap and the container package.
- Amends the context
-of [0012](0012-status-page-hosting.md): the agent's token can now push
-workflow files.
+
+Amends the context of [0012](0012-status-page-hosting.md): the agent's
+token can now push workflow files.
 
 ## Context
 

@@ -18,6 +18,6 @@ table in the same PR.
 | [0009](0009-os-mimicry.md) | macOS and Windows mimicked; real only for verify runs | Accepted 2026-10-24 |
 | [0010](0010-public-tracking-in-issues.md) | All work tracked in public GitHub issues | Accepted 2026-10-24 |
 | [0011](0011-name-tailsuite.md) | The name is tailsuite | Accepted 2026-10-24 |
-| [0012](0012-status-page-hosting.md) | The status page: GitHub Pages from `docs/`, no build | Accepted 2026-10-24 |
+| [0012](0012-status-page-hosting.md) | The status page: GitHub Pages from `docs/`, no build | Accepted 2026-10-24; context amended by 0013 |
 | [0013](0013-ci-trust-model.md) | Agents write CI; nothing merges or ships without the maintainer | Accepted 2026-10-24; settings in place (#39) |
 | [0014](0014-tailnet-model-and-project-layout.md) | The tailnet model, and which project file owns each fact | Accepted 2026-10-24 |

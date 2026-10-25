@@ -167,8 +167,9 @@ Issues say "Depends on #n" where an order matters.
 ## Open design questions
 
 Each is a [`type:design` issue](https://github.com/bulkhead-labs/tailsuite/issues?q=is%3Aopen+label%3Atype%3Adesign),
-on the milestone where it must be settled. When one is settled, its answer
-becomes a decision record and the issue closes.
+on the milestone where it must be settled, or on none (shown as later) when
+nothing before M7 depends on it. When one is settled, its answer becomes a
+decision record, and the issue closes with a link to it.
 
 ## Not building
 

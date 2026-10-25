@@ -1,6 +1,8 @@
 # 0012: The status page is served by GitHub Pages from docs/, with no build
 
-Status: **accepted** (2026-10-24).
+Status: **accepted** (2026-10-24). Its context is amended by
+[0013](0013-ci-trust-model.md): the agent's token can now push workflow
+files.
 
 ## Context
 

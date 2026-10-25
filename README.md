@@ -36,7 +36,8 @@ tailsuite deploy                    # lab tests → tofu plan → blast-radius d
 - **Every deny has a positive control.** A dead service looks exactly like
   a blocked one, so each deny is paired with proof that the target is alive.
 - **OpenTofu owns the config; tailsuite owns the machines.** The module that
-  configures the lab is the one that configures production.
+  configures the lab is the one that configures production. On headscale,
+  for now, tailsuite applies the module's values itself.
 - **Read-only by default.** Writing to your real tailnet is an explicit,
   gated step.
 - **Local first.** Your policy and your credentials stay on your machine or

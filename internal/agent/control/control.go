@@ -56,6 +56,13 @@ func Start(ctx context.Context, sb sandbox.Sandbox, node sandbox.Node) (*Session
 		stderr: &limitedBuffer{max: 64 << 10},
 		exited: make(chan struct{}),
 	}
+	// If the client stops reading (a bad line, or one too long), nothing
+	// would drain the session's output, and Exec would block writing it.
+	// Closing the pipe makes those writes fail, so Exec returns.
+	go func() {
+		<-s.Done()
+		_ = fromAgent.CloseWithError(agent.ErrClosed)
+	}()
 	go func() {
 		s.code, s.execErr = sb.Exec(ctx, node, sandbox.ExecSpec{
 			Cmd:    []string{AgentPath, "connect"},

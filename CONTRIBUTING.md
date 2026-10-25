@@ -52,7 +52,7 @@ hash `nix build` reports.
 
 Tests that need Docker sit behind the `integration` build tag. They create
 containers and networks named `tailsuite-<run>-…` on internal networks,
-and remove them. The agent's also build it for Linux with your Go:
+and remove them. The agent's tests also build it for Linux with your Go:
 
 ```
 go test -tags integration ./...

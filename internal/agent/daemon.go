@@ -20,7 +20,8 @@ const DefaultSocket = "/run/tailsuite/agent.sock"
 // stopGrace is how long the node's command gets to exit after SIGTERM.
 const stopGrace = 10 * time.Second
 
-// ExitError is the exit status of the node's command.
+// ExitError is the exit status of the node's command: its exit code, or
+// 128 plus the signal that killed it, as shells report it.
 type ExitError struct{ Code int }
 
 func (e *ExitError) Error() string { return fmt.Sprintf("the node's command exited %d", e.Code) }
@@ -28,8 +29,10 @@ func (e *ExitError) Error() string { return fmt.Sprintf("the node's command exit
 // Run is the agent's life in a node. It serves sessions on a Unix socket,
 // and runs the node's own command (such as tailscaled), if there is one,
 // until it exits. It returns when the command exits, with an *ExitError if
-// it failed, or when ctx is cancelled, after stopping the command. The
-// listeners close as it returns.
+// it failed. When ctx is cancelled it stops the command with SIGTERM, and
+// returns how the command ended, so a node stopped mid-run doesn't read as
+// a clean exit. The listeners close as it returns. It refuses to start
+// where another agent already serves.
 func Run(ctx context.Context, a *Agent, socket string, command []string, stderr io.Writer) error {
 	defer a.Close()
 	ln, err := listenUnix(socket)
@@ -44,7 +47,8 @@ func Run(ctx context.Context, a *Agent, socket string, command []string, stderr 
 	}()
 	sessionCtx, endSessions := context.WithCancel(ctx)
 	defer endSessions()
-	go func() {
+	// The accept loop is counted too, so no session can start after Wait.
+	sessions.Go(func() {
 		for {
 			conn, err := ln.Accept()
 			if err != nil {
@@ -57,7 +61,7 @@ func Run(ctx context.Context, a *Agent, socket string, command []string, stderr 
 				_ = a.Serve(sessionCtx, conn, conn)
 			})
 		}
-	}()
+	})
 
 	if len(command) == 0 {
 		<-ctx.Done()
@@ -66,14 +70,32 @@ func Run(ctx context.Context, a *Agent, socket string, command []string, stderr 
 	return supervise(ctx, command, stderr)
 }
 
-// listenUnix listens on socket, replacing a stale one, in a directory only
-// its owner can enter.
+// listenUnix listens on socket, in a directory only its owner can enter.
+// It replaces a stale socket, but refuses one a live agent still serves:
+// taking it would orphan that agent's listeners.
 func listenUnix(socket string) (net.Listener, error) {
-	if err := os.MkdirAll(filepath.Dir(socket), 0o700); err != nil {
+	dir := filepath.Dir(socket)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, fmt.Errorf("agent socket: %w", err)
 	}
-	if err := os.Remove(socket); err != nil && !errors.Is(err, os.ErrNotExist) {
+	if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // G302: a directory, which needs its execute bit
 		return nil, fmt.Errorf("agent socket: %w", err)
+	}
+	var d net.Dialer
+	dctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	conn, err := d.DialContext(dctx, "unix", socket)
+	cancel()
+	switch {
+	case err == nil:
+		_ = conn.Close()
+		return nil, fmt.Errorf("agent socket %s: another agent is serving on it", socket)
+	case errors.Is(err, os.ErrNotExist):
+	case errors.Is(err, syscall.ECONNREFUSED):
+		if err := os.Remove(socket); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("agent socket: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("agent socket %s: %w", socket, err)
 	}
 	var lc net.ListenConfig
 	ln, err := lc.Listen(context.Background(), "unix", socket)
@@ -105,12 +127,12 @@ func supervise(ctx context.Context, command []string, stderr io.Writer) error {
 	}
 	_ = cmd.Process.Signal(syscall.SIGTERM)
 	select {
-	case <-done:
+	case err := <-done:
+		return exitError(err)
 	case <-time.After(stopGrace):
 		_ = cmd.Process.Kill()
-		<-done
+		return exitError(<-done)
 	}
-	return nil
 }
 
 func exitError(err error) error {
@@ -119,6 +141,9 @@ func exitError(err error) error {
 	}
 	var exit *exec.ExitError
 	if errors.As(err, &exit) {
+		if ws, ok := exit.Sys().(syscall.WaitStatus); ok && ws.Signaled() {
+			return &ExitError{Code: 128 + int(ws.Signal())}
+		}
 		return &ExitError{Code: exit.ExitCode()}
 	}
 	return fmt.Errorf("the node's command: %w", err)

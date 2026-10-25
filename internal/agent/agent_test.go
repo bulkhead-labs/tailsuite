@@ -2,11 +2,13 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -102,7 +104,7 @@ func TestListenersAndProbes(t *testing.T) {
 	ctx := context.Background()
 	c := session(t, newAgent(t, "server"))
 	tcp, web := local(ProtoTCP, freePort(t)), local(ProtoHTTP, freePort(t))
-	open, err := c.SetListeners(ctx, []Listener{tcp, web})
+	open, _, err := c.SetListeners(ctx, []Listener{tcp, web})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +135,7 @@ func TestListenersOutliveSessions(t *testing.T) {
 	a := newAgent(t, "server")
 	first := session(t, a)
 	want := local(ProtoTCP, freePort(t))
-	if _, err := first.SetListeners(ctx, []Listener{want}); err != nil {
+	if _, _, err := first.SetListeners(ctx, []Listener{want}); err != nil {
 		t.Fatal(err)
 	}
 	if err := first.Close(); err != nil {
@@ -142,7 +144,7 @@ func TestListenersOutliveSessions(t *testing.T) {
 	<-first.Done()
 
 	second := session(t, a)
-	open, err := second.Listeners(ctx)
+	open, _, err := second.Listeners(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,11 +162,11 @@ func TestSetListenersReconciles(t *testing.T) {
 	ctx := context.Background()
 	c := session(t, newAgent(t, "server"))
 	p1, p2, p3 := freePort(t), freePort(t), freePort(t)
-	if _, err := c.SetListeners(ctx, []Listener{local(ProtoTCP, p1), local(ProtoTCP, p2)}); err != nil {
+	if _, _, err := c.SetListeners(ctx, []Listener{local(ProtoTCP, p1), local(ProtoTCP, p2)}); err != nil {
 		t.Fatal(err)
 	}
 	// p2 changes protocol; p1 goes; p3 arrives.
-	open, err := c.SetListeners(ctx, []Listener{local(ProtoHTTP, p2), local(ProtoTCP, p3)})
+	open, _, err := c.SetListeners(ctx, []Listener{local(ProtoHTTP, p2), local(ProtoTCP, p3)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +186,7 @@ func TestSetListenersReconciles(t *testing.T) {
 			t.Errorf("%s/%d: %+v, want %s", ch.probe.Proto, ch.probe.Port, res, ch.want)
 		}
 	}
-	if open, err := c.SetListeners(ctx, nil); err != nil || len(open) != 0 {
+	if open, _, err := c.SetListeners(ctx, nil); err != nil || len(open) != 0 {
 		t.Errorf("setting none: %+v, %v", open, err)
 	}
 	if res, _ := c.Probe(ctx, probeLocal(ProtoTCP, p3)); res.Outcome != Refused {
@@ -213,7 +215,7 @@ func TestSetListenersIsIdempotentAcrossSessions(t *testing.T) {
 	for range 8 {
 		c := session(t, a)
 		wg.Go(func() {
-			_, err := c.SetListeners(ctx, want)
+			_, _, err := c.SetListeners(ctx, want)
 			errs <- err
 		})
 	}
@@ -224,7 +226,7 @@ func TestSetListenersIsIdempotentAcrossSessions(t *testing.T) {
 			t.Error(err)
 		}
 	}
-	if got := a.Listeners(); !sameSet(got, want) {
+	if got, _ := a.Listeners(); !sameSet(got, want) {
 		t.Errorf("listeners = %+v, want %+v", got, want)
 	}
 }
@@ -238,7 +240,7 @@ func TestSetListenersErrors(t *testing.T) {
 		"port too big":     {{Proto: ProtoTCP, Port: 70000}},
 		"wanted twice":     {local(ProtoTCP, 4000), local(ProtoTCP, 4000)},
 	} {
-		if _, err := c.SetListeners(ctx, want); err == nil {
+		if _, _, err := c.SetListeners(ctx, want); err == nil {
 			t.Errorf("%s: accepted", name)
 		}
 	}
@@ -251,7 +253,7 @@ func TestSetListenersErrors(t *testing.T) {
 	}
 	defer func() { _ = busy.Close() }()
 	ok := local(ProtoTCP, freePort(t))
-	open, err := c.SetListeners(ctx, []Listener{ok, local(ProtoTCP, port(t, busy.Addr().String()))})
+	open, _, err := c.SetListeners(ctx, []Listener{ok, local(ProtoTCP, port(t, busy.Addr().String()))})
 	if err == nil || !strings.Contains(err.Error(), busy.Addr().String()) {
 		t.Errorf("a busy port: err = %v", err)
 	}
@@ -366,7 +368,7 @@ func TestConcurrentRequests(t *testing.T) {
 	ctx := context.Background()
 	c := session(t, newAgent(t, "server"))
 	web := local(ProtoHTTP, freePort(t))
-	if _, err := c.SetListeners(ctx, []Listener{web}); err != nil {
+	if _, _, err := c.SetListeners(ctx, []Listener{web}); err != nil {
 		t.Fatal(err)
 	}
 	var wg sync.WaitGroup
@@ -414,9 +416,8 @@ func TestBadRequests(t *testing.T) {
 	if _, err := c.call(ctx, Request{Op: "reboot"}); err == nil || !strings.Contains(err.Error(), "unknown op") {
 		t.Errorf("unknown op: %v", err)
 	}
-	res, err := c.Probe(ctx, ProbeSpec{Proto: "gopher", Host: "127.0.0.1", Port: 70})
-	if err != nil || res.Outcome != Error {
-		t.Errorf("unknown probe protocol = %+v, %v; want an error outcome", res, err)
+	if res, err := c.Probe(ctx, ProbeSpec{Proto: "gopher", Host: "127.0.0.1", Port: 70}); err == nil {
+		t.Errorf("unknown probe protocol = %+v, want a request error", res)
 	}
 	if _, err := c.Hello(ctx); err != nil {
 		t.Errorf("the session didn't survive bad requests: %v", err)
@@ -461,7 +462,7 @@ func TestRunServesSessionsUntilStopped(t *testing.T) {
 		t.Fatalf("hello = %+v, %v", h, err)
 	}
 	web := local(ProtoTCP, freePort(t))
-	if _, err := c.SetListeners(ctx, []Listener{web}); err != nil {
+	if _, _, err := c.SetListeners(ctx, []Listener{web}); err != nil {
 		t.Fatal(err)
 	}
 	if err := c.Close(); err != nil {
@@ -496,6 +497,13 @@ func TestRunSupervisesTheNodesCommand(t *testing.T) {
 			t.Errorf("Run = %v, want exit 3", err)
 		}
 	})
+	t.Run("killed by a signal", func(t *testing.T) {
+		err := Run(context.Background(), New("n"), socketPath(t), []string{"sh", "-c", "kill -9 $$"}, io.Discard)
+		var exit *ExitError
+		if !errors.As(err, &exit) || exit.Code != 137 {
+			t.Errorf("Run = %v, want exit 137 (128+SIGKILL)", err)
+		}
+	})
 	t.Run("stopped with the agent", func(t *testing.T) {
 		ctx, stop := context.WithCancel(context.Background())
 		ran := make(chan error, 1)
@@ -504,8 +512,10 @@ func TestRunSupervisesTheNodesCommand(t *testing.T) {
 		stop()
 		select {
 		case err := <-ran:
-			if err != nil {
-				t.Errorf("Run = %v, want nil", err)
+			// sleep dies of the SIGTERM; a stopped node never reads as clean.
+			var exit *ExitError
+			if !errors.As(err, &exit) || exit.Code != 143 {
+				t.Errorf("Run = %v, want exit 143 (128+SIGTERM)", err)
 			}
 		case <-time.After(stopGrace / 2):
 			t.Fatal("the command didn't stop on SIGTERM")
@@ -569,5 +579,212 @@ func TestDurationJSON(t *testing.T) {
 	}
 	if err := back.UnmarshalJSON([]byte(`"soon"`)); err == nil {
 		t.Error("a bad duration was accepted")
+	}
+}
+
+// A malformed probe spec is the host's mistake: refused as a request
+// error, never reported as something the lab saw. The first two are the
+// review's reproductions: before, they reached another port and another
+// host, and reported success.
+func TestBadProbeSpecs(t *testing.T) {
+	ctx := context.Background()
+	c := session(t, newAgent(t, "server"))
+	web := local(ProtoHTTP, freePort(t))
+	if _, _, err := c.SetListeners(ctx, []Listener{web}); err != nil {
+		t.Fatal(err)
+	}
+	p := strconv.Itoa(web.Port)
+	bad := map[string]ProbeSpec{
+		"a path that changes the port": {Proto: ProtoHTTP, Host: "127.0.0.1", Port: web.Port / 10, Path: p[len(p)-1:] + "/"},
+		"a path that changes the host": {Proto: ProtoHTTP, Host: "192.0.2.1", Port: 80, Path: "@127.0.0.1:" + p + "/"},
+		"port 0":                       {Proto: ProtoTCP, Host: "127.0.0.1", Port: 0},
+		"port 65536":                   {Proto: ProtoTCP, Host: "127.0.0.1", Port: 65536},
+		"no host":                      {Proto: ProtoTCP, Host: "", Port: web.Port},
+		"a name, not an address":       {Proto: ProtoTCP, Host: "localhost", Port: web.Port},
+		"an address with a zone":       {Proto: ProtoTCP, Host: "fe80::1%eth0", Port: web.Port},
+		"a negative timeout":           {Proto: ProtoTCP, Host: "127.0.0.1", Port: web.Port, Timeout: Duration(-time.Second)},
+		"an unknown protocol":          {Proto: "gopher", Host: "127.0.0.1", Port: 70},
+	}
+	for name, spec := range bad {
+		if res, err := c.Probe(ctx, spec); err == nil {
+			t.Errorf("%s: probe ran: %+v", name, res)
+		}
+		if res := Probe(ctx, spec); res.Outcome != Error || !strings.Contains(res.Detail, "bad probe spec") {
+			t.Errorf("%s: Probe = %+v, want an Error outcome naming the spec", name, res)
+		}
+	}
+	// A path that only looks like an address stays a path.
+	res, err := c.Probe(ctx, ProbeSpec{Proto: ProtoHTTP, Host: "127.0.0.1", Port: freePort(t), Path: "/@127.0.0.1:" + p + "/"})
+	if err != nil || res.Outcome != Refused {
+		t.Errorf("a closed port with an address in its path = %+v, %v; want refused", res, err)
+	}
+}
+
+func TestClassifyDNSTimeoutIsNotATimeout(t *testing.T) {
+	err := &net.OpError{Op: "dial", Net: "tcp", Err: &net.DNSError{Err: "i/o timeout", Name: "db.example", IsTimeout: true}}
+	if got := classify(err); got != Error {
+		t.Errorf("a lookup that timed out = %s, want error: only an unanswered connection is a timeout", got)
+	}
+}
+
+// Changing a port's protocol straight after opening it reopens the port
+// at once. Before the fix this failed in about 4 of 5 rounds.
+func TestProtocolChangeRightAfterOpening(t *testing.T) {
+	ctx := context.Background()
+	c := session(t, newAgent(t, "server"))
+	port := freePort(t)
+	for i := range 300 {
+		for _, proto := range []string{ProtoHTTP, ProtoTCP} {
+			if _, _, err := c.SetListeners(ctx, []Listener{local(proto, port)}); err != nil {
+				t.Fatalf("round %d, %s: %v", i, proto, err)
+			}
+		}
+	}
+}
+
+func TestGeneration(t *testing.T) {
+	ctx := context.Background()
+	c := session(t, newAgent(t, "server"))
+	want := []Listener{local(ProtoTCP, freePort(t))}
+	_, g1, err := c.SetListeners(ctx, want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, g2, _ := c.SetListeners(ctx, want); g2 != g1 {
+		t.Errorf("declaring the same set moved the generation: %d to %d", g1, g2)
+	}
+	if _, g3, _ := c.Listeners(ctx); g3 != g1 {
+		t.Errorf("listing moved the generation: %d to %d", g1, g3)
+	}
+	if _, g4, _ := c.SetListeners(ctx, nil); g4 == g1 {
+		t.Errorf("closing a listener didn't move the generation (%d)", g1)
+	}
+}
+
+// A request with a bad field gets its error under its own ID, so its
+// caller isn't left waiting.
+func TestBadFieldKeepsItsID(t *testing.T) {
+	a := newAgent(t, "n")
+	toAgent, fromClient := io.Pipe()
+	fromAgent, toClient := io.Pipe()
+	go func() { _ = a.Serve(context.Background(), toAgent, toClient) }()
+	defer func() { _ = fromClient.Close() }()
+	if _, err := io.WriteString(fromClient, `{"id":7,"op":"probe","probe":{"proto":"tcp","host":"127.0.0.1","port":1,"timeout":"soon"}}`+"\n"); err != nil {
+		t.Fatal(err)
+	}
+	var resp Response
+	if err := json.NewDecoder(fromAgent).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.ID != 7 || !strings.Contains(resp.Error, "bad request") {
+		t.Errorf("response = %+v, want id 7 with a bad-request error", resp)
+	}
+}
+
+// A second agent on the same socket would orphan the first one's
+// listeners, so it's refused.
+func TestRunRefusesALiveSocket(t *testing.T) {
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	socket := socketPath(t)
+	go func() { _ = Run(ctx, New("first"), socket, nil, io.Discard) }()
+	c, _ := connect(t, socket, 5*time.Second)
+	if _, err := c.Hello(ctx); err != nil {
+		t.Fatal(err)
+	}
+	second := make(chan error, 1)
+	sctx, sstop := context.WithCancel(ctx)
+	defer sstop()
+	go func() { second <- Run(sctx, New("second"), socket, nil, io.Discard) }()
+	select {
+	case err := <-second:
+		if err == nil || !strings.Contains(err.Error(), "another agent") {
+			t.Errorf("a second agent on a live socket: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		sstop()
+		t.Fatal("a second agent started on a live socket")
+	}
+	if h, err := c.Hello(ctx); err != nil || h.Node != "first" {
+		t.Errorf("the first agent after the attempt: %+v, %v", h, err)
+	}
+}
+
+func TestSocketDirectoryIsPrivate(t *testing.T) {
+	ctx, stop := context.WithCancel(context.Background())
+	socket := socketPath(t)
+	if err := os.MkdirAll(filepath.Dir(socket), 0o755); err != nil { //nolint:gosec // G301: too open on purpose; the agent must tighten it
+		t.Fatal(err)
+	}
+	ran := make(chan error, 1)
+	go func() { ran <- Run(ctx, New("n"), socket, nil, io.Discard) }()
+	c, _ := connect(t, socket, 5*time.Second)
+	if _, err := c.Hello(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []struct {
+		path string
+		want os.FileMode
+	}{{filepath.Dir(socket), 0o700}, {socket, 0o600}} {
+		fi, err := os.Stat(p.path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := fi.Mode().Perm(); got != p.want {
+			t.Errorf("%s: mode %o, want %o", p.path, got, p.want)
+		}
+	}
+	stop()
+	<-ran
+}
+
+// The SIGTERM path end to end: the agent runs as its own process, as in a
+// node, and gets a real SIGTERM, as docker-init passes on. Its command dies
+// of it, and the agent exits 128+15.
+func TestMainStopsOnSIGTERM(t *testing.T) {
+	if os.Getenv("TAILSUITE_AGENT_CHILD") != "" {
+		var args []string
+		if err := json.Unmarshal([]byte(os.Getenv("TAILSUITE_AGENT_CHILD")), &args); err != nil {
+			os.Exit(99)
+		}
+		os.Exit(Main(args, os.Stdin, os.Stdout, os.Stderr))
+	}
+	dir := t.TempDir()
+	pidFile := filepath.Join(dir, "pid")
+	socket := socketPath(t)
+	args := []string{"run", "--node", "n", "--socket", socket, "--", "sh", "-c", "echo $$ > " + pidFile + "; exec sleep 60"}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestMainStopsOnSIGTERM$") //nolint:gosec // G204: it runs this test binary itself
+	encoded, err := json.Marshal(args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd.Env = append(os.Environ(), "TAILSUITE_AGENT_CHILD="+string(encoded))
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	var pid int
+	deadline := time.Now().Add(10 * time.Second)
+	for pid == 0 && time.Now().Before(deadline) {
+		if b, err := os.ReadFile(pidFile); err == nil { //nolint:gosec // G304: the test's own file
+			pid, _ = strconv.Atoi(strings.TrimSpace(string(b)))
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if pid == 0 {
+		_ = cmd.Process.Kill()
+		t.Fatal("the command never started")
+	}
+	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+	err = cmd.Wait()
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) || exit.ExitCode() != 143 {
+		t.Errorf("the agent exited with %v, want 143", err)
+	}
+	if err := syscall.Kill(pid, 0); !errors.Is(err, syscall.ESRCH) {
+		t.Errorf("the command (pid %d) outlived the agent: %v", pid, err)
 	}
 }

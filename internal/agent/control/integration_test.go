@@ -127,7 +127,7 @@ func TestProbesBetweenNodes(t *testing.T) {
 	serverNode := l.node(t, "server")
 	b := l.session(t, serverNode)
 
-	if _, err := b.SetListeners(ctx, []agent.Listener{
+	if _, _, err := b.SetListeners(ctx, []agent.Listener{
 		{Proto: agent.ProtoTCP, Port: 5432},
 		{Proto: agent.ProtoHTTP, Port: 80},
 		{Proto: agent.ProtoTCP, Port: 8081},
@@ -184,7 +184,7 @@ func TestListenersOutliveSessions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := up.SetListeners(ctx, want); err != nil {
+	if _, _, err := up.SetListeners(ctx, want); err != nil {
 		t.Fatal(err)
 	}
 	if err := up.Close(); err != nil {
@@ -198,16 +198,16 @@ func TestListenersOutliveSessions(t *testing.T) {
 	// Two sessions at once declare the same set; nothing changes.
 	first, second := l.session(t, server), l.session(t, server)
 	for _, s := range []*Session{first, second} {
-		open, err := s.SetListeners(ctx, want)
+		open, _, err := s.SetListeners(ctx, want)
 		if err != nil || len(open) != 1 {
 			t.Fatalf("declaring again: %+v, %v", open, err)
 		}
 	}
 	// Declaring none closes it, for everyone.
-	if _, err := second.SetListeners(ctx, nil); err != nil {
+	if _, _, err := second.SetListeners(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
-	if open, err := first.Listeners(ctx); err != nil || len(open) != 0 {
+	if open, _, err := first.Listeners(ctx); err != nil || len(open) != 0 {
 		t.Errorf("the other session sees %+v, %v", open, err)
 	}
 	if res, err := laptop.Probe(ctx, probe); err != nil || res.Outcome != agent.Refused {

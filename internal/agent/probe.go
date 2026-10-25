@@ -8,6 +8,8 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,9 +29,40 @@ const nodeHeader = "X-Tailsuite-Node"
 // is still a success.
 const bannerWait = 500 * time.Millisecond
 
+// CheckProbeSpec checks a probe spec. A malformed spec is the host's
+// mistake, not something the lab saw, so the agent refuses it as an error
+// and never reports it as an outcome.
+func CheckProbeSpec(spec ProbeSpec) error {
+	switch spec.Proto {
+	case ProtoTCP, ProtoHTTP:
+	default:
+		return fmt.Errorf("probe: unknown protocol %q", spec.Proto)
+	}
+	// An IP literal: a name would add a lookup, and a resolver that doesn't
+	// answer would look like a drop.
+	addr, err := netip.ParseAddr(spec.Host)
+	if err != nil || addr.Zone() != "" {
+		return fmt.Errorf("probe: host %q isn't an IP address", spec.Host)
+	}
+	if spec.Port < 1 || spec.Port > 65535 {
+		return fmt.Errorf("probe: port %d out of range", spec.Port)
+	}
+	if spec.Path != "" && !strings.HasPrefix(spec.Path, "/") {
+		return fmt.Errorf("probe: path %q doesn't start with /", spec.Path)
+	}
+	if spec.Timeout < 0 {
+		return errors.New("probe: negative timeout")
+	}
+	return nil
+}
+
 // Probe runs one probe and reports what it saw. It never returns an
-// error: everything that can go wrong is an outcome.
+// error: everything the lab can do is an outcome, and a spec that fails
+// CheckProbeSpec is an Error outcome that runs nothing.
 func Probe(ctx context.Context, spec ProbeSpec) ProbeResult {
+	if err := CheckProbeSpec(spec); err != nil {
+		return ProbeResult{Outcome: Error, Detail: "bad probe spec: " + err.Error()}
+	}
 	timeout := time.Duration(spec.Timeout)
 	if timeout <= 0 {
 		timeout = DefaultProbeTimeout
@@ -39,13 +72,10 @@ func Probe(ctx context.Context, spec ProbeSpec) ProbeResult {
 
 	start := time.Now()
 	var res ProbeResult
-	switch spec.Proto {
-	case ProtoTCP:
-		res = probeTCP(ctx, spec)
-	case ProtoHTTP:
+	if spec.Proto == ProtoHTTP {
 		res = probeHTTP(ctx, spec)
-	default:
-		res = ProbeResult{Outcome: Error, Detail: fmt.Sprintf("unknown protocol %q", spec.Proto)}
+	} else {
+		res = probeTCP(ctx, spec)
 	}
 	res.Total = Duration(time.Since(start))
 	return res
@@ -118,9 +148,14 @@ func probeHTTP(ctx context.Context, spec ProbeSpec) ProbeResult {
 		// A redirect is an answer; following it would probe somewhere else.
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+target(spec)+path, nil)
+	// Built from parts, so nothing in the path can change the host or port.
+	u := &url.URL{Scheme: "http", Host: target(spec), Path: path}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return ProbeResult{Outcome: Error, Detail: err.Error()}
+	}
+	if req.URL.Host != target(spec) || req.URL.User != nil {
+		return ProbeResult{Outcome: Error, Detail: fmt.Sprintf("probe: the request would go to %q, not %q", req.URL.Host, target(spec))}
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -143,12 +178,17 @@ func failed(err error) ProbeResult {
 	return ProbeResult{Outcome: classify(err), Detail: err.Error()}
 }
 
-// classify tells a refusal from a timeout from anything else.
+// classify tells a refusal from a timeout from anything else. A failed
+// lookup is never a timeout, even one that timed out: only a connection
+// that got no answer is.
 func classify(err error) Outcome {
 	var netErr net.Error
+	var dnsErr *net.DNSError
 	switch {
 	case err == nil:
 		return Success
+	case errors.As(err, &dnsErr):
+		return Error
 	case errors.Is(err, syscall.ECONNREFUSED):
 		return Refused
 	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &netErr) && netErr.Timeout():

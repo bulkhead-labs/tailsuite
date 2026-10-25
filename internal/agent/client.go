@@ -128,17 +128,17 @@ func (c *Client) Hello(ctx context.Context) (Hello, error) {
 }
 
 // SetListeners makes the node's listeners exactly want, and returns those
-// open afterwards. An empty want closes them all. On error, the result
-// still says what's open.
-func (c *Client) SetListeners(ctx context.Context, want []Listener) ([]Listener, error) {
+// open afterwards, with their generation. An empty want closes them all.
+// On error, the result still says what's open.
+func (c *Client) SetListeners(ctx context.Context, want []Listener) ([]Listener, uint64, error) {
 	resp, err := c.call(ctx, Request{Op: OpSetListeners, Want: want})
-	return resp.Listeners, err
+	return resp.Listeners, resp.Generation, err
 }
 
-// Listeners returns the node's open listeners.
-func (c *Client) Listeners(ctx context.Context) ([]Listener, error) {
+// Listeners returns the node's open listeners, and their generation.
+func (c *Client) Listeners(ctx context.Context) ([]Listener, uint64, error) {
 	resp, err := c.call(ctx, Request{Op: OpListeners})
-	return resp.Listeners, err
+	return resp.Listeners, resp.Generation, err
 }
 
 // Probe runs a probe from the agent's node. A non-nil error means the probe

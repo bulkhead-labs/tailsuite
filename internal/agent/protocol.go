@@ -41,11 +41,16 @@ type Request struct {
 
 // Response answers one request: either Error, or the result for its op.
 type Response struct {
-	ID        uint64       `json:"id"`
-	Error     string       `json:"error,omitempty"`
-	Hello     *Hello       `json:"hello,omitempty"`
-	Listeners []Listener   `json:"listeners,omitempty"` // set_listeners, listeners
-	Probe     *ProbeResult `json:"probe,omitempty"`
+	ID        uint64     `json:"id"`
+	Error     string     `json:"error,omitempty"`
+	Hello     *Hello     `json:"hello,omitempty"`
+	Listeners []Listener `json:"listeners,omitempty"` // set_listeners, listeners
+	// Generation counts the changes to the node's listeners, for
+	// set_listeners and listeners. A runner reads it before and after its
+	// probes: if it moved, another process changed the listeners under
+	// them, and the probes prove nothing (#8).
+	Generation uint64       `json:"generation,omitempty"`
+	Probe      *ProbeResult `json:"probe,omitempty"`
 }
 
 // Hello identifies the agent.
@@ -91,8 +96,10 @@ type Outcome string
 const (
 	// Success: the connection opened, and for HTTP, a response came back.
 	Success Outcome = "success"
-	// Refused: the target answered that nothing listens on the port. The
-	// packets got through, so whatever is in the way, it isn't a drop.
+	// Refused: something answered with a refusal. Usually that's the
+	// target, with nothing listening on the port; a REJECT rule on the path
+	// answers the same way. It isn't a drop, and a Tailscale filter only
+	// drops, so it isn't the lab's deny either.
 	Refused Outcome = "refused"
 	// Timeout: no answer within the timeout. A Tailscale filter drops
 	// denied packets silently, so a deny looks like this; so does a node

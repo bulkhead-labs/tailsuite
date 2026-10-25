@@ -23,8 +23,9 @@ const maxLine = 1 << 20
 type Agent struct {
 	node string
 
-	mu        sync.Mutex
-	listeners map[Listener]io.Closer
+	mu         sync.Mutex
+	listeners  map[Listener]io.Closer
+	generation uint64 // counts changes to listeners
 }
 
 // New returns the agent for the node with the given name.
@@ -42,11 +43,11 @@ func (a *Agent) Close() {
 	}
 }
 
-// Listeners returns the open listeners, sorted.
-func (a *Agent) Listeners() []Listener {
+// Listeners returns the open listeners, sorted, and their generation.
+func (a *Agent) Listeners() ([]Listener, uint64) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return a.sortedLocked()
+	return a.sortedLocked(), a.generation
 }
 
 func (a *Agent) sortedLocked() []Listener {
@@ -78,25 +79,30 @@ func (a *Agent) sortedLocked() []Listener {
 // SetListeners makes the node's listeners exactly want: it closes those not
 // wanted, keeps those already open, and opens the rest. A listener that
 // differs only in protocol is replaced. It returns the listeners open
-// afterwards, and an error naming any it couldn't open.
-func (a *Agent) SetListeners(want []Listener) ([]Listener, error) {
+// afterwards, their generation, and an error naming any it couldn't open.
+// The generation moves whenever a listener opens or closes.
+func (a *Agent) SetListeners(want []Listener) ([]Listener, uint64, error) {
 	wanted := map[Listener]bool{}
 	for _, l := range want {
 		if err := checkListener(l); err != nil {
-			return a.Listeners(), err
+			open, gen := a.Listeners()
+			return open, gen, err
 		}
 		if wanted[l] {
-			return a.Listeners(), fmt.Errorf("listener %s/%d on %q is wanted twice", l.Proto, l.Port, l.Addr)
+			open, gen := a.Listeners()
+			return open, gen, fmt.Errorf("listener %s/%d on %q is wanted twice", l.Proto, l.Port, l.Addr)
 		}
 		wanted[l] = true
 	}
 
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	changed := false
 	for l, c := range a.listeners {
 		if !wanted[l] {
 			_ = c.Close()
 			delete(a.listeners, l)
+			changed = true
 		}
 	}
 	var errs []error
@@ -110,8 +116,12 @@ func (a *Agent) SetListeners(want []Listener) ([]Listener, error) {
 			continue
 		}
 		a.listeners[l] = c
+		changed = true
 	}
-	return a.sortedLocked(), errors.Join(errs...)
+	if changed {
+		a.generation++
+	}
+	return a.sortedLocked(), a.generation, errors.Join(errs...)
 }
 
 func checkListener(l Listener) error {
@@ -140,11 +150,27 @@ func (a *Agent) open(l Listener) (io.Closer, error) {
 			ReadHeaderTimeout: 5 * time.Second,
 		}
 		go func() { _ = srv.Serve(ln) }()
-		return srv, nil
+		return httpListener{srv, ln}, nil
 	default:
 		go a.serveTCP(ln)
 		return ln, nil
 	}
+}
+
+// httpListener closes its server and its listener. Closing the listener
+// itself frees the port at once: the server may not have started tracking
+// it yet, and a protocol change reopens the port straight away.
+type httpListener struct {
+	srv *http.Server
+	ln  net.Listener
+}
+
+func (h httpListener) Close() error {
+	err := h.srv.Close()
+	if lerr := h.ln.Close(); lerr != nil && !errors.Is(lerr, net.ErrClosed) {
+		err = errors.Join(err, lerr)
+	}
+	return err
 }
 
 // serveTCP sends each connection a banner with the node's name, then
@@ -193,7 +219,13 @@ func (a *Agent) Serve(ctx context.Context, r io.Reader, w io.Writer) error {
 	for lines.Scan() {
 		var req Request
 		if err := json.Unmarshal(lines.Bytes(), &req); err != nil {
-			reply(Response{Error: "bad request: " + err.Error()})
+			// Answer under the request's own ID, if it has one, so its
+			// caller isn't left waiting.
+			var id struct {
+				ID uint64 `json:"id"`
+			}
+			_ = json.Unmarshal(lines.Bytes(), &id)
+			reply(Response{ID: id.ID, Error: "bad request: " + err.Error()})
 			continue
 		}
 		wg.Go(func() { reply(a.handle(ctx, req)) })
@@ -210,16 +242,20 @@ func (a *Agent) handle(ctx context.Context, req Request) Response {
 	case OpHello:
 		resp.Hello = &Hello{Version: ProtocolVersion, Node: a.node}
 	case OpSetListeners:
-		open, err := a.SetListeners(req.Want)
-		resp.Listeners = open
+		open, gen, err := a.SetListeners(req.Want)
+		resp.Listeners, resp.Generation = open, gen
 		if err != nil {
 			resp.Error = err.Error()
 		}
 	case OpListeners:
-		resp.Listeners = a.Listeners()
+		resp.Listeners, resp.Generation = a.Listeners()
 	case OpProbe:
 		if req.Probe == nil {
 			resp.Error = "probe: no spec"
+			break
+		}
+		if err := CheckProbeSpec(*req.Probe); err != nil {
+			resp.Error = err.Error()
 			break
 		}
 		result := Probe(ctx, *req.Probe)

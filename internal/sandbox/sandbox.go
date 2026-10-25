@@ -74,8 +74,10 @@ type NetworkSpec struct {
 	Name string
 
 	// Internet gives the network a route out of the lab. Off, the network
-	// is internal: its nodes reach each other and nothing else. Only the
-	// Tailscale engine needs it, to reach Tailscale's control plane.
+	// is internal: no route out, and on the Docker Engines the sandbox
+	// accepts, no DNS out. Its nodes can still connect to the host itself,
+	// through the network's gateway address (#54). Only the Tailscale
+	// engine needs Internet, to reach Tailscale's control plane.
 	Internet bool
 }
 

@@ -38,7 +38,9 @@ through the sandbox's exec channel, not over a separate network.
     through the host's resolver, when that resolver is on a loopback
     address (CVE-2024-29018). A lab node's lookup of Tailscale's control
     server would leave the lab.
-  - Docker Desktop isn't affected, and reports a fixed version anyway.
+  - Docker Desktop isn't affected. A current one reports a fixed engine
+    version; an older one reporting, say, 24.x is refused anyway, on the
+    safe side.
   - **Podman isn't checked:** its networking and DNS (aardvark-dns) are
     its own, and the advisory doesn't cover them.
 
@@ -77,10 +79,15 @@ type Sandbox interface {
 - **Images are pinned by digest.** `StartNode` refuses a reference without
   `@sha256:`. It pulls a missing image.
 - **Lab networks are internal by default:** no route out of the host, and
-  on the engines the sandbox accepts, no DNS out of it either. So a
-  headscale lab can't send traffic outside the lab even by mistake (rule
-  3). A network opts into the internet only for the Tailscale engine,
-  which needs Tailscale's control plane.
+  on the Docker Engines the sandbox accepts, no DNS out of it either. A
+  network opts into the internet only for the Tailscale engine, which
+  needs Tailscale's control plane.
+  - **One way out remains: the host itself.** Docker gives an internal
+    bridge an address on the host, the network's gateway. Its rules drop
+    only forwarded traffic, so a node can connect to a host service that
+    listens on all interfaces, such as a resolver. Nothing tailsuite runs
+    sends traffic there, and tailscaled doesn't on its own. Docker 28's
+    isolated gateway mode closes it (#54).
 - **A node has 128 MiB of memory and no swap**, unless its spec says
   otherwise. The 2026-10-23 benchmark measured 20–31 MiB per tailscaled.
 
@@ -146,8 +153,9 @@ type Sandbox interface {
   process's stdin and stdout.
 - **Labels make teardown work after a crash**, with nothing to read from
   disk first.
-- **Internal networks turn rule 3 into a property of the lab**, rather
-  than a habit of the code.
+- **Internal networks make most of rule 3 a property of the lab**, rather
+  than a habit of the code: no route out, and no DNS out. The host's
+  gateway address is the exception, until #54.
 
 ## Evidence (checked 2026-10-25)
 
@@ -227,6 +235,11 @@ type Sandbox interface {
   behind.** Looking again narrows that window but can't close it. `Runs`
   lists such a run, and `TeardownRun` removes it.
 - **Podman isn't checked** for leaking DNS from internal networks.
+  aardvark-dns forwarded internal networks' queries upstream until
+  v1.11.0 (2024-05-30).
+- **Nodes on an internal network can reach the host** through the
+  network's gateway address, until #54 uses Docker 28's isolated gateway
+  mode where the engine has it.
 - **A cancelled `Exec` leaves its process running**, because the Docker
   Engine can't stop an exec'd process. It ends when the node is torn
   down.

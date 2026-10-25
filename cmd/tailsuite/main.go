@@ -15,7 +15,8 @@ import (
 )
 
 // exitCouldNotRun is the exit code for "tailsuite couldn't run", such as an
-// unknown command. `tailsuite test` uses the same code for the same case.
+// unknown command. `tailsuite test` will use the same code for the same
+// case (decision 0015).
 const exitCouldNotRun = 3
 
 const usage = `tailsuite proves what your tailnet allows, with real traffic.

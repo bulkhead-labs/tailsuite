@@ -43,11 +43,11 @@ or later. CI runs both ways on every push to a pull request
 in the dev shell:
 
 ```
-go mod tidy -diff && golangci-lint run && go test -race ./...
+go mod tidy -diff && golangci-lint run && CGO_ENABLED=1 go test -race ./...
 ```
 
-`go test -race` needs cgo, so run it with `CGO_ENABLED=1` (the dev shell
-turns cgo off for static builds). When `go.sum` changes, update
+The race detector needs cgo, which the dev shell turns off for static
+builds. When `go.sum` changes, update
 `vendorHash` in `flake.nix` to the hash `nix build` reports.
 
 ## Never commit

@@ -59,8 +59,8 @@ Status: **accepted** (2026-10-25). Built in #1. Refines
 - **`checks.tailsuite` is the package**, so `nix flake check` builds it,
   and runs the tests of the package it builds.
 - **Two dev shells, one lock:**
-  - `ci` has what CI runs: Go, golangci-lint, lychee, actionlint, zizmor
-    and nixfmt;
+  - `ci` has what CI runs: Go, golangci-lint, lychee, actionlint (with
+    shellcheck), zizmor and nixfmt;
   - `default` adds gopls, goreleaser, OpenTofu, the Docker CLI, gh and jq.
 - **The formatter is nixfmt**, nixpkgs' official one, in place of
   nixpkgs-fmt.
@@ -85,8 +85,10 @@ Status: **accepted** (2026-10-25). Built in #1. Refines
      - gofmt and goimports;
   3. `go test -race ./...`;
   4. **the docs link check**: lychee, offline. It checks links between
-     files in this repo and the headings they point at;
-  5. **the workflow audit**: actionlint, and zizmor offline. zizmor flags
+     files in this repo, `.github/` and `.claude/` included, and the
+     headings they point at;
+  5. **the workflow audit**: actionlint, which also runs shellcheck on
+     every `run:` script, and zizmor offline. zizmor flags
      unpinned actions, broad permissions and template injection, the
      mechanical half of 0013's rules;
   6. `nixfmt --check flake.nix`;
@@ -98,6 +100,8 @@ Status: **accepted** (2026-10-25). Built in #1. Refines
   - `actions/checkout` v7.0.1 and `cachix/install-nix-action` v31.11.1,
     which installs Nix 2.35.2, both by commit;
   - the runner, `ubuntu-24.04`.
+- **A newer push to a pull request cancels its older run.** Every commit
+  on `main` keeps its run.
 - **No cache.** A run takes about a minute without one (below). Revisit
   when a run passes five minutes.
 - **The checks aren't required by a ruleset.**
@@ -147,7 +151,8 @@ Status: **accepted** (2026-10-25). Built in #1. Refines
   - goreleaser 2.17.1;
   - OpenTofu 1.13.1, the version [research 0005](../research/0005-tailnet-model-trial.md)
     used;
-  - lychee 0.24.2, actionlint 1.7.12, zizmor 1.30.1, nixfmt 1.5.0;
+  - lychee 0.24.2, actionlint 1.7.12, shellcheck, zizmor 1.30.1,
+    nixfmt 1.5.0;
   - the Docker CLI 29.8.1.
 - **Every check fails on a planted fault.** Run locally in `nixos/nix`
   2.34.9, on a copy of the tree with:

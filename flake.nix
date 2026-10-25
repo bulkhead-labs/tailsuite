@@ -27,6 +27,7 @@
           lychee
           actionlint
           zizmor
+          shellcheck # actionlint checks run: scripts with it
           nixfmt
         ];
     in

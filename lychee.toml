@@ -4,4 +4,6 @@
 # a build.
 offline = true
 include_fragments = "anchor-only"
-exclude_path = ["docs/assets/vendor"]
+# .github/ and .claude/ hold docs too.
+hidden = true
+exclude_path = ["docs/assets/vendor", "(^|/)\\.git/"]

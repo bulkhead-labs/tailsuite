@@ -9,7 +9,7 @@ table in the same PR.
 |---|---|---|
 | [0001](0001-truth-over-mocks.md) | Truth over mocks: real traffic, four results, positive controls | Accepted 2026-10-23 |
 | [0002](0002-two-engines.md) | Two engines from M1: headscale and Tailscale throwaway tailnets | Accepted 2026-10-23; refined by 0016 |
-| [0003](0003-docker-one-container-per-node.md) | Docker, one container per node, kernel TUN, TLS in the lab | Accepted 2026-10-23; refined by 0016 |
+| [0003](0003-docker-one-container-per-node.md) | Docker, one container per node, kernel TUN, TLS in the lab | Accepted 2026-10-23; refined by 0016; amended by 0019 |
 | [0004](0004-opentofu-owns-config.md) | OpenTofu owns the tailnet config; tailsuite owns the machines | Accepted 2026-10-24; amended by 0014 |
 | [0005](0005-go-single-binary-nix.md) | Go, one signed binary, Nix for development | Accepted 2026-10-24 |
 | [0006](0006-apache-2-dco-open-core.md) | Apache-2.0, DCO sign-off, open core later | Accepted 2026-10-24 |
@@ -25,3 +25,4 @@ table in the same PR.
 | [0016](0016-engine-interface-capabilities.md) | The engine interface and the capability matrix | Accepted 2026-10-25 |
 | [0017](0017-local-ui.md) | The local UI: the map first, localhost only, no build step | Accepted 2026-10-25 |
 | [0018](0018-go-toolchain-flake-ci.md) | The Go toolchain, the flake, and CI for lint and unit tests | Accepted 2026-10-25 |
+| [0019](0019-docker-sandbox.md) | The Docker sandbox, and agents controlled through it | Accepted 2026-10-25 |

@@ -1,10 +1,14 @@
 # Architecture
 
-**Status: designed; M1 is being built.** So far the code is the Go module
-and its CI ([0018](decisions/0018-go-toolchain-flake-ci.md)): `cmd/tailsuite`
-only prints its version. The rest describes the intended design, and the
-open questions are linked where they apply. Update it in the same pull
-request as any change to it.
+**Status: designed; M1 is being built.** Built so far:
+
+- the Go module and its CI ([0018](decisions/0018-go-toolchain-flake-ci.md));
+  `cmd/tailsuite` only prints its version;
+- the Docker sandbox, `internal/sandbox`
+  ([0019](decisions/0019-docker-sandbox.md)).
+
+The rest describes the intended design, and the open questions are linked
+where they apply. Update it in the same pull request as any change to it.
 
 ## The picture
 
@@ -42,8 +46,8 @@ request as any change to it.
 | **Tailnet model** | Plain data | Our own types, in Tailscale's terms, independent of the source. The policy is the user's file as read, plus a read-only typed copy that lists every key it doesn't understand. Devices are keyed by MagicDNS name; users, DNS and settings follow. Each record says whether it was observed, declared or inferred. Only inputs are stored; effective state is computed | [0014](decisions/0014-tailnet-model-and-project-layout.md) |
 | **Planner** | `TailnetModel + LabConfig → LabPlan` | Pure and deterministic. It chooses one representative node per equivalence class, the networks and the listeners. It computes each test's needs, and calls the chosen engine's `Lower`, which returns a patch on the user's file that records every rewrite | [0014](decisions/0014-tailnet-model-and-project-layout.md), [0016](decisions/0016-engine-interface-capabilities.md), [#22](https://github.com/bulkhead-labs/tailsuite/issues/22) |
 | **Engines** | `Capabilities()`, `Lower(model)`, `Start(plan)`; the lab: `CompiledFilter(node)`, `Teardown()` | headscale; Tailscale throwaway tailnet; later NetBird. Each declares every capability as native, lowered (by a rewrite that's exact for every test it touches) or refused. Lowering is pure, and every test an inexact rewrite would touch is REFUSED | [0002](decisions/0002-two-engines.md), [0016](decisions/0016-engine-interface-capabilities.md) |
-| **Sandbox** | Networks, nodes, exec, teardown | Docker (default); Podman through the same API; later a VM driver (Lima) and real macOS or Windows nodes for verify runs | [0003](decisions/0003-docker-one-container-per-node.md), [0009](decisions/0009-os-mimicry.md) |
-| **Node agent** | Control over an out-of-band network, never over the tailnet | One small Go binary in every node, running its listeners and probes | [#7](https://github.com/bulkhead-labs/tailsuite/issues/7) |
+| **Sandbox** | `CreateNetwork`, `StartNode`, `Exec`, `Teardown`; `sandbox.Run` tears down however a run ends | **Built:** Docker, through the official client (Podman through the same API). Every resource is named and labelled with its run's ID, so teardown works after a crash. Lab networks are internal unless an engine needs the internet. Tailnet nodes get a kernel TUN device, and userspace mode is refused, before start and once running. Later: a VM driver (Lima) and real macOS or Windows nodes for verify runs | [0003](decisions/0003-docker-one-container-per-node.md), [0009](decisions/0009-os-mimicry.md), [0019](decisions/0019-docker-sandbox.md) |
+| **Node agent** | Controlled through the sandbox's exec channel: a long-lived session's stdin and stdout, never a network, so never the tailnet | One small Go binary in every node, running its listeners and probes | [#7](https://github.com/bulkhead-labs/tailsuite/issues/7), [0019](decisions/0019-docker-sandbox.md) |
 | **Tests** | YAML files in `tests/`, plus the policy's own `tests` and `sshTests` | A test names devices or identities (every matching device), probes the real protocol, and expects allow, deny or, for SSH, check. The planner computes each test's needs, and turns a missing capability into REFUSED or UNKNOWN before anything runs. Every deny gets a positive control. Labels and profiles choose what runs where | [0015](decisions/0015-test-file-labels-profiles.md), [0016](decisions/0016-engine-interface-capabilities.md) |
 | **Outputs** | Reporters and writers | CLI, JSON, JUnit, PR comment; the local UI, which reads the same JSON over Server-Sent Events; a policy file, a checklist, OpenTofu | [0015](decisions/0015-test-file-labels-profiles.md), [0017](decisions/0017-local-ui.md) |
 

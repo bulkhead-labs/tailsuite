@@ -3,7 +3,9 @@
 Status: **accepted** (2026-10-23). Evidence:
 [research 0004](../research/0004-benchmark-2026-10-23.md). Refined by
 [0016](0016-engine-interface-capabilities.md): rules that name a Tailscale
-IPv6 address are refused, not only flagged.
+IPv6 address are refused, not only flagged. Amended by
+[0019](0019-docker-sandbox.md): agents are controlled through the
+sandbox's exec channel, not over a separate network.
 
 ## Decision
 

@@ -1,12 +1,16 @@
-# Lint and unit tests on every push (decision 0018). Every workflow follows
-# decision 0013: least privilege, actions pinned by commit, no secrets here.
+# Lint and unit tests on every push to a pull request or to main
+# (decision 0018). Every workflow follows decision 0013: least privilege,
+# actions pinned by commit, no secrets here.
 name: ci
 
+# One run per commit. A job skipped by an `if:` reports success, so a
+# skipped twin could satisfy a required check that the real run failed.
 on:
-  push:
-    branches: ["**"]
-  # For forks. This repo's own branches already run on push.
   pull_request:
+  push:
+    branches: [main]
+  # Any branch, by hand, before it has a pull request. No inputs.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -18,7 +22,6 @@ concurrency:
 jobs:
   check:
     name: Lint and unit
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -50,7 +53,6 @@ jobs:
 
   plain-go:
     name: Plain go build
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     container:

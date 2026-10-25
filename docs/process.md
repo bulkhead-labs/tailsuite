@@ -35,7 +35,7 @@ and design questions live from GitHub, so it can't drift on its own.
 
 ## A pull request, start to finish
 
-Lint and unit tests run on every push
+Lint and unit tests run on every push to a pull request
 ([0018](decisions/0018-go-toolchain-flake-ci.md)). The heavy tiers in steps
 2 and 4 arrive with #13. Until then, the `pr-ready` checklist and the
 reviewer agent are those checks.

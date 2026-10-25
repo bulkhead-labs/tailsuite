@@ -38,7 +38,7 @@ The repo has a Nix flake:
 - `nix build` builds the binary into `result/bin/tailsuite`.
 
 Plain `go build ./...` and `go test ./...` work without Nix, with Go 1.27
-or later. CI runs both ways on every push
+or later. CI runs both ways on every push to a pull request
 ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)). Before you push,
 in the dev shell:
 

@@ -67,10 +67,13 @@ Status: **accepted** (2026-10-25). Built in #1. Refines
 
 ### CI: `.github/workflows/ci.yml`
 
-- **Triggers:**
-  - `push` to any branch;
-  - `pull_request`, for forks only. This repo's own branches already run
-    on push, and a fork's run needs the maintainer's approval (0013).
+- **Triggers, one run per commit:**
+  - `pull_request`, drafts included: every push to a pull request runs it,
+    on the merge with `main`. A fork's run needs the maintainer's approval
+    (0013);
+  - `push` to `main`;
+  - `workflow_dispatch`, with no inputs, for a branch without a pull
+    request yet.
 - **No secrets and no environment.** `permissions: contents: read`, and
   the checkout keeps no credentials.
 - **"Lint and unit" runs through the `ci` shell:**
@@ -118,6 +121,11 @@ Status: **accepted** (2026-10-25). Built in #1. Refines
   down or rate-limits GitHub's runners.
 - **zizmor and actionlint** catch an unpinned action or a broad permission
   before a reviewer has to.
+- **One run per commit.** The first version ran on every branch push, and
+  also on `pull_request` with an `if:` that skipped this repo's own
+  branches. GitHub reports a job skipped by a condition as successful, so
+  that skipped twin could satisfy a required check the real run had
+  failed.
 - **A container job for plain Go** proves the claim without another
   action to pin.
 
@@ -157,6 +165,9 @@ Status: **accepted** (2026-10-25). Built in #1. Refines
     14 s, lint 8 s, the race tests 13 s, `nix flake check` and
     `nix build` 15 s.
   - "Plain go build" took 30 s, 17 s of it pulling the image.
+- **A job skipped by a condition reports success**: "It will not prevent
+  a pull request from merging, even if it is a required check"
+  ([Control jobs with conditions](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-jobs-with-conditions)).
 - **`install-nix-action` v31.11.1:**
   - it installs Nix 2.35.2 from releases.nixos.org;
   - it writes the job's `GITHUB_TOKEN` into `/etc/nix/nix.conf` as a
@@ -174,6 +185,8 @@ Status: **accepted** (2026-10-25). Built in #1. Refines
   graph.
 - **CI without Nix** (setup-go and golangci-lint's action). Faster with
   caches, but CI and the dev shell would drift apart, against 0005.
+- **Every branch push, plus forks' pull requests** (the first version).
+  It gave every pull request a skipped, "successful" twin of each check.
 - **Checking external links on every push.** Other sites' outages would
   fail builds. A nightly check could do it later.
 - **A Nix cache** (Cachix, cache-nix-action). Not needed at a minute a
@@ -187,6 +200,8 @@ Status: **accepted** (2026-10-25). Built in #1. Refines
   one's. Each bump is a PR, and CI runs on it.
 - **Plain builds need Go 1.27**, or a Go that downloads it.
 - **`vendorHash` must be kept in step with `go.sum`.**
+- **A branch without a pull request runs CI only by hand.** Agents open
+  pull requests as drafts at once, so it's rare.
 - **External links aren't checked** on every push.
 - **The job's read-only token sits in `nix.conf`**, readable by anything
   the job runs, the tests included. It can read this public repo, and

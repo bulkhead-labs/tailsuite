@@ -1,0 +1,35 @@
+// Synthetic. A small startup after its first segmentation pass.
+{
+	"groups": {
+		"group:eng": ["alice@example.com", "bob@example.com"],
+		"group:ops": ["carol@example.com"],
+	},
+
+	"tagOwners": {
+		"tag:prod": ["group:ops"],
+		"tag:db":   ["group:ops"],
+		"tag:ci":   ["group:ops"],
+	},
+
+	"hosts": {
+		"office-printer": "192.0.2.10",
+	},
+
+	"grants": [
+		// Engineers reach the web tier over HTTPS only.
+		{"src": ["group:eng"], "dst": ["tag:prod"], "ip": ["tcp:443"]},
+		// Only ops reaches the databases.
+		{"src": ["group:ops"], "dst": ["tag:db"], "ip": ["tcp:5432"]},
+		// The web tier talks to the databases.
+		{"src": ["tag:prod"], "dst": ["tag:db"], "ip": ["tcp:5432"]},
+		// CI deploys to prod over SSH.
+		{"src": ["tag:ci"], "dst": ["tag:prod"], "ip": ["tcp:22"]},
+		// Alice prints. A user named directly, which the rewrite has to find.
+		{"src": ["alice@example.com"], "dst": ["office-printer"], "ip": ["tcp:631"]},
+	],
+
+	"tests": [
+		{"src": "alice@example.com", "accept": ["tag:prod:443"], "deny": ["tag:db:5432"]},
+		{"src": "carol@example.com", "accept": ["tag:db:5432"]},
+	],
+}

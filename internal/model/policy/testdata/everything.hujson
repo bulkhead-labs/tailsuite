@@ -1,0 +1,66 @@
+// Synthetic. The features a lab has to treat carefully, in one file.
+{
+	"groups": {
+		"group:eng": ["alice@example.com", "dave@example.com"],
+	},
+
+	"tagOwners": {
+		"tag:prod":     ["autogroup:admin"],
+		"tag:router":   ["autogroup:admin"],
+		"tag:exit":     ["autogroup:admin"],
+		"tag:recorder": ["autogroup:admin"],
+	},
+
+	// Posture: only up-to-date Macs reach prod.
+	"postures": {
+		"posture:stableMac": [
+			"node:os == 'macos'",
+			"node:tsReleaseTrack == 'stable'",
+		],
+	},
+	"defaultSrcPosture": ["posture:stableMac"],
+
+	"ipsets": {
+		"ipset:office": ["add 192.0.2.0/24", "remove 192.0.2.10"],
+	},
+
+	"grants": [
+		{"src": ["group:eng"], "dst": ["tag:prod"], "ip": ["tcp:443"], "srcPosture": ["posture:stableMac"]},
+		// The office LAN, only through the office router.
+		{"src": ["group:eng"], "dst": ["ipset:office"], "ip": ["*"], "via": ["tag:router"]},
+		{"src": ["autogroup:member"], "dst": ["autogroup:self"], "ip": ["*"]},
+		{"src": ["autogroup:member"], "dst": ["autogroup:internet"], "ip": ["*"]},
+	],
+
+	"ssh": [
+		{
+			"action":      "check",
+			"src":         ["group:eng"],
+			"dst":         ["tag:prod"],
+			"users":       ["autogroup:nonroot"],
+			"checkPeriod": "12h",
+			// Session recording: left out of the trial's types on purpose.
+			"recorder":        ["tag:recorder"],
+			"enforceRecorder": true,
+		},
+	],
+
+	"sshTests": [
+		{"src": "alice@example.com", "dst": ["tag:prod"], "check": ["ubuntu"], "deny": ["root"]},
+	],
+
+	"nodeAttrs": [
+		{"target": ["tag:prod"], "attr": ["funnel"]},
+	],
+
+	"autoApprovers": {
+		"routes":   {"192.0.2.0/24": ["tag:router"]},
+		"exitNode": ["tag:exit"],
+	},
+
+	// Custom device attributes: left out of the trial's types on purpose.
+	// The owner is named here, which a users-to-tags rewrite would miss.
+	"attrConfig": {
+		"custom:team": {"type": "string", "broadcastToPeers": ["dave@example.com"]},
+	},
+}

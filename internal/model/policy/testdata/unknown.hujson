@@ -1,0 +1,20 @@
+// Synthetic. Keys the typed copy doesn't understand, at several depths,
+// a key written twice, and keys it does understand in other spellings.
+{
+	"Groups": {
+		"group:eng": ["alice@example.com"],
+		"group:Eng": ["bob@example.com"],
+	},
+	"acls": [],
+	"ACLs": [{"action": "accept", "src": ["*"], "dst": ["*:*"]}],
+	"grants": [
+		{"src": ["group:eng"], "dst": ["tag:prod"], "ip": ["tcp:443"], "futureField": true},
+	],
+	"postures": {
+		"posture:new": {"assertions": ["node:os == 'linux'"], "futureKey": 1},
+		"posture:old": ["node:os == 'macos'"],
+	},
+	"tests": [],
+	"randomizeClientPort": false,
+	"futureSection": {"anything": ["goes"]},
+}

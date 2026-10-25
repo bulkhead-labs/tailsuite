@@ -1,10 +1,14 @@
 # Architecture
 
-**Status: designed; M1 is being built.** So far the code is the Go module
-and its CI ([0018](decisions/0018-go-toolchain-flake-ci.md)): `cmd/tailsuite`
-only prints its version. The rest describes the intended design, and the
-open questions are linked where they apply. Update it in the same pull
-request as any change to it.
+**Status: designed; M1 is being built.** Built so far:
+
+- the Go module and its CI ([0018](decisions/0018-go-toolchain-flake-ci.md));
+  `cmd/tailsuite` only prints its version;
+- the tailnet model and loading a project, `internal/model` and
+  `internal/project` ([0022](decisions/0022-reading-a-project.md)).
+
+The rest describes the intended design, and the open questions are linked
+where they apply. Update it in the same pull request as any change to it.
 
 ## The picture
 
@@ -39,7 +43,7 @@ request as any change to it.
 | Layer | Interface | Implementations | Notes |
 |---|---|---|---|
 | **Sources** | `Source → TailnetModel` | The project's files; Tailscale API (read-only); OpenTofu plan JSON; later Pulumi and headscale | [0014](decisions/0014-tailnet-model-and-project-layout.md) |
-| **Tailnet model** | Plain data | Our own types, in Tailscale's terms, independent of the source. The policy is the user's file as read, plus a read-only typed copy that lists every key it doesn't understand. Devices are keyed by MagicDNS name; users, DNS and settings follow. Each record says whether it was observed, declared or inferred. Only inputs are stored; effective state is computed | [0014](decisions/0014-tailnet-model-and-project-layout.md) |
+| **Tailnet model** | Plain data | **Built** (`internal/model`, `internal/project`). Our own types, in Tailscale's terms, independent of the source. The policy is the user's file as read, plus a read-only typed copy that lists every key it doesn't understand. Devices are keyed by MagicDNS name; users, DNS and settings follow. Each record says whether it was observed, declared or inferred. Only inputs are stored; effective state is computed | [0014](decisions/0014-tailnet-model-and-project-layout.md), [0022](decisions/0022-reading-a-project.md) |
 | **Planner** | `TailnetModel + LabConfig → LabPlan` | Pure and deterministic. It chooses one representative node per equivalence class, the networks and the listeners. It computes each test's needs, and calls the chosen engine's `Lower`, which returns a patch on the user's file that records every rewrite | [0014](decisions/0014-tailnet-model-and-project-layout.md), [0016](decisions/0016-engine-interface-capabilities.md), [#22](https://github.com/bulkhead-labs/tailsuite/issues/22) |
 | **Engines** | `Capabilities()`, `Lower(model)`, `Start(plan)`; the lab: `CompiledFilter(node)`, `Teardown()` | headscale; Tailscale throwaway tailnet; later NetBird. Each declares every capability as native, lowered (by a rewrite that's exact for every test it touches) or refused. Lowering is pure, and every test an inexact rewrite would touch is REFUSED | [0002](decisions/0002-two-engines.md), [0016](decisions/0016-engine-interface-capabilities.md) |
 | **Sandbox** | Networks, nodes, exec, teardown | Docker (default); Podman through the same API; later a VM driver (Lima) and real macOS or Windows nodes for verify runs | [0003](decisions/0003-docker-one-container-per-node.md), [0009](decisions/0009-os-mimicry.md) |

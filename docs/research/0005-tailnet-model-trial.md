@@ -255,8 +255,13 @@ then fail for the same reason as policy 2's tests: no devices.
 - **Whether Tailscale accepts each policy.** That needs `/acl/validate` on a
   tailnet, which the test organization provides (#3). Checked on
   2026-10-25 in [research 0006](0006-throwaway-tailnets-spike.md):
-  Tailscale accepts policies 1 and 2, and rejects policy 3's `attrConfig`
-  entry (`broadcastToPeers` must be `*` or absent).
+  - Tailscale accepts policies 1 and 2.
+  - It rejects policy 3's `attrConfig` entry: `broadcastToPeers` must be
+    `*` or absent, and this tailnet may not use `attrConfig` at all.
+  - Without that entry, it accepts the rest of policy 3, except that the
+    policy's own `sshTests` fail while the SSH rule enforces recording.
+  - So the user hidden in `attrConfig`, above, is an example that
+    Tailscale wouldn't accept.
 - **More than three policies.** The M2 sample configs can grow from these.
 - **Capitalised keys** (`ACLs`, `Groups`), which older policies use. Go's
   decoder matches them to the typed copy ignoring case, so the comparison

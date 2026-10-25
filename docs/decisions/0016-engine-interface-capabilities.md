@@ -2,6 +2,9 @@
 
 Status: **accepted** (2026-10-25). Settles #17. What results that
 couldn't be proven do to CI is in [0015](0015-test-file-labels-profiles.md).
+Amended by [0021](0021-empty-grants-and-the-marker-on-tailscale.md): an
+empty `grants` section with no `acls` section denies everything on both
+engines, so it's no longer REFUSED; and the marker holds on Tailscale.
 
 Refines earlier records:
 

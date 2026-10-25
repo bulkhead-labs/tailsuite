@@ -13,7 +13,7 @@ request as any change to it.
  Tailscale API ├─► tailnet ─► plan ┤      or a throwaway Tailscale tailnet  ├─► blast-radius diff
   (read-only)  │    model        │ one container per node class           │    JUnit, PR comment
  OpenTofu ─────┘                 │ real tailscaled, kernel TUN            │    policy file, checklist
-  plan JSON                      │ node agent: services + probes          │    the local UI
+  plan JSON                      │ node agent: listeners + probes         │    the local UI
                                  └ LANs behind routers, a fake internet   ┘
                  OpenTofu applies the tailnet config ──► the lab, and later production
 ```
@@ -26,7 +26,8 @@ request as any change to it.
 - **OpenTofu**, with the official Tailscale provider, applies the tailnet's
   configuration: the policy, device tags, routes, DNS and settings. It
   applies the same module to the lab and, at deploy time, to production.
-  On headscale, until #20, tailsuite reads the module's values and applies
+  On the Tailscale engine it applies the engine's copy of the policy. On
+  headscale, until #20, tailsuite reads the module's values and applies
   them itself ([0014](decisions/0014-tailnet-model-and-project-layout.md)).
 
 ## Layers
@@ -38,7 +39,7 @@ request as any change to it.
 | **Planner** | `TailnetModel + LabConfig → LabPlan` | Pure and deterministic. It chooses one representative node per equivalence class, the networks and the listeners. It lowers the policy for the chosen engine as a patch on the user's file, which records every rewrite | [0014](decisions/0014-tailnet-model-and-project-layout.md), [#22](https://github.com/bulkhead-labs/tailsuite/issues/22) |
 | **Engines** | `Capabilities()`, `Create(plan)`, `Teardown()` | headscale; Tailscale throwaway tailnet; later NetBird | [0002](decisions/0002-two-engines.md), [#17](https://github.com/bulkhead-labs/tailsuite/issues/17) |
 | **Sandbox** | Networks, nodes, exec, teardown | Docker (default); Podman through the same API; later a VM driver (Lima) and real macOS or Windows nodes for verify runs | [0003](decisions/0003-docker-one-container-per-node.md), [0009](decisions/0009-os-mimicry.md) |
-| **Node agent** | Control over an out-of-band network, never over the tailnet | One small Go binary in every node, running its services and probes | [#7](https://github.com/bulkhead-labs/tailsuite/issues/7) |
+| **Node agent** | Control over an out-of-band network, never over the tailnet | One small Go binary in every node, running its listeners and probes | [#7](https://github.com/bulkhead-labs/tailsuite/issues/7) |
 | **Tests** | Each test declares the capabilities it needs | The runner turns a missing capability into REFUSED or UNKNOWN before anything runs; every deny gets a positive control | [#8](https://github.com/bulkhead-labs/tailsuite/issues/8), [#16](https://github.com/bulkhead-labs/tailsuite/issues/16) |
 | **Outputs** | Reporters and writers | CLI, JSON, JUnit, PR comment, the UI; a policy file, a checklist, OpenTofu | |
 
@@ -59,8 +60,9 @@ UNKNOWN and REFUSED are never shown as a pass or a deny.
 ## A user's project
 
 A folder the user owns. Nobody clones tailsuite. **A fact lives in the
-file for whatever makes it true in production**, so no fact has two homes
-([0014](decisions/0014-tailnet-model-and-project-layout.md)):
+file for whatever makes it true in production**, so each fact has one home.
+The one exception, auto-approved routes, is in
+[0014](decisions/0014-tailnet-model-and-project-layout.md):
 
 ```
 my-tailnet/
@@ -74,7 +76,8 @@ my-tailnet/
   .tailsuite/            # gitignored: the model, the lab plan, results
 ```
 
-The project alone rebuilds the lab, with no credentials and no network.
+The project alone rebuilds the lab, with no access to production. On
+headscale it needs no credentials at all.
 
 ## Commands (planned)
 
@@ -84,7 +87,7 @@ The project alone rebuilds the lab, with no credentials and no network.
 | `tailsuite up` | Starts the lab and the local UI |
 | `tailsuite test` | Runs the suite; exit codes suit CI |
 | `tailsuite down` | Tears the lab down |
-| `tailsuite export tofu` | Writes the OpenTofu module for the current project |
+| `tailsuite export tofu` | Writes `tofu/` (tailsuite's module and the values) from the current model, once; `init` and `import` use it, and the user owns the result |
 | `tailsuite import tailscale` | Reads a real tailnet read-only into a project, with OpenTofu import blocks |
 | `tailsuite deploy` | Lab tests → `tofu plan` against production → blast-radius diff → apply, behind the gates in [0007](decisions/0007-read-only-by-default.md) |
 

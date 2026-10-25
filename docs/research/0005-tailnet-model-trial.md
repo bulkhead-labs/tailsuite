@@ -27,7 +27,10 @@ policy it:
 1. parses the file with hujson, standardizes a copy, and decodes it into a
    typed copy;
 2. lists every key the typed copy didn't understand, at any depth, by
-   comparing the file with the typed copy encoded again;
+   comparing the file with the typed copy encoded again. The trial's types
+   have no `omitempty`, so a known key at its zero value survives the
+   round trip; the comparison was case-sensitive, and the policies use
+   lower-case keys only;
 3. lists every user named anywhere, and whether the typed copy found it;
 4. reads a grant's byte offsets.
 
@@ -202,9 +205,10 @@ applied to policy 2 as two RFC 6902 operations: replace
 - All six comment lines survived.
 - `diff` showed only the two touched lines changed.
 - The patched file parsed again.
-- hujson doesn't reformat, so the added member sits on the line before it
-  (`"tag:ci": ["group:ops"],"tag:user-alice":[…]`). That's harmless in an
-  engine's copy, which users see as the patch, not as a file.
+- hujson doesn't reformat, so the added member sits on the line before it:
+  `"tag:ci":   ["group:ops"],"tag:user-alice":["tag:tailsuite"]`. That's
+  harmless in an engine's copy, which users see as the patch, not as a
+  file.
 - headscale rejected the patched file: `tag "tag:user-alice" references
   undefined tag "tag:tailsuite"`.
 
@@ -251,3 +255,7 @@ then fail for the same reason as policy 2's tests: no devices.
 - **Whether Tailscale accepts each policy.** That needs `/acl/validate` on a
   tailnet, which the test organization provides (#3).
 - **More than three policies.** The M2 sample configs can grow from these.
+- **Capitalised keys** (`ACLs`, `Groups`), which older policies use. Go's
+  decoder matches them to the typed copy ignoring case, so the comparison
+  has to ignore case too, and patch pointers have to come from the file's
+  own keys (0014).

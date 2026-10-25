@@ -58,10 +58,25 @@ Three findings shaped both (checked 2026-10-24):
   - **Keys the typed copy doesn't understand are always listed.** They're
     found at any depth, by comparing the file with what the copy
     understood.
+    - A key counts as understood when it matches a known key ignoring
+      case, because older policies capitalise keys (`ACLs`, `Groups`), as
+      the official client's `hujson` tags show.
+    - A known key at its zero value (`"tests": []`, `false`) counts as
+      understood. The comparison never relies on `omitempty`.
   - **Each engine gets the user's file plus an RFC 6902 patch**, applied
     with `tailscale/hujson`, which keeps comments. The patch is the record
     of rewrites that [0002](0002-two-engines.md) requires, and is shown
     with every run.
+    - Patch pointers come from the file's own keys (hujson `Find`), never
+      from the typed copy, so `/Groups/…` stays `/Groups/…`.
+    - A patch defines every tag it introduces, with its owners.
+      headscale rejects a tag owned by an undefined tag (research 0005).
+    - **On the Tailscale engine, the patched copy is what tofu applies.**
+      `tailsuite.tf` reads the policy through a `policy_file` variable that
+      falls back to `../policy.hujson`. tailsuite sets it on the command
+      line to the engine's copy under `.tailsuite/`. Deploy never sets it,
+      so production always gets the user's own file. On that engine, 0004's
+      "same module" is the same module with a different policy input.
   - **A key the typed copy doesn't understand:**
     - **The patch rewrites nothing:** the key passes through unchanged and
       the run carries a note. If the engine rejects the key, the run is
@@ -96,7 +111,7 @@ Three findings shaped both (checked 2026-10-24):
 |---|---|---|
 | Grants, acls, groups, tagOwners, hosts, ipsets, ssh, nodeAttrs, autoApprovers, postures, and the policy's own `tests` and `sshTests` | Tailscale's policy engine | `policy.hujson` |
 | Device tags and enabled routes; later key expiry, authorization, DNS, tailnet settings | The API, through OpenTofu | `tofu/` |
-| Which devices exist, who added each, OS, client version, IP; later advertised routes, exit node, SSH server, posture attributes | The device itself; tailsuite never deploys these | `lab.yaml` |
+| Which devices exist, who added each, OS, client version, IP; later advertised routes, exit node, SSH server, posture attributes | The device, or the control plane (IPs, owners). No provider resource sets them, so tailsuite never deploys them | `lab.yaml` |
 | What listens on each lab node (explicit in M1), engines, profiles | Nothing: lab only | `lab.yaml` |
 | tailsuite's own tests | Nothing | `tests/` |
 | The model, the lab plan, results, lab state | Computed | `.tailsuite/`, gitignored |
@@ -128,12 +143,15 @@ engines:
   profiles: { pr: headscale, nightly: tailscale }
 ```
 
-- **One copy of the policy.** The module reads it with
-  `file("${path.module}/../policy.hujson")`.
-- **The project alone rebuilds the lab, with no credentials and no
-  network.**
-  - PR runs on headscale have no secrets
-    ([0013](0013-ci-trust-model.md)), so the device facts are committed.
+- **One copy of the policy.** The module reads `../policy.hujson` unless
+  tailsuite hands it an engine's copy (above).
+- **The project alone rebuilds the lab, with no access to production.**
+  - On headscale it needs no credentials at all. PR runs there have no
+    secrets ([0013](0013-ci-trust-model.md)), so the device facts are
+    committed.
+  - The Tailscale engine needs only the test organization's OAuth client,
+    never production's.
+  - Pulling the pinned lab images needs the network.
   - Import (M5) writes a snapshot into `lab.yaml`, and keeps hand-written
     `listen:` entries.
 - **Production never reads `lab.yaml`**, and a deploy never writes to it.
@@ -165,17 +183,55 @@ engines:
   }
   ```
 
+  ```hcl
+  # tofu/tailsuite.tf (excerpt)
+  variable "policy_file" {
+    type    = string
+    default = null # deploy never sets it
+  }
+
+  resource "tailscale_acl" "policy" {
+    acl = file(coalesce(var.policy_file, "${path.module}/../policy.hujson"))
+  }
+  ```
+
 - **tailsuite reads the values itself:**
   - to build the model;
   - to give nodes their tags as they join, before tofu can look them up
     (throwaway tailnets hold tagged devices only);
   - to apply them on headscale.
-- **The Tailscale engine and production run `tofu` as usual.**
-- **headscale can apply only tailsuite's own module until #20.** Its runs
-  are REFUSED, with the reason, when:
-  - `tailsuite.tf` differs from the version tailsuite shipped;
-  - or another `.tf` file declares an ACL, device-tag, route or DNS
-    resource.
+- **The Tailscale engine and production run `tofu` as usual**, the engine
+  with `policy_file` set to its copy.
+- **headscale can apply only tailsuite's own module until #20.** Anything
+  else in `tofu/` could change what production gets without tailsuite
+  seeing it, so the check is an allow-list. A headscale run is REFUSED,
+  with the reason, unless `tofu/` holds only:
+  - `tailsuite.tf`, exactly as tailsuite shipped it;
+  - `tailnet.auto.tfvars`;
+  - other `.tf` or `.tf.json` files that declare no `tailscale_*`
+    resource or data source and no `module` block, none of them an
+    override file (`override.tf`, `*_override.tf`, or their `.tf.json`
+    forms).
+
+  No other variable-definitions file is allowed (`terraform.tfvars`,
+  `*.auto.tfvars`, `*.tfvars.json`), because OpenTofu loads
+  `*.auto.tfvars` files in lexical order and a later one would win.
+  Values passed on the command line aren't in the project.
+  `tailsuite deploy` (M6) passes none, `policy_file` included.
+
+### Export and the round trip
+
+- **`tailsuite export tofu` writes `tofu/` from the model:** the shipped
+  `tailsuite.tf` and a `tailnet.auto.tfvars`. `init` uses it for templates
+  and `import` (M5) for a real tailnet. After that, the user owns the
+  files. This isn't the rejected generated `tofu/` below: export writes
+  once, and tailsuite never regenerates the files on a run.
+- **The round trip (#10):** export from a lab's model into a fresh
+  project, rebuild the lab from it, and the same suite gives the same
+  results.
+  - On the Tailscale engine, `tofu apply` applies the export.
+  - On headscale, tailsuite reads the export back and applies it. That
+    proves export and read-back lose nothing.
 
 ## Why
 
@@ -209,8 +265,11 @@ three synthetic policies through a throwaway parser and headscale 0.29.5:
   (`/ssh/0/recorder`).
 - **Every user reference was found.** The one inside a section the types
   skipped was flagged as one a rewrite would miss.
-- **The patch was clean.** A users-to-tags patch kept every comment and
-  changed only the two places it touched.
+- **The patch kept everything the user wrote, and showed a rule it has to
+  follow.** A users-to-tags patch kept every comment and changed only the
+  two places it touched. headscale then rejected the patched file: the new
+  tag's owner, `tag:tailsuite`, wasn't defined. So a patch defines every
+  tag it introduces, with its owners.
 - **headscale rejected six features, one at a time:**
   - role autogroups as tag owners;
   - postures;
@@ -259,6 +318,16 @@ three synthetic policies through a throwaway parser and headscale 0.29.5:
   Tailscale change.
 - **A tagged device spans two files** (`lab.yaml` and the tfvars), joined
   by name.
+- **An auto-approved route is stated twice.** The provider requires a
+  device's enabled routes in `tofu/` to include the routes `autoApprovers`
+  approved, or the plan drifts. So such a route appears in `policy.hujson`
+  as a rule and in `tofu/` as state. When advertised routes land (M3), a
+  load check keeps the two in step: a route that `autoApprovers` would
+  approve for a device that advertises it must be listed in that device's
+  enabled routes.
+- **On the Tailscale engine, tofu applies the engine's copy of the
+  policy**, not the user's file. The module is the same; the policy input
+  differs, and the patch says how.
 - **A fact changes file if its owner changes**, say if the provider gains
   a device-IP resource. That move is a migration with a schema bump.
 - **On headscale, a customized module can't be tested until #20.**

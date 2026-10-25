@@ -54,7 +54,7 @@ Live progress is on the
 |---|---|---|---|---|
 | **M1** | [Walking skeleton](https://github.com/bulkhead-labs/tailsuite/milestone/1) | In progress | 3 nodes (laptop, server, db), a policy, 3 tests (allow, deny, positive control), both engines, the local UI, the OpenTofu module that configures the lab, the round-trip check, the release pipeline, the user-journey suite | `brew install` → `tailsuite init` → `tailsuite up`, about 5 minutes |
 | **M2** | [Tags, grants and the diff](https://github.com/bulkhead-labs/tailsuite/milestone/2) | Not started | Tags, grants and ports; the reachability matrix; the blast-radius diff; the headline (#33); the baseline pack (#32); test file v1; the GitHub Action; the generated quick-start repo; the first sample configs | Add tailsuite to their repo's CI |
-| **M3** | [SSH, subnets and exit nodes](https://github.com/bulkhead-labs/tailsuite/milestone/3) | Not started | Tailscale SSH (root vs nonroot, check mode); subnet routers with fake LANs; exit nodes with a fake internet; **engine scorecard #1** | The scenarios people get burned by |
+| **M3** | [SSH, subnets and exit nodes](https://github.com/bulkhead-labs/tailsuite/milestone/3) | Not started | Tailscale SSH (root vs nonroot, check mode); subnet routers with fake LANs; exit nodes with a fake internet; differential fuzzing across the engines (#42); **engine scorecard #1** | The scenarios people get burned by |
 | **M4** | [Users and posture](https://github.com/bulkhead-labs/tailsuite/milestone/4) | Not started | Users and groups; posture (OS mimicked, real client versions); equivalence classes; **engine scorecard #2**. The lab is feature complete | |
 | **M5** | [Import](https://github.com/bulkhead-labs/tailsuite/milestone/5) | Not started | Read-only import from the Tailscale API or an OpenTofu plan (#36); onboarding with no credentials: a pasted policy or a demo (#35); a library of synthetic sample configs (a wide-open startup, a homelab, a segmented startup, contractors, subnet-heavy); import to OpenTofu with a zero-change plan as the proof | Connect read-only: their tailnet in 2 minutes, on IaC in 10 |
 | **M6** | [Deploy](https://github.com/bulkhead-labs/tailsuite/milestone/6) | Not started | Editing the policy in the UI (#34); `tailsuite deploy` with the apply gates; PR mode for GitOps or Terraform-managed tailnets; deploy from the Action | Ship a change safely |
@@ -141,7 +141,8 @@ ready starts the heavy tiers. Any branch can run them by hand
 
 1. **Settle the design questions that shape everything:**
    - #15, the tailnet model, together with #18 (the project layout, and
-     explicit services in `lab.yaml` for M1);
+     explicit listeners in `lab.yaml` for M1): settled in
+     [0014](decisions/0014-tailnet-model-and-project-layout.md);
    - #16, the test format;
    - #17, the engine interface and capability matrix.
 2. **Run the #3 spike**, as soon as the test organization exists.

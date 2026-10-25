@@ -52,13 +52,22 @@ type Lab interface {
   - the control plane is up;
   - the nodes have joined through the sandbox (0003);
   - the configuration is applied;
-  - every node's compiled filter shows the applied policy.
+  - every node shows the applied policy, in its packet filter, its SSH
+    policy and its list of peers.
 
-  That last wait is the plan's one allowed kind of wait, bounded and only
-  for policy propagation. Without it, a probe could pass on the previous
-  filter, and headscale's starts as allow-all. On headscale the policy is
-  set after the nodes join. On the Tailscale engine, the wait comes after
-  `tofu apply`.
+  How it waits:
+  - **A marker shows a node has the new policy.** Each apply's patch adds
+    a rule from an address no node holds, on a port unique to that apply,
+    and the same marker as an SSH rule.
+  - **tailsuite waits** until every node's compiled filter and SSH policy
+    hold the marker, and its peer list has every peer the plan expects.
+  - **The wait is bounded.** It's the plan's one allowed kind of wait, only
+    for policy propagation. At the bound the run stops with exit 3, and no
+    probe starts.
+  - **Without it**, a probe could pass on the previous filter, and
+    headscale's starts as allow-all.
+  - **On headscale**, the policy is set after the nodes join. **On the
+    Tailscale engine**, the wait comes after `tofu apply`.
 - **`Teardown` runs on every exit path.** `tailsuite down` can also run it
   after a crash, from the lab state in `.tailsuite/`.
 - **`CompiledFilter` is required of every engine.** Readiness, the
@@ -95,25 +104,36 @@ UNKNOWN on both:
 
 The matrix lives in code next to each engine. `tailsuite capabilities`
 prints it, and the docs page is generated from the same data, so the two
-can't drift. Here it is as of headscale 0.29.5 and Tailscale's docs
-(checked 2026-10-25):
+can't drift.
+
+**A capability is refused until the milestone that builds it ships.** The
+table shows each one's target. In M1, these are built:
+
+- grants, ACLs, ports, hosts and tags;
+- users and groups, lowered to tags on the Tailscale engine;
+- pinned IPv4 addresses;
+- the compiled filter.
+
+Here's the table as of headscale 0.29.5 and Tailscale's docs (checked
+2026-10-25):
 
 | Capability | headscale | Tailscale engine |
 |---|---|---|
 | Grants, ACLs, ports, hosts, tags | native | native |
-| Users and groups | native (matched by email) | lowered: one user becomes one tag (#6; the hard cases are #21) |
+| Users and groups | native (matched by email) | lowered: one user becomes one tag (#6). Rules whose meaning depends on the source's login are refused until #21 (rows below) |
 | `autogroup:member`, `autogroup:self` | native | refused in M1; #21 decides |
 | `autogroup:tagged` | native | refused while users are lowered to tags, since every device is then tagged (#21) |
 | `autogroup:shared`, groups synced from an identity provider | refused | refused |
 | Role autogroups (`autogroup:admin`…) | lowered: as tag owners, to the lab's admin, which can't change who reaches what because tags come from `tofu/`; in rules, to the users with that role in `lab.yaml`, else refused | refused: no human users (Tailscale says users are coming) |
-| Posture (`postures`, `srcPosture`, `defaultSrcPosture`) | refused; declined upstream ([headscale#2458](https://github.com/juanfont/headscale/issues/2458)) | native; `node:os` mimicked |
+| Posture (`postures`, `srcPosture`, `defaultSrcPosture`) | refused; declined upstream ([headscale#2458](https://github.com/juanfont/headscale/issues/2458)) | native from M4, with `node:os` mimicked |
 | IP sets | lowered: expanded to addresses; refused when a set includes an autogroup or a host | native |
-| `via`, `autogroup:internet`, subnet routes, exit nodes | native (M3 proves them) | native |
-| SSH accept and deny | native | native |
-| SSH check | native: the demand is proven, completing it is UNKNOWN | refused: "an SSH access rule from a tagged device cannot be in check mode" |
-| SSH session recording | refused | native, with a recorder node (M3) |
-| Funnel (`nodeAttrs`) | refused | native as configuration; traffic from the internet is UNKNOWN |
-| `attrConfig` | refused | native (M4) |
+| `via`, `autogroup:internet`, subnet routes, exit nodes | native from M3 | native from M3 |
+| SSH accept and deny | native from M3 | native from M3 |
+| SSH logins tied to the source's login (`localpart:*@<domain>`) | refused; headscale's support isn't verified | refused: a tagged device has no login (#21) |
+| SSH check | native from M3: the demand is proven, completing it is UNKNOWN | refused: "an SSH access rule from a tagged device cannot be in check mode" |
+| SSH session recording | refused | native from M3, with a recorder node |
+| Funnel (`nodeAttrs`) | refused | native as configuration, from the config checks of #32 (M2); traffic from the internet is UNKNOWN |
+| `attrConfig` | refused | native from M4 |
 | Services (`svc:`) | refused | refused until a milestone adds them |
 | Pinned IPv4 addresses | native (allocation, #5) | native (`POST /device/{id}/ip`) |
 | Pinned IPv6 addresses | refused | refused |
@@ -143,16 +163,22 @@ can't drift. Here it is as of headscale 0.29.5 and Tailscale's docs
   - headscale checks them against live devices, and has no field for
     `srcPostureAttrs`.
   - On the Tailscale engine, their users would need rewriting too.
-- **headscale's copy also loses what headscale refuses**, because headscale
-  rejects the whole policy over a single refused feature. Each removal is
-  recorded in the patch:
+- **Each engine's copy also loses what that engine refuses**, because each
+  rejects the whole policy over a single invalid rule:
+  - headscale over any feature it lacks;
+  - Tailscale, once users are tags, over a check-mode SSH rule ("an SSH
+    access rule from a tagged device cannot be in check mode") or an
+    `autogroup:self` destination (valid "if the source contains only users
+    or groups").
+
+  Each removal is recorded in the patch:
   - every test whose source and destination a removed or altered rule
     could match is REFUSED;
   - a removal that isn't about a rule's source or destination (Funnel in
     `nodeAttrs`, `attrConfig`) refuses every test on the devices it
     targets;
   - if the removals leave no `grants` or `acls`, the whole run is
-    REFUSED, because headscale would then allow everything;
+    REFUSED, because both engines would then allow everything;
   - `defaultSrcPosture` applies to every rule, so a policy that uses it is
     REFUSED on headscale entirely;
   - the rest of the suite still runs.

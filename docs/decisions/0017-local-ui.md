@@ -44,23 +44,30 @@ out, and the UI doesn't use one.
 
 - **Localhost only:** served on `127.0.0.1` and `::1`, on a random free
   port.
-- **A secret per session, sent on every request:**
+- **A one-time link, then a secret per session:**
   - The link carries a random secret in its `#fragment`, which browsers
     never send to a server or put in logs.
-  - The page keeps it in `sessionStorage`, which is per port, so a reload
-    keeps working.
-  - The page sends it as a header on every request, and the server
-    refuses any request without it.
+  - **On first load, the page trades it**, in one POST, for a session
+    secret. From then on the server refuses the link's secret. A copy of
+    the link is then useless, whether it's in a terminal, in the browser's
+    history, or on the command line of the browser `tailsuite up` started.
+  - The page keeps the session secret in `sessionStorage`, which is per
+    port and per tab, so a reload keeps working.
+  - **Every data, stream and POST request** carries the session secret as
+    a header, and the server refuses any without it.
+  - **The page's shell and its embedded scripts and styles hold no tailnet
+    data**, so they're served without the secret. A navigation can't carry
+    a custom header.
   - Results stream through `fetch`, which can send that header.
     `EventSource` can't.
-- **Origin checks:** every request must carry the UI's own `Origin`, or
+- **Origin checks:** every data, stream and POST request must carry the
+  UI's own `Origin`, or
   `Sec-Fetch-Site: same-origin`, so a page served from another local port
   can't drive it.
 - **Host checks:** the server refuses any `Host` header other than the
   localhost names, which defeats DNS rebinding.
-- **A link expires** if it isn't opened within a few minutes.
-  `tailsuite up` prints a fresh one whenever asked. With `--no-browser`,
-  or over SSH, a link sitting in a terminal doesn't stay valid.
+- **An unused link expires** after a few minutes, and a used one is dead
+  at once. `tailsuite up` prints a fresh one whenever asked.
 - **A strict Content-Security-Policy**, sent as a header:
   - `default-src 'self'`, with no inline scripts;
   - `connect-src 'self'`;
@@ -97,9 +104,10 @@ out, and the UI doesn't use one.
   results list alone looks like a CI log.
 - **Opening the browser** removes a step from that first minute, and the
   CI rule keeps it out of pipelines.
-- **A header secret plus the Origin and Host checks** keep the map from
-  other local users and from web pages, even ones served from another
-  localhost port. A cookie couldn't do that.
+- **A one-time link, a header secret, and the Origin and Host checks**
+  keep the map from other local users and from web pages, even ones served
+  from another localhost port. A cookie couldn't do that, and a
+  long-lived link would leak through command lines and history.
 - **No build step** keeps the toolchain Go-only, and the release free of a
   second ecosystem. It's the approach the status page already proved.
 - **Preact and htm** give later views (the matrix, the diff, the editor) a
@@ -141,6 +149,9 @@ out, and the UI doesn't use one.
   passes the two-week rule.
 - **A new browser tab needs a fresh link.** `sessionStorage` isn't shared
   between tabs.
+- **A race of a few seconds.** A local user who reads the link before the
+  page loads could trade it first. The real page then can't, and says the
+  link was already used, so the attempt is visible.
 - **Until esbuild is wired, only libraries that ship ES modules** can be
   used, and vendoring has to rewrite their imports.
 - **Vendored libraries are updated by hand**, as on the status page.

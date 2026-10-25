@@ -63,6 +63,13 @@ tests:
   - Any other overlap is an error that names both.
 - **An identity means every matching device.**
   - Results list each device pair.
+  - **A test's result combines its pairs:**
+    - any FAIL makes it a FAIL;
+    - otherwise, any REFUSED makes it REFUSED;
+    - otherwise, any UNKNOWN makes it UNKNOWN;
+    - it's a PASS only when every pair passed.
+
+    The two sides of a condition combine the same way.
   - Once equivalence classes land (#22, M4), "every device" becomes one
     device per class, and the result says so.
   - **An identity that matches no device in the lab** makes the test fail
@@ -73,6 +80,10 @@ tests:
   - `probe: tcp` forces a bare connection, and later `udp` and `icmp`.
   - A test aimed at a port where nothing listens in the lab fails to load,
     and says which `listen:` entry to add.
+  - **A test without `ssh:` asserts network access**, even on an SSH
+    listener. `allow` means the server answered, and `deny` that it
+    didn't. The login result counts only in a test with `ssh:`. The
+    policy's own `tests` assert network access the same way.
 - **`expect`:** `allow` or `deny`. An SSH test (`ssh: <login>`) can also
   expect `check`. SSH results are judged by what the server does, not by
   any engine's evaluation:
@@ -117,7 +128,11 @@ tests:
   `policy tests[2]: alice@example.com → tag:prod:443`.
 - **`proto` decides the probes.**
   - An omitted `proto` means TCP and UDP, as Tailscale reads it.
-  - An `accept` needs either one allowed. A `deny` needs both blocked.
+  - An `accept` passes when either half is allowed, and fails when both
+    are blocked.
+  - A `deny` passes when both are blocked, and fails when either is
+    allowed.
+  - Anything in between is UNKNOWN.
   - Until a protocol's probe exists (UDP and ICMP come after M1), that
     half is UNKNOWN. A `deny` with an omitted `proto` is therefore UNKNOWN
     in M1, never a PASS on TCP alone.
@@ -149,7 +164,8 @@ tests:
     in a profile, because a typo there would silently run nothing.
   - `--skip <label>` (repeatable) wins over `--only`. tailsuite warns when
     it names a label no test has.
-  - `--run <regex>` matches test names, as `go test -run` does.
+  - `--run <regex>` matches test names, as `go test -run` does. One that
+    matches no test is an error (exit 3) too.
 
 ### Profiles
 
@@ -186,8 +202,11 @@ profiles:
   - neither ever counts as a pass.
 - **`unproven: fail`**, or `--strict`, fails the run on them too.
 - **A run that proved nothing fails, even under `report`**: no test ran,
-  or none ended PASS or FAIL. Otherwise a misspelt profile, or a policy
-  every test of which is refused on the engine, would show green.
+  or none ended PASS or FAIL.
+  - Positive controls don't count. Only the user's tests and the policy's
+    tests do.
+  - Otherwise a misspelt profile, or a policy every test of which is
+    refused on the engine, would show green.
 - **`tailsuite deploy`'s lab gate** ([0007](0007-read-only-by-default.md))
   **is always strict.**
 - **Exit codes:**
@@ -196,7 +215,8 @@ profiles:
   - 1: a FAIL;
   - 2: nothing proven, or unproven results under strict;
   - 3: tailsuite couldn't run, for example an invalid test file, an
-    `--only` that matches nothing, or a lab that didn't start.
+    `--only` or `--run` that matches nothing, or a lab that didn't start
+    or didn't become ready (0016).
 - **Warnings:**
   - a test that no profile ever runs;
   - a test that every profile's engine refuses, so nothing ever proves it.

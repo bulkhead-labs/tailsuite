@@ -155,8 +155,8 @@ type Sandbox interface {
   one at a time:
   - without the TUN device, tailscaled exits, and the TUN test fails;
   - without `sandbox.Run`, the interrupt test finds the run still there;
-  - with the network not internal, the test finds
-    `default via 192.168.64.1`.
+  - with the network not internal, the test finds a default route via
+    the bridge's gateway.
 - **govulncheck v1.8.0** found no vulnerable dependency. It found one
   vulnerability in Go 1.27.2's standard library, GO-2026-6809 in
   `crypto/x509`, reachable through the Docker client. It's fixed in

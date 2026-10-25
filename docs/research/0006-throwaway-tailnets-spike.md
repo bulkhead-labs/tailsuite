@@ -7,7 +7,7 @@ The questions:
   organization;
 - the two checks [0016](../decisions/0016-engine-interface-capabilities.md)
   gave this spike: how Tailscale reads `{"grants": []}`, and whether the
-  readiness marker survives beside an allow-all rule.
+  readiness marker survives beside an allow-all grant.
 
 Evidence for #6, the Tailscale engine, and for
 [0021](../decisions/0021-empty-grants-and-the-marker-on-tailscale.md).
@@ -73,7 +73,7 @@ has to be built (below).
 | Two auth keys: tagged, ephemeral, pre-authorized, 15-minute expiry | 200 | 0.27 s each |
 | Delete the tailnet with its own token | 200 | Runs 2–4: 0.27, 0.28, **26.2 s**. Run 5: 0.28 s each |
 | The deleted tailnet's token afterwards | 401 | |
-| **List the organization's tailnets** | **Lagged in run 5.** Right after it created a second tailnet, the list's count was 1. Right after it deleted both, the list still held 2, one of them its own. Checked again about a minute later, it held only the original. Runs 1–4's lists were right at once, and so were the checks after runs 6 and 7 | |
+| **List the organization's tailnets** | **Lagged in run 5.** Right after it created a second tailnet, the list's count was 1. Right after it deleted both, the list still held 2, one of them its own. Checked again about 15 s later, it held only the original. Runs 1–4's lists were right at once, and so were the checks after runs 6 and 7 | |
 
 ### Nodes and traffic
 
@@ -163,7 +163,7 @@ three synthetic policies.
      no default added. No lab ever applies the shape bare, so running labs
      couldn't see a change in that reading. So every Tailscale-engine run
      checks it through `/acl/validate` (run 7), and #5 tests headscale's.
-   - The marker survives beside an allow-all rule on Tailscale, so the
+   - The marker survives beside an allow-all grant on Tailscale, so the
      readiness wait can rely on it there. #5 checks it on headscale.
    - Both are recorded in
      [0021](../decisions/0021-empty-grants-and-the-marker-on-tailscale.md).
@@ -220,8 +220,11 @@ Also:
   are set, not to tailsuite's own tests, which always use real traffic.
 - **The alpha API's errors aren't stable**: the same refused request came
   back as 403 or 404. The engine shouldn't match on error text.
-- **Empty `tagOwners` lists are accepted**, so the engine's tags need no
-  owner in a tailnet with no users.
+- **Empty `tagOwners` lists are accepted.** Tailscale's reference makes
+  `[]` shorthand for `autogroup:admin` (with `autogroup:network-admin`).
+  In a tailnet with no users, that leaves the tailnet's own `all`-scope
+  OAuth client as the only one that can apply such a tag, which is what
+  the engine uses.
 - **Research 0005's evidence that an unknown key can hide a user** rested
   on policy 3's `attrConfig` entry, which Tailscale rejects. So the
   example doesn't exist as written. 0014's rule (REFUSED when a key the

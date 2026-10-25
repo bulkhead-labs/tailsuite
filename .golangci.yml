@@ -1,0 +1,28 @@
+# golangci-lint v2. The version comes from the flake (decision 0018).
+version: "2"
+
+linters:
+  # errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+  enable:
+    - bodyclose # probes and API clients must close what they open
+    - errorlint # wrapped errors compared with errors.Is and As
+    - gosec
+    - misspell
+    - noctx # every network call takes a context, so teardown can cancel it
+    - nolintlint
+    - unconvert
+    - usestdlibvars
+  settings:
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/bulkhead-labs/tailsuite

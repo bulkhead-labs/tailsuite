@@ -1,8 +1,14 @@
 # 0014: The tailnet model, and which project file owns each fact
 
 Status: **accepted** (2026-10-24). Settles #15 and #18. Amends
-[0004](0004-opentofu-owns-config.md): on headscale, M1 reads the module's
-values from `tofu/tailnet.auto.tfvars`, not from `tofu plan -json`.
+[0004](0004-opentofu-owns-config.md) twice:
+
+- On headscale, M1 reads the module's values from
+  `tofu/tailnet.auto.tfvars`, not from `tofu plan -json`.
+- A lab applies the module from its own run directory, and on the
+  Tailscale engine with the engine's copy of the policy, so the policy
+  input differs from production's.
+
 Evidence: [research 0005](../research/0005-tailnet-model-trial.md).
 
 ## Context
@@ -200,24 +206,45 @@ engines:
   - to give nodes their tags as they join, before tofu can look them up
     (throwaway tailnets hold tagged devices only);
   - to apply them on headscale.
-- **The Tailscale engine and production run `tofu` as usual**, the engine
-  with `policy_file` set to its copy.
-- **headscale can apply only tailsuite's own module until #20.** Anything
-  else in `tofu/` could change what production gets without tailsuite
-  seeing it, so the check is an allow-list. A headscale run is REFUSED,
-  with the reason, unless `tofu/` holds only:
-  - `tailsuite.tf`, exactly as tailsuite shipped it;
+- **A lab run never runs tofu in the user's `tofu/`.**
+  - That folder holds production's provider settings and state backend.
+    A run there could write the lab's policy to the production tailnet,
+    and the lab's state over production's ([0007](0007-read-only-by-default.md)).
+  - Instead, each Tailscale-engine run builds its own directory under
+    `.tailsuite/`, holding:
+    - `tailsuite.tf` and `tailnet.auto.tfvars`, copied from `tofu/`;
+    - the engine's copy of the policy;
+    - tailsuite's own provider and backend file: the throwaway tailnet's
+      credentials, `tailnet` and `base_url`, and local state.
+  - tofu runs there with no `TF_VAR_*` and no `TAILSCALE_*` variables
+    other than tailsuite's own.
+  - On headscale nothing runs tofu at all.
+- **Production runs `tofu` in `tofu/` as usual**, with the user's provider
+  settings and backend, and `policy_file` unset.
+- **A lab applies only tailsuite's own module, on either engine.** Until
+  #20, headscale can't apply anything else, and the Tailscale engine's run
+  directory holds nothing else. So anything else in `tofu/` that could
+  change what production gets would make the lab differ from production
+  without tailsuite seeing it, and the check is an allow-list.
+
+  A lab run is REFUSED, with the reason, unless the files OpenTofu reads
+  as configuration or variables in `tofu/` (`*.tf`, `*.tf.json`,
+  `*.tfvars`, `*.tfvars.json`) are only:
+  - `tailsuite.tf`, as shipped by this or an earlier tailsuite release;
   - `tailnet.auto.tfvars`;
   - other `.tf` or `.tf.json` files that declare no `tailscale_*`
     resource or data source and no `module` block, none of them an
     override file (`override.tf`, `*_override.tf`, or their `.tf.json`
-    forms).
+    forms). `provider` and `terraform` blocks are fine: that's where
+    production's credentials and backend live;
+  - other variables files that set no variable `tailsuite.tf` declares.
+    A `*.auto.tfvars` file would override the values in lexical order,
+    and any other would reach production through `-var-file`.
 
-  No other variable-definitions file is allowed (`terraform.tfvars`,
-  `*.auto.tfvars`, `*.tfvars.json`), because OpenTofu loads
-  `*.auto.tfvars` files in lexical order and a later one would win.
-  Values passed on the command line aren't in the project.
-  `tailsuite deploy` (M6) passes none, `policy_file` included.
+  Other files, such as `.terraform.lock.hcl`, `.terraform/`, state files
+  or a README, are ignored. Values passed on the command line aren't in
+  the project. `tailsuite deploy` (M6) passes none, `policy_file`
+  included.
 
 ### Export and the round trip
 
@@ -226,6 +253,13 @@ engines:
   and `import` (M5) for a real tailnet. After that, the user owns the
   files. This isn't the rejected generated `tofu/` below: export writes
   once, and tailsuite never regenerates the files on a run.
+- **Upgrading `tailsuite.tf`.**
+  - The binary carries the hash of every release's `tailsuite.tf`, so a
+    copy from an earlier release still counts as shipped, and results
+    say which version ran.
+  - When the user asks, tailsuite replaces `tailsuite.tf` with the
+    current release's copy and leaves the values alone. #9 names the
+    command.
 - **The round trip (#10):** export from a lab's model into a fresh
   project, rebuild the lab from it, and the same suite gives the same
   results.
@@ -301,6 +335,11 @@ three synthetic policies through a throwaway parser and headscale 0.29.5:
   `yamldecode`.** One place per device, but tofu's inputs would live
   outside `tofu/`, beside facts that are never deployed. That's unusual
   for Terraform teams, and hard to import into their codebases.
+- **Running a lab in a copy of every file in `tofu/`, with override files
+  for the provider and the backend.** It would let a team's own
+  `tailscale_*` resources reach the Tailscale engine. But every provider
+  alias, module and data source would have to be redirected correctly, a
+  miss writes to production, and headscale still couldn't apply them.
 - **A generated `tofu/`.** It contradicts 0004, and users editing
   generated files drift.
 - **`tofu plan -json` for headscale** (0004 as written), **or building
@@ -321,16 +360,19 @@ three synthetic policies through a throwaway parser and headscale 0.29.5:
 - **An auto-approved route is stated twice.** The provider requires a
   device's enabled routes in `tofu/` to include the routes `autoApprovers`
   approved, or the plan drifts. So such a route appears in `policy.hujson`
-  as a rule and in `tofu/` as state. When advertised routes land (M3), a
-  load check keeps the two in step: a route that `autoApprovers` would
-  approve for a device that advertises it must be listed in that device's
-  enabled routes.
+  as a rule and in `tofu/` as state. Once advertised routes land, a load
+  check keeps the two in step (#44, M3).
+- **A team's own `tailscale_*` resources in `tofu/` make lab runs
+  REFUSED** until tailsuite's module covers them, as DNS and settings
+  will when their milestones land, or until #36 (M5) brings in teams' own
+  HCL.
 - **On the Tailscale engine, tofu applies the engine's copy of the
   policy**, not the user's file. The module is the same; the policy input
   differs, and the patch says how.
 - **A fact changes file if its owner changes**, say if the provider gains
   a device-IP resource. That move is a migration with a schema bump.
-- **On headscale, a customized module can't be tested until #20.**
+- **A customized `tailsuite.tf` can't be tested in the lab**, because it
+  isn't a shipped copy.
 - **A team's own HCL (M5, #36) is read through `tofu plan -json` against
   production**, which needs a credential (#24).
 - **`hashicorp/hcl` (MPL-2.0) becomes a dependency.**

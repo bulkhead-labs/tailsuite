@@ -26,8 +26,10 @@ request as any change to it.
 - **OpenTofu**, with the official Tailscale provider, applies the tailnet's
   configuration: the policy, device tags, routes, DNS and settings. It
   applies the same module to the lab and, at deploy time, to production.
-  On the Tailscale engine it applies the engine's copy of the policy. On
-  headscale, until #20, tailsuite reads the module's values and applies
+  A lab never runs it in the user's `tofu/`, which holds production's
+  credentials and state. On the Tailscale engine, tailsuite applies the
+  module from its own run directory, with the engine's copy of the policy.
+  On headscale, until #20, tailsuite reads the module's values and applies
   them itself ([0014](decisions/0014-tailnet-model-and-project-layout.md)).
 
 ## Layers

@@ -38,7 +38,7 @@ request as any change to it.
 |---|---|---|---|
 | **Sources** | `Source → TailnetModel` | The project's files; Tailscale API (read-only); OpenTofu plan JSON; later Pulumi and headscale | [0014](decisions/0014-tailnet-model-and-project-layout.md) |
 | **Tailnet model** | Plain data | Our own types, in Tailscale's terms, independent of the source. The policy is the user's file as read, plus a read-only typed copy that lists every key it doesn't understand. Devices are keyed by MagicDNS name; users, DNS and settings follow. Each record says whether it was observed, declared or inferred. Only inputs are stored; effective state is computed | [0014](decisions/0014-tailnet-model-and-project-layout.md) |
-| **Planner** | `TailnetModel + LabConfig → LabPlan` | Pure and deterministic. It chooses one representative node per equivalence class, the networks and the listeners. It lowers the policy for the chosen engine as a patch on the user's file, which records every rewrite | [0014](decisions/0014-tailnet-model-and-project-layout.md), [#22](https://github.com/bulkhead-labs/tailsuite/issues/22) |
+| **Planner** | `TailnetModel + LabConfig → LabPlan` | Pure and deterministic. It chooses one representative node per equivalence class, the networks and the listeners. It computes each test's needs, and calls the chosen engine's `Lower`, which returns a patch on the user's file that records every rewrite | [0014](decisions/0014-tailnet-model-and-project-layout.md), [0016](decisions/0016-engine-interface-capabilities.md), [#22](https://github.com/bulkhead-labs/tailsuite/issues/22) |
 | **Engines** | `Capabilities()`, `Lower(model)`, `Start(plan)`; the lab: `CompiledFilter(node)`, `Teardown()` | headscale; Tailscale throwaway tailnet; later NetBird. Each declares every capability as native, lowered (after a recorded rewrite) or refused. Lowering is pure, and errs toward more access, never less | [0002](decisions/0002-two-engines.md), [0016](decisions/0016-engine-interface-capabilities.md) |
 | **Sandbox** | Networks, nodes, exec, teardown | Docker (default); Podman through the same API; later a VM driver (Lima) and real macOS or Windows nodes for verify runs | [0003](decisions/0003-docker-one-container-per-node.md), [0009](decisions/0009-os-mimicry.md) |
 | **Node agent** | Control over an out-of-band network, never over the tailnet | One small Go binary in every node, running its listeners and probes | [#7](https://github.com/bulkhead-labs/tailsuite/issues/7) |
@@ -52,8 +52,8 @@ Every test ends in one of four results:
 - **PASS**: the traffic did what the test expected.
 - **FAIL**: it didn't.
 - **UNKNOWN**: the lab can't reproduce a condition the result depends on.
-  For example, a posture rule on a client OS the lab only mimics, on an
-  engine that can't mimic it.
+  For example, a posture rule on the device's country (`ip:country`), or
+  completing an SSH check, which needs a person.
 - **REFUSED**: the engine doesn't support a feature the test needs, such as
   posture on headscale.
 
@@ -93,7 +93,7 @@ headscale it needs no credentials at all.
 |---|---|
 | `tailsuite init --template <name> [--nix]` | Writes a project from a template embedded in the binary |
 | `tailsuite up` | Starts the lab and the local UI, and opens it in the browser (not in CI, or with `--no-browser`); localhost only, behind a one-time link ([0017](decisions/0017-local-ui.md)) |
-| `tailsuite test [--profile <name>] [--only <label>] [--skip <label>] [--run <regex>] [--strict]` | Runs the suite: the profile picks the engine, the tests and the strictness. Exit codes: 0 fine, 1 a FAIL, 2 unproven under strict, 3 couldn't run ([0015](decisions/0015-test-file-labels-profiles.md)) |
+| `tailsuite test [--profile <name>] [--engine <name>] [--only <label>] [--skip <label>] [--run <regex>] [--strict]` | Runs the suite: the profile picks the engine, the tests and the strictness, and flags override it. Exit codes: 0 fine, 1 a FAIL, 2 nothing proven or unproven under strict, 3 couldn't run ([0015](decisions/0015-test-file-labels-profiles.md)) |
 | `tailsuite capabilities` | Prints what each engine does natively, after a rewrite, or refuses ([0016](decisions/0016-engine-interface-capabilities.md)) |
 | `tailsuite down` | Tears the lab down |
 | `tailsuite export tofu` | Writes `tofu/` (tailsuite's module and the values) from the current model, once; `init` and `import` use it, and the user owns the result |

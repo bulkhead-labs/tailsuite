@@ -8,8 +8,8 @@ table in the same PR.
 | # | Decision | Status |
 |---|---|---|
 | [0001](0001-truth-over-mocks.md) | Truth over mocks: real traffic, four results, positive controls | Accepted 2026-10-23 |
-| [0002](0002-two-engines.md) | Two engines from M1: headscale and Tailscale throwaway tailnets | Accepted 2026-10-23 |
-| [0003](0003-docker-one-container-per-node.md) | Docker, one container per node, kernel TUN, TLS in the lab | Accepted 2026-10-23 |
+| [0002](0002-two-engines.md) | Two engines from M1: headscale and Tailscale throwaway tailnets | Accepted 2026-10-23; refined by 0016 |
+| [0003](0003-docker-one-container-per-node.md) | Docker, one container per node, kernel TUN, TLS in the lab | Accepted 2026-10-23; refined by 0016 |
 | [0004](0004-opentofu-owns-config.md) | OpenTofu owns the tailnet config; tailsuite owns the machines | Accepted 2026-10-24; amended by 0014 |
 | [0005](0005-go-single-binary-nix.md) | Go, one signed binary, Nix for development | Accepted 2026-10-24 |
 | [0006](0006-apache-2-dco-open-core.md) | Apache-2.0, DCO sign-off, open core later | Accepted 2026-10-24 |
@@ -20,7 +20,7 @@ table in the same PR.
 | [0011](0011-name-tailsuite.md) | The name is tailsuite | Accepted 2026-10-24 |
 | [0012](0012-status-page-hosting.md) | The status page: GitHub Pages from `docs/`, no build | Accepted 2026-10-24; context amended by 0013 |
 | [0013](0013-ci-trust-model.md) | Agents write CI; nothing merges or ships without the maintainer | Accepted 2026-10-24; settings in place (#39) |
-| [0014](0014-tailnet-model-and-project-layout.md) | The tailnet model, and which project file owns each fact | Accepted 2026-10-24; profiles sketch refined by 0015 |
+| [0014](0014-tailnet-model-and-project-layout.md) | The tailnet model, and which project file owns each fact | Accepted 2026-10-24; `lab.yaml` sketch refined by 0015 and 0016 |
 | [0015](0015-test-file-labels-profiles.md) | The test file, labels and profiles | Accepted 2026-10-25 |
 | [0016](0016-engine-interface-capabilities.md) | The engine interface and the capability matrix | Accepted 2026-10-25 |
 | [0017](0017-local-ui.md) | The local UI: the map first, localhost only, no build step | Accepted 2026-10-25 |

@@ -1,6 +1,8 @@
 # 0014: The tailnet model, and which project file owns each fact
 
-Status: **accepted** (2026-10-24). Settles #15 and #18. Amends
+Status: **accepted** (2026-10-24). Settles #15 and #18. Its `lab.yaml`
+sketch is refined by [0015](0015-test-file-labels-profiles.md) (profiles)
+and [0016](0016-engine-interface-capabilities.md) (user roles). Amends
 [0004](0004-opentofu-owns-config.md) twice:
 
 - On headscale, M1 reads the module's values from
@@ -9,9 +11,7 @@ Status: **accepted** (2026-10-24). Settles #15 and #18. Amends
   Tailscale engine with the engine's copy of the policy, so the policy
   file it reads differs from production's.
 
-Evidence: [research 0005](../research/0005-tailnet-model-trial.md). The
-`profiles` in its `lab.yaml` sketch are refined by
-[0015](0015-test-file-labels-profiles.md).
+Evidence: [research 0005](../research/0005-tailnet-model-trial.md).
 
 ## Context
 

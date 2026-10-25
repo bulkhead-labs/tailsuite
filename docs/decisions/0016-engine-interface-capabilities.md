@@ -3,16 +3,27 @@
 Status: **accepted** (2026-10-25). Settles #17. What results that
 couldn't be proven do to CI is in [0015](0015-test-file-labels-profiles.md).
 
+Refines earlier records:
+
+- [0002](0002-two-engines.md): headscale matches users by email, so users
+  are native there, not rewritten. IP sets, which 0002 lists as
+  unsupported, are lowered on headscale.
+- [0003](0003-docker-one-container-per-node.md): rules that name a
+  Tailscale IPv6 address are refused, not only flagged.
+- [0014](0014-tailnet-model-and-project-layout.md): a user's role (admin,
+  owner…) is a fact the identity provider or the admin console makes true,
+  never deployed, so it lives in `lab.yaml`, beside the user.
+
 ## Context
 
-- **Two engines with opposite gaps** ([0002](0002-two-engines.md)).
+- **Two engines with opposite gaps** (0002).
 - **A missing capability is REFUSED or UNKNOWN before anything runs**
   ([0001](0001-truth-over-mocks.md)).
-- **Each engine gets the user's policy plus a recorded patch**
-  ([0014](0014-tailnet-model-and-project-layout.md)).
+- **Each engine gets the user's policy plus a recorded patch** (0014).
 - **headscale 0.29.5 rejects a policy with any feature it lacks**, one
   error at a time
-  ([research 0005](../research/0005-tailnet-model-trial.md)).
+  ([research 0005](../research/0005-tailnet-model-trial.md)). With no
+  policy, or one with no `grants` or `acls`, it allows all traffic.
 
 ## Decision
 
@@ -34,43 +45,53 @@ type Lab interface {
 }
 ```
 
-- **`Lower` is pure.**
-  - It returns the RFC 6902 patch and every rewrite, with no I/O. So it's
-    unit-tested and fuzzed without Docker, and shown to the user before
-    the lab starts.
-  - Where a rewrite can't be exact, it errs toward more access, never
-    less. A wrong "allowed" is visible and gets investigated. A wrong
-    "blocked" is the false "locked down" that 0001 calls the worst
-    failure.
-- **`Start`** brings up the control plane, joins the nodes through the
-  sandbox ([0003](0003-docker-one-container-per-node.md)), and applies the
-  configuration. On headscale it sets the policy after the nodes join,
-  because headscale checks a policy's own tests against live devices
-  (research 0005).
+- **`Lower` is pure.** It returns the RFC 6902 patch and every rewrite,
+  with no I/O. So it's unit-tested and fuzzed without Docker, and shown to
+  the user before the lab starts.
+- **`Start` returns only when the lab is ready:**
+  - the control plane is up;
+  - the nodes have joined through the sandbox (0003);
+  - the configuration is applied;
+  - every node's compiled filter shows the applied policy.
+
+  That last wait is the plan's one allowed kind of wait, bounded and only
+  for policy propagation. Without it, a probe could pass on the previous
+  filter, and headscale's starts as allow-all. On headscale the policy is
+  set after the nodes join. On the Tailscale engine, the wait comes after
+  `tofu apply`.
 - **`Teardown` runs on every exit path.** `tailsuite down` can also run it
   after a crash, from the lab state in `.tailsuite/`.
-- **`CompiledFilter` is required of every engine.** The conformance check
-  in 0002, and the differential fuzzing in #42, compare these filters.
+- **`CompiledFilter` is required of every engine.** Readiness, the
+  conformance check in 0002, and the differential fuzzing in #42 all use
+  it.
 
 ### Capabilities are data
 
 Each capability an engine declares has one of three values:
 
 - **native:** the engine does it as Tailscale does;
-- **lowered:** the engine does it after a recorded rewrite;
-- **refused:** the engine can't. A test that needs it is REFUSED on that
-  engine, and the result names the capability and the engine.
+- **lowered:** the engine does it after a rewrite that's exact for every
+  test it touches, recorded in the patch;
+- **refused:** the engine can't, or can only approximate it. A test that
+  needs it is REFUSED on that engine, and the result names the capability
+  and the engine.
+
+**A feature with no row is refused on every engine.** That fails safe, the
+same way 0014's allow-list does.
 
 Some conditions no engine can reproduce, so a test that depends on them is
 UNKNOWN on both:
 
-- a real macOS or Windows client (the lab mimics them, per
-  [0009](0009-os-mimicry.md); results say "OS mimicked");
-- completing an SSH check, which needs a person;
-- traffic from the public internet, as Funnel needs, so Funnel is a
-  config-only check (#32);
-- posture attributes from a third-party integration, which the lab can't
-  set.
+- **Per-OS behaviour outside the packet filter**
+  ([0009](0009-os-mimicry.md)). Filter-level `node:os` rules are proven,
+  and labelled "OS mimicked".
+- **Completing an SSH check**, which needs a person.
+- **Traffic from the public internet**, which a Funnel test would need.
+- **Posture attributes the lab can't set:** a third-party integration's,
+  or Tailscale's geolocation attributes (`ip:country`,
+  `ip:publicAddress`), which come from the device's public IP.
+- **The "doesn't meet it" side of a condition** when the lab can't build
+  such a device (0015).
 
 The matrix lives in code next to each engine. `tailsuite capabilities`
 prints it, and the docs page is generated from the same data, so the two
@@ -80,28 +101,33 @@ can't drift. Here it is as of headscale 0.29.5 and Tailscale's docs
 | Capability | headscale | Tailscale engine |
 |---|---|---|
 | Grants, ACLs, ports, hosts, tags | native | native |
-| Users and groups | native | lowered: one user becomes one tag (#6; the hard cases are #21) |
-| `autogroup:member`, `autogroup:self` | native | refused in M1; lowered from M3 (#21) |
-| Role autogroups (`autogroup:admin`…) | lowered: as tag owners, to the lab's admin; in rules, to the users with that role in `lab.yaml`, else refused | refused: no human users (Tailscale says users are coming) |
-| Posture (`postures`, `srcPosture`, `defaultSrcPosture`) | refused; declined upstream ([headscale#2458](https://github.com/juanfont/headscale/issues/2458)) | native, OS mimicked |
-| IP sets | lowered: expanded to addresses; refused when a set includes an autogroup | native |
+| Users and groups | native (matched by email) | lowered: one user becomes one tag (#6; the hard cases are #21) |
+| `autogroup:member`, `autogroup:self` | native | refused in M1; #21 decides |
+| `autogroup:tagged` | native | refused while users are lowered to tags, since every device is then tagged (#21) |
+| `autogroup:shared`, groups synced from an identity provider | refused | refused |
+| Role autogroups (`autogroup:admin`…) | lowered: as tag owners, to the lab's admin, which can't change who reaches what because tags come from `tofu/`; in rules, to the users with that role in `lab.yaml`, else refused | refused: no human users (Tailscale says users are coming) |
+| Posture (`postures`, `srcPosture`, `defaultSrcPosture`) | refused; declined upstream ([headscale#2458](https://github.com/juanfont/headscale/issues/2458)) | native; `node:os` mimicked |
+| IP sets | lowered: expanded to addresses; refused when a set includes an autogroup or a host | native |
 | `via`, `autogroup:internet`, subnet routes, exit nodes | native (M3 proves them) | native |
 | SSH accept and deny | native | native |
-| SSH check | native; the demand is proven, completing it is UNKNOWN | the same |
+| SSH check | native: the demand is proven, completing it is UNKNOWN | refused: "an SSH access rule from a tagged device cannot be in check mode" |
 | SSH session recording | refused | native, with a recorder node (M3) |
-| Funnel | config-only | config-only |
+| Funnel (`nodeAttrs`) | refused | native as configuration; traffic from the internet is UNKNOWN |
 | `attrConfig` | refused | native (M4) |
+| Services (`svc:`) | refused | refused until a milestone adds them |
 | Pinned IPv4 addresses | native (allocation, #5) | native (`POST /device/{id}/ip`) |
 | Pinned IPv6 addresses | refused | refused |
 | Compiled filter dump | native | native |
 
 ### How a test becomes REFUSED or UNKNOWN
 
-1. **The planner computes each test's needs, before the lab starts:**
+1. **The planner computes each test's needs, before the lab starts.**
+   Needs always over-approximate:
    - the features of every rule that could match the test's source and
      destination, ignoring the rules' conditions. This comes from the typed
      copy in 0014;
-   - its probe, such as SSH or a check;
+   - a selector the planner can't resolve counts as matching every device;
+   - the test's probe, such as SSH or a check;
    - its conditions, such as posture.
 2. **A need the engine refuses makes the test REFUSED on that engine**,
    naming the capability. A need no engine or lab can reproduce makes it
@@ -110,19 +136,30 @@ can't drift. Here it is as of headscale 0.29.5 and Tailscale's docs
    a profile can send those tests to an engine that can prove them.
 4. **A key the typed copy doesn't understand** follows 0014.
 
-### Lowering for headscale when the policy uses refused features
+### The engines' copies of the policy
 
-headscale rejects the whole policy over a single refused feature. So the
-headscale lowering removes what headscale refuses, and records each
-removal in the patch:
-
-- Every test whose source and destination a removed or altered rule could
-  match is REFUSED. The rest of the suite still runs.
-- **Conditions are removed, not the rules they guard.** A rule without its
-  posture condition allows more, never less, so any mistake in the needs
-  computation shows extra access instead of a false block.
-- **`defaultSrcPosture` applies to every rule**, so a policy that uses it
-  is REFUSED on headscale entirely.
+- **The policy's own `tests` and `sshTests` are removed from every
+  engine's copy**, because tailsuite runs them itself (0015).
+  - headscale checks them against live devices, and has no field for
+    `srcPostureAttrs`.
+  - On the Tailscale engine, their users would need rewriting too.
+- **headscale's copy also loses what headscale refuses**, because headscale
+  rejects the whole policy over a single refused feature. Each removal is
+  recorded in the patch:
+  - every test whose source and destination a removed or altered rule
+    could match is REFUSED;
+  - a removal that isn't about a rule's source or destination (Funnel in
+    `nodeAttrs`, `attrConfig`) refuses every test on the devices it
+    targets;
+  - if the removals leave no `grants` or `acls`, the whole run is
+    REFUSED, because headscale would then allow everything;
+  - `defaultSrcPosture` applies to every rule, so a policy that uses it is
+    REFUSED on headscale entirely;
+  - the rest of the suite still runs.
+- **Conditions are removed, not the rules they guard.** Every test such a
+  rule touches is already REFUSED, so this only matters if the needs
+  computation has a bug. Then a rule without its condition allows more,
+  never less, and the bug shows extra access instead of a false block.
 
 ## Why
 
@@ -132,25 +169,38 @@ removal in the patch:
 - **Capabilities as data** let the planner refuse before starting a lab,
   let profiles route by `needs:` labels, and keep the published matrix
   true.
-- **Erring toward more access** matches what tailsuite promises: it may
-  over-report exposure while the lab can't prove something, but it never
-  reports a lockdown that isn't there.
+- **Refusing whatever an inexact rewrite touches** is 0001 applied to
+  rewrites: a result the lab couldn't prove is never a PASS or a deny.
+- **More access as the bound on bugs.** It's chosen because a false
+  "locked down" is the failure 0001 calls worst.
+- **Waiting for the compiled filters** stops a probe from passing on the
+  filter the lab started with.
 - **Removing refused features** keeps pull-request runs on headscale
   useful for policies that use posture, instead of refusing everything.
 
 ## Evidence
 
-- **headscale 0.29.5** rejected role autogroups as tag owners, `postures`,
-  `ipsets`, SSH `recorder`, Funnel in `nodeAttrs`, and `attrConfig`. It
-  accepted `via`, `autogroup:self`, `autogroup:internet`, SSH check mode,
-  `sshTests` and `autoApprovers` (research 0005, 2026-10-24).
+- **headscale 0.29.5:**
+  - research 0005 (2026-10-24) found it rejects role autogroups as tag
+    owners, `postures`, `ipsets`, SSH `recorder`, Funnel in `nodeAttrs`,
+    and `attrConfig`;
+  - it accepted `via`, `autogroup:self`, `autogroup:internet`, SSH check
+    mode, `sshTests` and `autoApprovers`;
+  - its policy tests have no `srcPostureAttrs` field, and it rejects
+    unknown fields (`hscontrol/policy/v2/test.go`, checked 2026-10-25);
+  - with no policy loaded it "allows all traffic between nodes", and a
+    policy file with no `acls` or `grants` defaults to allow-all
+    (`docs/ref/policy.md`, checked 2026-10-25).
 - **headscale's maintainer declined posture** in 2025 ("Headscale is not
   really a ZTNA solution"; headscale#2458, closed as not planned).
-- **Tailscale's API-only tailnets** "have no human owner or users", and
-  "future iterations of this feature will remove this limitation".
-  Tailscale's docs, checked 2026-10-25.
-- **The engines' other gaps are in
-  [research 0002](../research/0002-engines.md).**
+- **Tailscale's docs, checked 2026-10-25:**
+  - "An SSH access rule from a tagged device cannot be in check mode";
+  - API-only tailnets "have no human owner or users", and "future
+    iterations of this feature will remove this limitation";
+  - the geolocation posture attributes `ip:country` and
+    `ip:publicAddress`.
+- **The engines' other gaps** are in
+  [research 0002](../research/0002-engines.md).
 
 ## Alternatives
 
@@ -159,8 +209,12 @@ removal in the patch:
 - **REFUSED for the whole run whenever the policy uses anything an engine
   lacks.** It's simpler, but every posture user would lose headscale for
   pull requests.
-- **Removing the rule instead of its condition.** It's more faithful to
-  the rule's intent, but a mistake would show a false block.
+- **Trusting an approximate rewrite, erring toward more access**, which
+  an earlier draft of this record proposed. A wrong allow is a PASS when
+  the test expects allow, so it isn't visible. Refusing is the only safe
+  answer.
+- **Removing the rule instead of its condition.** A bug in the needs
+  computation would then show a false block.
 - **A hand-written matrix in the docs.** It would drift from the code.
 
 ## Given up
@@ -168,9 +222,14 @@ removal in the patch:
 - **headscale tests a narrower policy** when the real one uses features
   it lacks. Tests touching those features are REFUSED, so nothing false
   shows, but pull-request runs prove less for those policies.
+- **`check` and `autogroup:tagged` are refused on the Tailscale engine**
+  until its throwaway tailnets hold human users.
+- **The policy's own tests never run inside an engine's evaluator.**
+  tailsuite runs them with real traffic instead, and `tailsuite deploy`
+  still runs them through `/acl/validate` (0007).
 - **The needs computation relies on the typed copy's static view.** A bug
-  there could send a test to the wrong engine. Erring toward more access,
-  the nightly Tailscale run and the conformance check (#42) bound the
-  damage.
-- **Each new Tailscale feature needs a capability entry.** That's 0014's
-  forcing function again.
+  there could send a test to the wrong engine. Over-approximation, erring
+  toward more access, the nightly Tailscale run and the conformance check
+  (#42) bound the damage.
+- **Each new Tailscale feature is refused until it has a capability
+  entry.** That's 0014's forcing function again.

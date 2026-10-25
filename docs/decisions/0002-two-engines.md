@@ -1,7 +1,10 @@
 # 0002: Two engines from the first milestone
 
 Status: **accepted** (2026-10-23). The default engine is decided by the
-scorecards after M3 and M4 ([plan](../plan.md#milestones)).
+scorecards after M3 and M4 ([plan](../plan.md#milestones)). Refined by
+[0016](0016-engine-interface-capabilities.md): headscale matches users by
+email, so they aren't rewritten there, and IP sets are lowered on
+headscale.
 
 ## Context
 

@@ -33,6 +33,9 @@ record's.
   - It doesn't when the `CI` environment variable is set, or with
     `--no-browser`.
   - It always prints the link.
+  - It opens the browser on a local redirect file, mode 0600, in the
+    user's runtime directory, so the secret never appears on a command
+    line. Jupyter Server does the same by default.
 - **The UI is read-only in M1.** Editing the policy arrives with #34 (M6),
   behind 0007's gates.
 
@@ -49,16 +52,19 @@ out, and the UI doesn't use one.
     never send to a server or put in logs.
   - **On first load, the page trades it**, in one POST, for a session
     secret. From then on the server refuses the link's secret. A copy of
-    the link is then useless, whether it's in a terminal, in the browser's
-    history, or on the command line of the browser `tailsuite up` started.
+    the link is then useless, whether it's in a terminal or in the
+    browser's history.
   - The page keeps the session secret in `sessionStorage`, which is per
-    port and per tab, so a reload keeps working.
+    port and per tab, so a reload keeps working. After the trade, the page
+    drops the fragment from the address bar (`history.replaceState`). On a
+    reload, it uses the stored session secret instead of trading again.
   - **Every data, stream and POST request** carries the session secret as
     a header, and the server refuses any without it.
   - **The trade is the one exception.** It carries the link's secret
     instead, and still has to pass the Origin check.
-  - **A used link traded again ends the session the first trade made**,
-    and the page asks for a fresh link.
+  - **A used link traded again within its unused lifetime** (a few
+    minutes) ends the session the first trade made, and the page asks for
+    a fresh link. After that, a used link is refused and changes nothing.
   - **The page's shell and its embedded scripts and styles hold no tailnet
     data**, so they're served without the secret. A navigation can't carry
     a custom header.
@@ -129,6 +135,10 @@ out, and the UI doesn't use one.
 
 #11 pins the exact versions when it's built.
 
+**Jupyter Server's `use_redirect_file`**, on by default, opens the browser
+on a redirect file so that the launch token isn't visible to other users
+(`jupyter_server/serverapp.py`, checked 2026-10-25).
+
 ## Alternatives
 
 - **A session cookie.** It isn't separated by port, so any other localhost
@@ -153,11 +163,14 @@ out, and the UI doesn't use one.
   passes the two-week rule.
 - **A new browser tab needs a fresh link.** `sessionStorage` isn't shared
   between tabs.
-- **A race of a few seconds.** A local user who reads the link before the
-  page loads could trade it first. When the real page then tries, the
-  server ends that user's session, and the page asks for a fresh link. If
-  the real page traded first and the other user came second, the real
-  page's session ends too, which costs only a fresh link.
+- **A race of a few seconds, when the link is printed.** This happens
+  with `--no-browser`, or when someone copies the printed link.
+  - A local user who reads it from the terminal before the page loads
+    could trade it first, and see the map until the real page loads.
+  - The real page's trade then ends that user's session, and the page asks
+    for a fresh link.
+  - The browser `tailsuite up` opens never exposes the link, because it
+    gets a redirect file.
 - **Until esbuild is wired, only libraries that ship ES modules** can be
   used, and vendoring has to rewrite their imports.
 - **Vendored libraries are updated by hand**, as on the status page.

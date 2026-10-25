@@ -61,14 +61,19 @@ type Lab interface {
       on a port unique to that apply.
     - The patch shown to the user labels it as tailsuite's.
     - `Lower` stays pure, because the marker isn't part of it.
-  - **A policy with neither `acls` nor `grants` gets its default made
-    explicit first.**
-    - Both engines allow everything for such a policy. With the marker
-      alone, they'd allow only the marker.
+  - **A policy with no `acls` section and no `grants` section gets its
+    default made explicit first.**
+    - Both engines allow everything when both sections are absent. With
+      the marker alone, they'd allow only the marker.
+    - An empty section, such as `"acls": []`, is different: both engines
+      deny everything. Such a policy gets no default.
     - So the patch first adds `{"src": ["*"], "dst": ["*"], "ip": ["*"]}`,
       which is exact, and then the marker.
   - **tailsuite waits** until every node's compiled filter holds the
     marker, and its peer list has every peer the plan expects.
+  - **To check before the engines rely on it:** an allow-all rule covers
+    the marker, so the marker has to survive under one. #5 checks that on
+    headscale, and the #3 spike on Tailscale.
   - **The SSH policy gets its own marker from M3**, when SSH ships. M3
     settles its shape, because Tailscale's SSH rules can't take an address
     as their source.
@@ -123,6 +128,8 @@ table shows each one's target, and its milestone where that's after M1:
 - **M1, the walking skeleton**, builds what the three-node lab needs:
   - grants and ACLs on TCP ports between tags, hosts, users and groups,
     with users lowered to tags on the Tailscale engine;
+  - `*` sources and destinations, and `"ip": ["*"]`, as in a new tailnet's
+    untouched default policy;
   - pinned IPv4 addresses;
   - the compiled filter.
 - **M2** completes tags, grants and ports: every port and protocol form,
@@ -195,9 +202,11 @@ Here's the table as of headscale 0.29.5 and Tailscale's docs (checked
   - a removal that isn't about a rule's source or destination (Funnel in
     `nodeAttrs`, `attrConfig`) refuses every test on the devices it
     targets;
-  - if the user's policy had `grants` or `acls`, and the removals leave
-    none of them, the whole run is REFUSED, because both engines would then
-    allow everything. The readiness marker doesn't count as one;
+  - if the user's policy had rules in `grants` or `acls`, and the removals
+    leave none, the whole run is REFUSED. A section left absent would make
+    both engines allow everything, and one left empty would make them deny
+    everything. Neither is the user's policy. The readiness marker doesn't
+    count as a rule;
   - `defaultSrcPosture` applies to every rule, so a policy that uses it is
     REFUSED on headscale entirely;
   - the rest of the suite still runs.
@@ -235,11 +244,16 @@ Here's the table as of headscale 0.29.5 and Tailscale's docs (checked
     unknown fields (`hscontrol/policy/v2/test.go`, checked 2026-10-25);
   - with no policy loaded it "allows all traffic between nodes", and a
     policy file with no `acls` or `grants` defaults to allow-all
-    (`docs/ref/policy.md`, checked 2026-10-25).
+    (`docs/ref/policy.md`, checked 2026-10-25);
+  - it allows all only when both sections are absent: `pol.ACLs == nil &&
+    pol.Grants == nil` (`hscontrol/policy/v2/filter.go`).
 - **headscale's maintainer declined posture** in 2025 ("Headscale is not
   really a ZTNA solution"; headscale#2458, closed as not planned).
 - **Tailscale's docs, checked 2026-10-25:**
   - "An SSH access rule from a tagged device cannot be in check mode";
+  - "in the absence of an acls section", Tailscale "applies the default
+    allow all policy", and "to deny all traffic, use an empty object for
+    the acls section";
   - API-only tailnets "have no human owner or users", and "future
     iterations of this feature will remove this limitation";
   - the geolocation posture attributes `ip:country` and

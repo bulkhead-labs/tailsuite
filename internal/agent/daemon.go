@@ -30,8 +30,8 @@ func (e *ExitError) Error() string { return fmt.Sprintf("the node's command exit
 // and runs the node's own command (such as tailscaled), if there is one,
 // until it exits. It returns when the command exits, with an *ExitError if
 // it failed. When ctx is cancelled it stops the command with SIGTERM, and
-// returns how the command ended, so a node stopped mid-run doesn't read as
-// a clean exit. The listeners close as it returns. It refuses to start
+// returns how the command ended: whatever the command does with SIGTERM
+// (tailscaled exits 0), or 137 if it had to be killed. The listeners close as it returns. It refuses to start
 // where another agent already serves.
 func Run(ctx context.Context, a *Agent, socket string, command []string, stderr io.Writer) error {
 	defer a.Close()
@@ -73,13 +73,25 @@ func Run(ctx context.Context, a *Agent, socket string, command []string, stderr 
 // listenUnix listens on socket, in a directory only its owner can enter.
 // It replaces a stale socket, but refuses one a live agent still serves:
 // taking it would orphan that agent's listeners.
+//
+// It never changes a directory it didn't create: it refuses an existing
+// one that others can enter, such as /tmp.
 func listenUnix(socket string) (net.Listener, error) {
 	dir := filepath.Dir(socket)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	switch fi, err := os.Stat(dir); {
+	case errors.Is(err, os.ErrNotExist):
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return nil, fmt.Errorf("agent socket: %w", err)
+		}
+		if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // G302: a directory, which needs its execute bit; the umask could have widened nothing, but make sure
+			return nil, fmt.Errorf("agent socket: %w", err)
+		}
+	case err != nil:
 		return nil, fmt.Errorf("agent socket: %w", err)
-	}
-	if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // G302: a directory, which needs its execute bit
-		return nil, fmt.Errorf("agent socket: %w", err)
+	case !fi.IsDir():
+		return nil, fmt.Errorf("agent socket: %s isn't a directory", dir)
+	case fi.Mode().Perm()&0o077 != 0:
+		return nil, fmt.Errorf("agent socket: %s can be entered by others (mode %o); want a directory only its owner can enter", dir, fi.Mode().Perm())
 	}
 	var d net.Dialer
 	dctx, cancel := context.WithTimeout(context.Background(), time.Second)

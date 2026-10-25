@@ -41,16 +41,20 @@ exec channel.
 - **`tailsuite-agent run --node <name> [-- <command>]` is the node's
   entrypoint.**
   - It serves sessions on a Unix socket inside the node,
-    `/run/tailsuite/agent.sock`. It makes the socket's directory 0700 and
-    the socket 0600, so only root can reach it.
+    `/run/tailsuite/agent.sock`. It creates the socket's directory 0700,
+    and the socket 0600, so only root can reach it. It never changes a
+    directory it didn't create, and refuses an existing one that others
+    can enter.
   - **It refuses to start where another agent already serves.** Taking a
     live agent's socket would leave its listeners where no session could
     reach them. A stale socket, with no agent behind it, is replaced.
   - It runs the node's own command under it, such as tailscaled, and
     passes SIGTERM on. It exits with the command's status: its exit code,
     or 128 plus the signal that killed it. So the container stops when the
-    command does, and a node stopped mid-run, or a tailscaled killed for
-    memory (137), never reads as a clean exit.
+    command does, and a command killed outright, such as a tailscaled
+    killed for memory (137), never reads as a clean exit. A node stopped
+    with SIGTERM exits with whatever its command does then: tailscaled
+    v1.102.5 exits 0.
   - `control.Entrypoint` builds this, and the engines (#5, #6) give it
     their command.
 - **The sandbox runs every node with an init process (docker-init) as PID
@@ -83,8 +87,9 @@ exec channel.
 - **A generation tells a runner whether the set changed under it.** It
   moves whenever a listener opens or closes, and `set_listeners` and
   `listeners` return it. The runner (#8) reads it before and after its
-  probes. If it moved, another process changed the listeners in between,
-  and those results are UNKNOWN.
+  probes, on one session. If it moved, another process changed the
+  listeners in between, and those results are UNKNOWN. The generation
+  restarts with the agent, so a lost session makes them UNKNOWN too.
 - **A listener can't go stale.** If `lab.yaml` drops one, the next
   declaration closes it, so a probe can't succeed against a service the
   lab no longer has.
@@ -130,8 +135,10 @@ exec channel.
 - **`Connect` and `Total` are timings, for reporting only.** The plan's
   stability rules say results never depend on timings.
 - **A probe spec is checked before anything is sent.** The host is an IP
-  address, not a name, the port is 1–65535, and an HTTP path starts with
-  `/`. A spec that fails is a request error, never an outcome.
+  address, not a name and not the unspecified address (which reaches the
+  node itself), the port is 1–65535, and an HTTP path is a plain path:
+  it starts with `/`, with no query, fragment or escape. A spec that
+  fails is a request error, never an outcome.
   - A name would add a lookup, and a resolver that doesn't answer would
     look like a drop.
   - The HTTP request's URL is built from its parts, and checked, so
@@ -256,7 +263,7 @@ exec channel.
   node can reach, not traffic forwarded through it. Subnet routers and
   exit nodes are M3.
 - **Only TCP and HTTP so far.** HTTPS, Postgres, UDP and ICMP are #56
-  (M2); SSH is M3.
+  (M2); SSH is #59 (M3).
 - **Every node needs its engine's init binary**: docker-init on Docker,
   catatonit on Podman. It isn't checked.
 - **Probes take IP addresses only.** The runner resolves device names

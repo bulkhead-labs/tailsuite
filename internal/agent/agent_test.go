@@ -604,6 +604,12 @@ func TestBadProbeSpecs(t *testing.T) {
 		"an address with a zone":       {Proto: ProtoTCP, Host: "fe80::1%eth0", Port: web.Port},
 		"a negative timeout":           {Proto: ProtoTCP, Host: "127.0.0.1", Port: web.Port, Timeout: Duration(-time.Second)},
 		"an unknown protocol":          {Proto: "gopher", Host: "127.0.0.1", Port: 70},
+		"0.0.0.0, which is this node":  {Proto: ProtoTCP, Host: "0.0.0.0", Port: web.Port},
+		":: , which is this node":      {Proto: ProtoTCP, Host: "::", Port: web.Port},
+		"a mapped 0.0.0.0":             {Proto: ProtoTCP, Host: "::ffff:0.0.0.0", Port: web.Port},
+		"a path with a query":          {Proto: ProtoHTTP, Host: "127.0.0.1", Port: web.Port, Path: "/health?ready=1"},
+		"a path with a fragment":       {Proto: ProtoHTTP, Host: "127.0.0.1", Port: web.Port, Path: "/a#b"},
+		"a path with an escape":        {Proto: ProtoHTTP, Host: "127.0.0.1", Port: web.Port, Path: "/a%20b"},
 	}
 	for name, spec := range bad {
 		if res, err := c.Probe(ctx, spec); err == nil {
@@ -710,32 +716,55 @@ func TestRunRefusesALiveSocket(t *testing.T) {
 	}
 }
 
-func TestSocketDirectoryIsPrivate(t *testing.T) {
-	ctx, stop := context.WithCancel(context.Background())
-	socket := socketPath(t)
-	if err := os.MkdirAll(filepath.Dir(socket), 0o755); err != nil { //nolint:gosec // G301: too open on purpose; the agent must tighten it
-		t.Fatal(err)
-	}
-	ran := make(chan error, 1)
-	go func() { ran <- Run(ctx, New("n"), socket, nil, io.Discard) }()
-	c, _ := connect(t, socket, 5*time.Second)
-	if _, err := c.Hello(ctx); err != nil {
-		t.Fatal(err)
-	}
-	for _, p := range []struct {
-		path string
-		want os.FileMode
-	}{{filepath.Dir(socket), 0o700}, {socket, 0o600}} {
-		fi, err := os.Stat(p.path)
+// The agent makes the socket's directory private when it creates it, and
+// never changes one it didn't: it refuses one others can enter, such as
+// /tmp.
+func TestSocketDirectory(t *testing.T) {
+	t.Run("created private", func(t *testing.T) {
+		ctx, stop := context.WithCancel(context.Background())
+		socket := socketPath(t)
+		ran := make(chan error, 1)
+		go func() { ran <- Run(ctx, New("n"), socket, nil, io.Discard) }()
+		c, _ := connect(t, socket, 5*time.Second)
+		if _, err := c.Hello(ctx); err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range []struct {
+			path string
+			want os.FileMode
+		}{{filepath.Dir(socket), 0o700}, {socket, 0o600}} {
+			fi, err := os.Stat(p.path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := fi.Mode().Perm(); got != p.want {
+				t.Errorf("%s: mode %o, want %o", p.path, got, p.want)
+			}
+		}
+		stop()
+		<-ran
+	})
+	t.Run("an open one refused, and left alone", func(t *testing.T) {
+		socket := socketPath(t)
+		dir := filepath.Dir(socket)
+		if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // G301: open on purpose; the agent must refuse it
+			t.Fatal(err)
+		}
+		if err := os.Chmod(dir, 0o777|os.ModeSticky); err != nil {
+			t.Fatal(err)
+		}
+		err := Run(context.Background(), New("n"), socket, nil, io.Discard)
+		if err == nil || !strings.Contains(err.Error(), "can be entered by others") {
+			t.Errorf("Run in an open directory: %v", err)
+		}
+		fi, err := os.Stat(dir)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := fi.Mode().Perm(); got != p.want {
-			t.Errorf("%s: mode %o, want %o", p.path, got, p.want)
+		if fi.Mode()&(os.ModePerm|os.ModeSticky) != 0o777|os.ModeSticky {
+			t.Errorf("the directory was changed: %v", fi.Mode())
 		}
-	}
-	stop()
-	<-ran
+	})
 }
 
 // The SIGTERM path end to end: the agent runs as its own process, as in a

@@ -44,11 +44,22 @@ func CheckProbeSpec(spec ProbeSpec) error {
 	if err != nil || addr.Zone() != "" {
 		return fmt.Errorf("probe: host %q isn't an IP address", spec.Host)
 	}
+	// 0.0.0.0 and :: connect to the prober's own node, as an empty host
+	// would.
+	if addr.Unmap().IsUnspecified() {
+		return fmt.Errorf("probe: host %q is the unspecified address", spec.Host)
+	}
 	if spec.Port < 1 || spec.Port > 65535 {
 		return fmt.Errorf("probe: port %d out of range", spec.Port)
 	}
 	if spec.Path != "" && !strings.HasPrefix(spec.Path, "/") {
 		return fmt.Errorf("probe: path %q doesn't start with /", spec.Path)
+	}
+	// The path is sent as written, a path and nothing else: a query, a
+	// fragment or an escape would be sent escaped, which isn't the request
+	// the spec describes.
+	if strings.ContainsAny(spec.Path, "?#%") {
+		return fmt.Errorf("probe: path %q has a query, fragment or escape; want a plain path", spec.Path)
 	}
 	if spec.Timeout < 0 {
 		return errors.New("probe: negative timeout")

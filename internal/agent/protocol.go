@@ -47,8 +47,9 @@ type Response struct {
 	Listeners []Listener `json:"listeners,omitempty"` // set_listeners, listeners
 	// Generation counts the changes to the node's listeners, for
 	// set_listeners and listeners. A runner reads it before and after its
-	// probes: if it moved, another process changed the listeners under
-	// them, and the probes prove nothing (#8).
+	// probes, on one session: if it moved, another process changed the
+	// listeners under them, and the probes prove nothing (#8). It restarts
+	// with the agent, so a lost session makes the results UNKNOWN too.
 	Generation uint64       `json:"generation,omitempty"`
 	Probe      *ProbeResult `json:"probe,omitempty"`
 }
@@ -80,7 +81,8 @@ type ProbeSpec struct {
 	Proto string `json:"proto"`
 	Host  string `json:"host"`
 	Port  int    `json:"port"`
-	// Path is the HTTP request's path. Empty means "/".
+	// Path is the HTTP request's path, a plain path with no query,
+	// fragment or escape. Empty means "/".
 	Path string `json:"path,omitempty"`
 	// Timeout bounds the whole probe. Zero means DefaultProbeTimeout.
 	Timeout Duration `json:"timeout,omitempty"`

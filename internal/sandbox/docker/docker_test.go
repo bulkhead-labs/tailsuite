@@ -56,6 +56,9 @@ func TestCreateOptionsTailnetNode(t *testing.T) {
 	if host.Privileged {
 		t.Error("a node must not be privileged")
 	}
+	if host.Init == nil || !*host.Init {
+		t.Error("a node has no init process to reap orphans")
+	}
 	if len(host.Devices) != 1 || host.Devices[0].PathOnHost != "/dev/net/tun" || host.Devices[0].PathInContainer != "/dev/net/tun" {
 		t.Errorf("Devices = %+v, want /dev/net/tun", host.Devices)
 	}

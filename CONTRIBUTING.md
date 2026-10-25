@@ -51,10 +51,11 @@ builds. When `go.sum` changes, update `vendorHash` in `flake.nix` to the
 hash `nix build` reports.
 
 Tests that need Docker sit behind the `integration` build tag. They create
-containers and networks named `tailsuite-<run>-…`, and remove them:
+containers and networks named `tailsuite-<run>-…` on internal networks,
+and remove them. The agent's also build it for Linux with your Go:
 
 ```
-go test -tags integration ./internal/sandbox/docker/
+go test -tags integration ./...
 ```
 
 ## Never commit

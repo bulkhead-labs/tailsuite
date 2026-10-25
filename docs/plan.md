@@ -156,7 +156,8 @@ ready starts the heavy tiers. Any branch can run them by hand
    - #4, the Docker sandbox: done
      ([0019](decisions/0019-docker-sandbox.md));
    - #5, headscale;
-   - #7, the node agent;
+   - #7, the node agent: done
+     ([0020](decisions/0020-node-agent.md));
    - #8, the test runner;
    - #12, the CLI;
    - #11, the UI;

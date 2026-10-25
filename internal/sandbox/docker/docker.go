@@ -450,7 +450,11 @@ func createOptions(runID string, spec sandbox.NodeSpec) client.ContainerCreateOp
 	if memory == 0 {
 		memory = sandbox.DefaultNodeMemory
 	}
+	// An init process (docker-init) as PID 1 reaps orphaned processes, such
+	// as those exec'd commands leave, and passes signals on.
+	withInit := true
 	host := &container.HostConfig{
+		Init:      &withInit,
 		Resources: container.Resources{Memory: memory, MemorySwap: memory},
 	}
 	if spec.Role == sandbox.RoleTailnetNode {

@@ -26,3 +26,4 @@ table in the same PR.
 | [0017](0017-local-ui.md) | The local UI: the map first, localhost only, no build step | Accepted 2026-10-25 |
 | [0018](0018-go-toolchain-flake-ci.md) | The Go toolchain, the flake, and CI for lint and unit tests | Accepted 2026-10-25 |
 | [0019](0019-docker-sandbox.md) | The Docker sandbox, and agents controlled through it | Accepted 2026-10-25 |
+| [0020](0020-node-agent.md) | The node agent: it lives with the node, and sessions come and go | Accepted 2026-10-25 |

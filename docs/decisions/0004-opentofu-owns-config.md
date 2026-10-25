@@ -7,7 +7,7 @@ Amended by [0014](0014-tailnet-model-and-project-layout.md):
   from `tofu plan -json`, because a plan needs a Tailscale API;
 - a lab applies the module from its own run directory, never in the
   user's `tofu/`, and on the Tailscale engine with the engine's copy of
-  the policy, so the policy input differs from production's.
+  the policy, so the policy file it reads differs from production's.
 
 ## Decision
 

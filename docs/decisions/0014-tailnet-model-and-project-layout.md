@@ -7,7 +7,7 @@ Status: **accepted** (2026-10-24). Settles #15 and #18. Amends
   `tofu/tailnet.auto.tfvars`, not from `tofu plan -json`.
 - A lab applies the module from its own run directory, and on the
   Tailscale engine with the engine's copy of the policy, so the policy
-  input differs from production's.
+  file it reads differs from production's.
 
 Evidence: [research 0005](../research/0005-tailnet-model-trial.md).
 
@@ -78,11 +78,11 @@ Three findings shaped both (checked 2026-10-24):
     - A patch defines every tag it introduces, with its owners.
       headscale rejects a tag owned by an undefined tag (research 0005).
     - **On the Tailscale engine, the patched copy is what tofu applies.**
-      `tailsuite.tf` reads the policy through a `policy_file` variable that
-      falls back to `../policy.hujson`. tailsuite sets it on the command
-      line to the engine's copy under `.tailsuite/`. Deploy never sets it,
-      so production always gets the user's own file. On that engine, 0004's
-      "same module" is the same module with a different policy input.
+      `tailsuite.tf` always reads `../policy.hujson`, and has no input
+      that could point it elsewhere. A lab run puts the engine's copy at
+      that path in its own run directory (below). So production always
+      gets the user's own file, and on that engine 0004's "same module"
+      is the same module reading a different file.
   - **A key the typed copy doesn't understand:**
     - **The patch rewrites nothing:** the key passes through unchanged and
       the run carries a note. If the engine rejects the key, the run is
@@ -191,16 +191,27 @@ engines:
 
   ```hcl
   # tofu/tailsuite.tf (excerpt)
-  variable "policy_file" {
-    type    = string
-    default = null # deploy never sets it
+  terraform {
+    required_providers {
+      tailscale = {
+        source  = "tailscale/tailscale"
+        version = "0.29.2" # exact: the lab and production run the same provider
+      }
+    }
   }
 
   resource "tailscale_acl" "policy" {
-    acl = file(coalesce(var.policy_file, "${path.module}/../policy.hujson"))
+    acl = file("${path.module}/../policy.hujson") # no input changes this path
   }
   ```
 
+- **The module's only input is its values.** `tailnet.auto.tfvars` sets
+  `devices` and nothing else, so nothing can point the module at another
+  policy.
+- **The provider is pinned to an exact version in `tailsuite.tf`**, so the
+  lab and production run the same one, and results say which. Whether
+  `tofu plan` checks the policy against `/acl/validate` depends on that
+  version (research 0005).
 - **tailsuite reads the values itself:**
   - to build the model;
   - to give nodes their tags as they join, before tofu can look them up
@@ -211,40 +222,64 @@ engines:
     A run there could write the lab's policy to the production tailnet,
     and the lab's state over production's ([0007](0007-read-only-by-default.md)).
   - Instead, each Tailscale-engine run builds its own directory under
-    `.tailsuite/`, holding:
-    - `tailsuite.tf` and `tailnet.auto.tfvars`, copied from `tofu/`;
-    - the engine's copy of the policy;
-    - tailsuite's own provider and backend file: the throwaway tailnet's
-      credentials, `tailnet` and `base_url`, and local state.
-  - tofu runs there with no `TF_VAR_*` and no `TAILSCALE_*` variables
-    other than tailsuite's own.
+    `.tailsuite/`:
+
+    ```
+    .tailsuite/run-<id>/
+      policy.hujson          # the engine's copy, where tailsuite.tf looks
+      tofu/
+        tailsuite.tf         # copied from tofu/ and hash-checked
+        tailnet.auto.tfvars  # copied from tofu/
+        lab.tf               # tailsuite's: the throwaway tailnet's `tailnet` and `base_url`, local state
+        .terraform.lock.hcl  # shipped with tailsuite: the pinned provider's hashes
+    ```
+
+  - **tofu starts from an empty environment**, plus an allow-list:
+    - `PATH`, `HOME`, and proxy and CA settings;
+    - `TF_CLI_CONFIG_FILE`, pointing at tailsuite's own CLI config;
+    - the throwaway tailnet's credentials, in
+      `TAILSCALE_OAUTH_CLIENT_ID` and `TAILSCALE_OAUTH_CLIENT_SECRET`.
+
+    Nothing the user's shell sets reaches it: no `TF_VAR_*`, no
+    `TF_CLI_ARGS*`, and no other provider credentials.
+  - **Credentials never touch disk.** The run directory is deleted at
+    teardown, even after a failure.
   - On headscale nothing runs tofu at all.
 - **Production runs `tofu` in `tofu/` as usual**, with the user's provider
-  settings and backend, and `policy_file` unset.
+  settings and backend.
 - **A lab applies only tailsuite's own module, on either engine.** Until
   #20, headscale can't apply anything else, and the Tailscale engine's run
-  directory holds nothing else. So anything else in `tofu/` that could
-  change what production gets would make the lab differ from production
-  without tailsuite seeing it, and the check is an allow-list.
+  directory holds nothing else. Anything else in `tofu/` that changes what
+  production applies would make the lab differ from production without
+  tailsuite seeing it.
 
-  A lab run is REFUSED, with the reason, unless the files OpenTofu reads
-  as configuration or variables in `tofu/` (`*.tf`, `*.tf.json`,
-  `*.tfvars`, `*.tfvars.json`) are only:
-  - `tailsuite.tf`, as shipped by this or an earlier tailsuite release;
-  - `tailnet.auto.tfvars`;
-  - other `.tf` or `.tf.json` files that declare no `tailscale_*`
-    resource or data source and no `module` block, none of them an
-    override file (`override.tf`, `*_override.tf`, or their `.tf.json`
-    forms). `provider` and `terraform` blocks are fine: that's where
-    production's credentials and backend live;
+  So the check is an allow-list. It covers every file OpenTofu would load
+  from `tofu/`, by the rules of the OpenTofu version tailsuite pins:
+  - `.tf`, `.tf.json`, `.tofu` and `.tofu.json` files (a `.tofu` file
+    replaces the `.tf` file of the same name);
+  - override files, in every extension;
+  - variables files (`.tfvars`, `.tfvars.json`).
+
+  A lab run is REFUSED, with the reason, unless those files are only:
+  - `tailsuite.tf`, as shipped by this or an earlier tailsuite release,
+    with no `.tofu` twin;
+  - `tailnet.auto.tfvars`, setting only `devices`;
+  - other configuration files that apply nothing, none of them an override
+    file.
+    - They may hold `terraform` blocks (production's backend), `provider`
+      blocks (its credentials), `variable`, `locals` and `output` blocks,
+      `import` blocks for `tailsuite.tf`'s resources, and data sources and
+      ephemeral resources that only read, such as credential lookups.
+    - They may not hold a `resource` or `module` block of any provider.
+    - They may not use an `external` or `http` data source, which can run
+      commands or send requests.
   - other variables files that set no variable `tailsuite.tf` declares.
-    A `*.auto.tfvars` file would override the values in lexical order,
-    and any other would reach production through `-var-file`.
+    A `*.auto.tfvars` file would override the values in lexical order, and
+    any other would reach production through `-var-file`.
 
   Other files, such as `.terraform.lock.hcl`, `.terraform/`, state files
   or a README, are ignored. Values passed on the command line aren't in
-  the project. `tailsuite deploy` (M6) passes none, `policy_file`
-  included.
+  the project, and `tailsuite deploy` (M6) passes none.
 
 ### Export and the round trip
 
@@ -340,6 +375,15 @@ three synthetic policies through a throwaway parser and headscale 0.29.5:
   `tailscale_*` resources reach the Tailscale engine. But every provider
   alias, module and data source would have to be redirected correctly, a
   miss writes to production, and headscale still couldn't apply them.
+- **A `policy_file` variable that points the module at the engine's copy**
+  (an earlier draft of this record). Production could set it too, from a
+  variables file, and the lab would then test a policy production doesn't
+  apply. A fixed path, with the copy placed there in the run directory,
+  leaves nothing to set.
+- **A guard that lists what to refuse** (another earlier draft). Each
+  review found a file type or block it missed: other variables files,
+  `module` blocks, other `tailscale_*` resources, `.tofu` files. An
+  allow-list fails safe.
 - **A generated `tofu/`.** It contradicts 0004, and users editing
   generated files drift.
 - **`tofu plan -json` for headscale** (0004 as written), **or building
@@ -362,13 +406,23 @@ three synthetic policies through a throwaway parser and headscale 0.29.5:
   approved, or the plan drifts. So such a route appears in `policy.hujson`
   as a rule and in `tofu/` as state. Once advertised routes land, a load
   check keeps the two in step (#44, M3).
-- **A team's own `tailscale_*` resources in `tofu/` make lab runs
-  REFUSED** until tailsuite's module covers them, as DNS and settings
-  will when their milestones land, or until #36 (M5) brings in teams' own
-  HCL.
+- **A team's own resources in `tofu/`, of any provider, make lab runs
+  REFUSED.**
+  - That holds until tailsuite's module covers them, as DNS and settings
+    will when their milestones land, or until #36 (M5) brings in teams'
+    own HCL.
+  - Teams that script around the provider's gaps, such as device IPs or
+    posture attributes, must keep those scripts outside `tofu/` to use the
+    lab.
+- **Data sources are trusted to only read.** tailsuite refuses `external`
+  and `http` data sources, but doesn't try to prove that another
+  provider's data source has no side effects.
 - **On the Tailscale engine, tofu applies the engine's copy of the
-  policy**, not the user's file. The module is the same; the policy input
-  differs, and the patch says how.
+  policy**, not the user's file. The module is the same, the file at
+  `../policy.hujson` differs, and the patch says how.
+- **Production takes tailsuite's provider version.** It's pinned exactly
+  in `tailsuite.tf`, so moving to a new provider means upgrading
+  `tailsuite.tf`.
 - **A fact changes file if its owner changes**, say if the provider gains
   a device-IP resource. That move is a migration with a schema bump.
 - **A customized `tailsuite.tf` can't be tested in the lab**, because it

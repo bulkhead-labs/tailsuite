@@ -149,8 +149,8 @@ engines:
   profiles: { pr: headscale, nightly: tailscale }
 ```
 
-- **One copy of the policy.** The module reads `../policy.hujson` unless
-  tailsuite hands it an engine's copy (above).
+- **One copy of the policy.** The module always reads `../policy.hujson`.
+  A lab run puts the engine's copy at that path in its own run directory.
 - **The project alone rebuilds the lab, with no access to production.**
   - On headscale it needs no credentials at all. PR runs there have no
     secrets ([0013](0013-ci-trust-model.md)), so the device facts are
@@ -205,9 +205,11 @@ engines:
   }
   ```
 
-- **The module's only input is its values.** `tailnet.auto.tfvars` sets
-  `devices` and nothing else, so nothing can point the module at another
-  policy.
+- **The module's only inputs are its values**, so nothing can point it at
+  another policy.
+  - `tailsuite.tf` declares no variable that names a file or a path.
+  - `tailnet.auto.tfvars` sets only the variables `tailsuite.tf` declares:
+    `devices` in M1, and DNS and settings as their milestones land.
 - **The provider is pinned to an exact version in `tailsuite.tf`**, so the
   lab and production run the same one, and results say which. Whether
   `tofu plan` checks the policy against `/acl/validate` depends on that
@@ -231,7 +233,7 @@ engines:
         tailsuite.tf         # copied from tofu/ and hash-checked
         tailnet.auto.tfvars  # copied from tofu/
         lab.tf               # tailsuite's: the throwaway tailnet's `tailnet` and `base_url`, local state
-        .terraform.lock.hcl  # shipped with tailsuite: the pinned provider's hashes
+        .terraform.lock.hcl  # the lock file for this tailsuite.tf's release
     ```
 
   - **tofu starts from an empty environment**, plus an allow-list:
@@ -242,8 +244,8 @@ engines:
 
     Nothing the user's shell sets reaches it: no `TF_VAR_*`, no
     `TF_CLI_ARGS*`, and no other provider credentials.
-  - **Credentials never touch disk.** The run directory is deleted at
-    teardown, even after a failure.
+  - **The throwaway tailnet's API credentials never touch disk.** The run
+    directory is deleted at teardown, even after a failure.
   - On headscale nothing runs tofu at all.
 - **Production runs `tofu` in `tofu/` as usual**, with the user's provider
   settings and backend.
@@ -263,7 +265,8 @@ engines:
   A lab run is REFUSED, with the reason, unless those files are only:
   - `tailsuite.tf`, as shipped by this or an earlier tailsuite release,
     with no `.tofu` twin;
-  - `tailnet.auto.tfvars`, setting only `devices`;
+  - `tailnet.auto.tfvars`, setting only the variables `tailsuite.tf`
+    declares;
   - other configuration files that apply nothing, none of them an override
     file.
     - They may hold `terraform` blocks (production's backend), `provider`
@@ -289,9 +292,10 @@ engines:
   files. This isn't the rejected generated `tofu/` below: export writes
   once, and tailsuite never regenerates the files on a run.
 - **Upgrading `tailsuite.tf`.**
-  - The binary carries the hash of every release's `tailsuite.tf`, so a
-    copy from an earlier release still counts as shipped, and results
-    say which version ran.
+  - The binary carries the hash of every release's `tailsuite.tf`, with
+    that release's lock file. So a copy from an earlier release still
+    counts as shipped, its run directory gets the matching lock file, and
+    results say which version ran.
   - When the user asks, tailsuite replaces `tailsuite.tf` with the
     current release's copy and leaves the values alone. #9 names the
     command.
@@ -414,9 +418,9 @@ three synthetic policies through a throwaway parser and headscale 0.29.5:
   - Teams that script around the provider's gaps, such as device IPs or
     posture attributes, must keep those scripts outside `tofu/` to use the
     lab.
-- **Data sources are trusted to only read.** tailsuite refuses `external`
-  and `http` data sources, but doesn't try to prove that another
-  provider's data source has no side effects.
+- **Data sources and ephemeral resources are trusted to only read.**
+  tailsuite refuses `external` and `http` data sources, but doesn't try to
+  prove that another provider's have no side effects.
 - **On the Tailscale engine, tofu applies the engine's copy of the
   policy**, not the user's file. The module is the same, the file at
   `../policy.hujson` differs, and the patch says how.

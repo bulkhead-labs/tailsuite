@@ -7,6 +7,9 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/moby/moby/api/types/system"
+	"github.com/moby/moby/client"
+
 	"github.com/bulkhead-labs/tailsuite/internal/sandbox"
 )
 
@@ -131,5 +134,29 @@ func TestEnvListIsSorted(t *testing.T) {
 	got := envList(map[string]string{"B": "2", "A": "1", "C": "x=y"})
 	if !slices.Equal(got, []string{"A=1", "B=2", "C=x=y"}) {
 		t.Errorf("envList = %q", got)
+	}
+}
+
+func TestCheckEngineVersion(t *testing.T) {
+	for _, v := range []string{"26.0.0", "26.1.5+dfsg1", "26.0.1-rc1", "27.3.1", "29.0.0", "25.0.5", "25.0.14", "23.0.11", "23.0.17"} {
+		if err := checkEngineVersion(v); err != nil {
+			t.Errorf("%s: %v", v, err)
+		}
+	}
+	for _, v := range []string{"26.0.0-rc1", "26.0.0-rc3", "25.0.4", "25.0.0", "24.0.9", "24.0.0", "23.0.10", "20.10.24+dfsg1", "19.03.15", "", "dev", "26.1", "26.x.0"} {
+		if err := checkEngineVersion(v); err == nil {
+			t.Errorf("%s: accepted", v)
+		}
+	}
+}
+
+func TestCheckEngineSkipsPodman(t *testing.T) {
+	podman := client.ServerVersionResult{Version: "5.2.0", Components: []system.ComponentVersion{{Name: "Podman Engine", Version: "5.2.0"}}}
+	if err := checkEngine(podman); err != nil {
+		t.Errorf("podman: %v", err)
+	}
+	old := client.ServerVersionResult{Version: "24.0.7", Components: []system.ComponentVersion{{Name: "Engine", Version: "24.0.7"}}}
+	if err := checkEngine(old); err == nil {
+		t.Error("Docker 24.0.7 was accepted")
 	}
 }

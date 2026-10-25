@@ -14,6 +14,7 @@ import (
 	"path"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -59,7 +60,8 @@ func New(ctx context.Context) (*Sandbox, error) {
 }
 
 // Connect returns a client for the Docker Engine named by the environment,
-// after checking that it answers.
+// after checking that it answers, and that its internal networks keep DNS
+// inside the lab.
 func Connect(ctx context.Context) (*client.Client, error) {
 	cli, err := client.New(client.FromEnv) // negotiates the API version by default
 	if err != nil {
@@ -69,7 +71,54 @@ func Connect(ctx context.Context) (*client.Client, error) {
 		_ = cli.Close()
 		return nil, fmt.Errorf("docker: can't reach the Docker Engine at %s (is it running? DOCKER_HOST chooses another): %w", cli.DaemonHost(), err)
 	}
+	v, err := cli.ServerVersion(ctx, client.ServerVersionOptions{})
+	if err == nil {
+		err = checkEngine(v)
+	}
+	if err != nil {
+		_ = cli.Close()
+		return nil, fmt.Errorf("docker: %w", err)
+	}
 	return cli, nil
+}
+
+// checkEngine refuses a Docker Engine whose internal networks forward DNS
+// queries out of the lab, through the host's resolver (CVE-2024-29018).
+// Podman's networking is its own, and isn't checked (decision 0019).
+func checkEngine(v client.ServerVersionResult) error {
+	for _, c := range v.Components {
+		if c.Name == "Podman Engine" {
+			return nil
+		}
+	}
+	return checkEngineVersion(v.Version)
+}
+
+// checkEngineVersion accepts the Docker Engine versions with the fix for
+// CVE-2024-29018: 26.0.0 and later, 25.0.5 and later in 25.x, and 23.0.11
+// and later in 23.x. 24.x never got it.
+func checkEngineVersion(version string) error {
+	core, pre, _ := strings.Cut(strings.SplitN(version, "+", 2)[0], "-")
+	var nums [3]int
+	parts := strings.Split(core, ".")
+	ok := len(parts) == 3
+	for i := 0; ok && i < 3; i++ {
+		n, err := strconv.Atoi(parts[i])
+		ok = err == nil && n >= 0
+		nums[i] = n
+	}
+	if !ok {
+		return fmt.Errorf("engine version %q: can't tell whether it has the fix for CVE-2024-29018, so the lab couldn't be kept inside its networks", version)
+	}
+	major, minor, patch := nums[0], nums[1], nums[2]
+	safe := major > 26 ||
+		(major == 26 && (minor > 0 || patch > 0 || pre == "")) ||
+		(major == 25 && (minor > 0 || patch >= 5)) ||
+		(major == 23 && (minor > 0 || patch >= 11))
+	if !safe {
+		return fmt.Errorf("this Docker Engine (%s) can send DNS queries from the lab's internal networks out through the host (CVE-2024-29018); tailsuite needs 26.0.0 or later, 25.0.5+ or 23.0.11+", version)
+	}
+	return nil
 }
 
 // Close closes the connection to the Docker Engine. It doesn't tear down.
@@ -266,9 +315,10 @@ func (s *Sandbox) exitCode(ctx context.Context, node sandbox.Node, execID string
 		}
 		if !res.Running {
 			// The daemon reports a PID for every exec that started. Without
-			// one, the exit code is the client's default, not the command's.
-			if res.PID == 0 && res.ExitCode == 0 {
-				return -1, fmt.Errorf("exec in node %s: the command never started", node.Name)
+			// one, the exit code is the daemon's, not the command's: 126 for
+			// a command the image doesn't have, or the client's default 0.
+			if res.PID == 0 {
+				return -1, fmt.Errorf("exec in node %s: the command never started (the daemon reports exit %d)", node.Name, res.ExitCode)
 			}
 			return res.ExitCode, nil
 		}

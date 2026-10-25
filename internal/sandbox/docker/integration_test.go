@@ -168,22 +168,48 @@ func TestOfficialEntrypointRunsKernelTUN(t *testing.T) {
 	}
 }
 
-// Exec runs commands only in this run's own nodes.
+// Exec runs commands only in this run's own nodes, even when another run
+// has a node of the same name, as two runs of one plan do.
 func TestExecRefusesOtherNodes(t *testing.T) {
 	ctx := context.Background()
 	a, b := newSandbox(t), newSandbox(t)
-	lan, err := b.CreateNetwork(ctx, sandbox.NetworkSpec{Name: "lan"})
-	if err != nil {
-		t.Fatal(err)
+	db := func(sb *Sandbox) sandbox.Node {
+		lan, err := sb.CreateNetwork(ctx, sandbox.NetworkSpec{Name: "lan"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		n, err := sb.StartNode(ctx, sandbox.NodeSpec{Name: "db", Role: sandbox.RoleService, Image: tailscaleImage, Networks: []sandbox.Network{lan}, Entrypoint: []string{"sleep", "infinity"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return n
 	}
-	theirs, err := b.StartNode(ctx, sandbox.NodeSpec{Name: "db", Role: sandbox.RoleService, Image: tailscaleImage, Networks: []sandbox.Network{lan}, Entrypoint: []string{"sleep", "infinity"}})
-	if err != nil {
-		t.Fatal(err)
+	ours, theirs := db(a), db(b)
+	if code, err := a.Exec(ctx, ours, sandbox.ExecSpec{Cmd: []string{"true"}}); err != nil || code != 0 {
+		t.Fatalf("Exec in its own node: code %d, %v", code, err)
 	}
-	for _, n := range []sandbox.Node{theirs, {Name: "db", ID: "0123456789ab"}} {
+	for _, n := range []sandbox.Node{theirs, {Name: "db", ID: "0123456789ab"}, {Name: "web", ID: ours.ID}} {
 		if _, err := a.Exec(ctx, n, sandbox.ExecSpec{Cmd: []string{"true"}}); err == nil {
 			t.Errorf("Exec ran in node %s (%s), which run %s didn't start", n.Name, n.ID, a.RunID())
 		}
+	}
+}
+
+// A command that never starts is an error, never an exit code: a caller
+// could read a non-zero code as a deny.
+func TestExecOfAMissingCommand(t *testing.T) {
+	ctx := context.Background()
+	sb := newSandbox(t)
+	lan, err := sb.CreateNetwork(ctx, sandbox.NetworkSpec{Name: "lan"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, err := sb.StartNode(ctx, sandbox.NodeSpec{Name: "box", Role: sandbox.RoleService, Image: tailscaleImage, Networks: []sandbox.Network{lan}, Entrypoint: []string{"sleep", "infinity"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code, err := sb.Exec(ctx, n, sandbox.ExecSpec{Cmd: []string{"/nonexistent/probe"}}); err == nil {
+		t.Errorf("Exec of a missing command = %d, nil; want an error", code)
 	}
 }
 

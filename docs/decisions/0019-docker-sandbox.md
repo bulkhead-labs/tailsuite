@@ -31,6 +31,16 @@ through the sandbox's exec channel, not over a separate network.
   over the client, and a second set of dependencies.
 - **It connects where `DOCKER_HOST` says, or to the default socket.**
   Docker contexts (Colima, OrbStack, Rancher Desktop) are #49.
+- **It refuses a Docker Engine whose internal networks leak DNS:**
+  anything before 26.0.0 except 25.0.5+ and 23.0.11+ (24.x was never
+  fixed).
+  - Those engines forward DNS queries from an internal network out
+    through the host's resolver, when that resolver is on a loopback
+    address (CVE-2024-29018). A lab node's lookup of Tailscale's control
+    server would leave the lab.
+  - Docker Desktop isn't affected, and reports a fixed version anyway.
+  - **Podman isn't checked:** its networking and DNS (aardvark-dns) are
+    its own, and the advisory doesn't cover them.
 
 ### The interface
 
@@ -52,9 +62,9 @@ type Sandbox interface {
   - Labels are `com.bulkheadlabs.tailsuite.run`, `.name` and `.role`.
 - **Teardown finds a run by its label**, so it needs no state file.
   - It force-removes the containers, then the networks, and is idempotent.
-  - It looks again until a pass finds nothing, up to five passes. A node
-    whose create was in flight when a run was interrupted can appear after
-    the first pass.
+  - It looks again until a pass finds nothing, up to five passes, 200 ms
+    apart. A node whose create was in flight when a run was interrupted
+    can appear after the first pass.
   - `TeardownRun` does the same from a run ID alone, for `tailsuite down`
     after a crash. `Runs` lists the runs that still have anything.
 - **`sandbox.Run(ctx, sb, fn)` always tears down:** when `fn` returns,
@@ -66,7 +76,8 @@ type Sandbox interface {
     `TeardownRun` is for.
 - **Images are pinned by digest.** `StartNode` refuses a reference without
   `@sha256:`. It pulls a missing image.
-- **Lab networks are internal by default:** no route out of the host. A
+- **Lab networks are internal by default:** no route out of the host, and
+  on the engines the sandbox accepts, no DNS out of it either. So a
   headscale lab can't send traffic outside the lab even by mistake (rule
   3). A network opts into the internet only for the Tailscale engine,
   which needs Tailscale's control plane.
@@ -101,7 +112,9 @@ type Sandbox interface {
   stdin, stdout and stderr, and returns its exit code.
   - It runs only in the run's own nodes.
   - An exit code is trusted only from a command the daemon says started
-    (it reports a PID).
+    (it reports a PID). A command that never started, such as one the
+    image doesn't have, is an error. The daemon gives it exit 126, which a
+    caller could read as a failed probe.
 - **The node agent (#7) is controlled the same way.** Each tailsuite
   process that needs an agent opens its own exec session to it, and the
   session's stdin and stdout carry the agent's protocol. So there is no
@@ -150,7 +163,7 @@ type Sandbox interface {
     new for the two-week rule.
   - The engines pin their own client versions (#5, #6).
 - **Integration tests** (`go test -tags integration ./internal/sandbox/docker/`),
-  against Docker 26.1.5 (API 1.45). All nine pass in about 7 s:
+  against Docker 26.1.5 (API 1.45). All ten pass in about 8 s:
   - a tailnet node's tailscaled creates `tailscale0` as a kernel TUN
     device, both when started directly and through the official image's
     own entrypoint, which honours `TS_USERSPACE=false`;
@@ -158,8 +171,10 @@ type Sandbox interface {
     `Internet` does (the positive control);
   - a userspace tailnet node is refused, and `CheckKernelTUN` flags a
     service that runs tailscaled in userspace mode;
-  - `Exec` carries stdin, stdout, stderr and exit codes, stops waiting
-    when its context ends, and refuses other runs' nodes;
+  - `Exec` carries stdin, stdout, stderr and exit codes, and stops
+    waiting when its context ends. It refuses another run's node of the
+    same name, and a command the image doesn't have is an error, not
+    exit 126;
   - files are copied in before a node starts, and `/tmp` keeps its mode
     1777 when one is copied there;
   - names and labels are right, and duplicates and other runs' networks
@@ -167,14 +182,24 @@ type Sandbox interface {
   - tearing one run down leaves another alone, and a second teardown
     succeeds;
   - SIGINT to a process with a running lab leaves nothing behind.
-- **The tests fail when the code is broken.** Four faults were planted,
+- **The tests fail when the code is broken.** Six faults were planted,
   one at a time:
+  - without the node ID check, `Exec` ran in another run's `db`, and the
+    test caught it;
+  - with only a 0 refused from a command that never started, the
+    missing-command test got 126;
   - with directory entries in the archive, `/tmp` became 0755, and the
     test caught it;
   - without the TUN device, tailscaled exits, and the TUN test fails;
   - without `sandbox.Run`, the interrupt test finds the run still there;
   - with the network not internal, the test finds a default route via
     the bridge's gateway.
+- **CVE-2024-29018**
+  ([GHSA-mq39-4gv4-mvpx](https://github.com/moby/moby/security/advisories/GHSA-mq39-4gv4-mvpx),
+  published 2024-03-20): affected ranges `< 23.0.11`, `>= 25.0.0, < 25.0.5`,
+  and 26.0.0's first release candidates. "Moby releases 26.0.0-rc3, 25.0.5
+  and 23.0.11 are patched"; there's no 24.x fix. Unit tests cover the
+  versions on both sides of each line, and that Podman is let through.
 - **govulncheck v1.8.0** found no vulnerable dependency. It found one
   vulnerability in Go 1.27.2's standard library, GO-2026-6809 in
   `crypto/x509`, reachable through the Docker client. It's fixed in
@@ -198,6 +223,10 @@ type Sandbox interface {
 - **The exec channel depends on the Docker API**, so every message to an
   agent passes through the daemon. That's fine at tens of nodes. Equivalence
   classes (#22) keep labs small.
+- **A create the daemon finishes after teardown's last pass is left
+  behind.** Looking again narrows that window but can't close it. `Runs`
+  lists such a run, and `TeardownRun` removes it.
+- **Podman isn't checked** for leaking DNS from internal networks.
 - **A cancelled `Exec` leaves its process running**, because the Docker
   Engine can't stop an exec'd process. It ends when the node is torn
   down.

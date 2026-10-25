@@ -135,13 +135,15 @@ Building it raised cases 0014 doesn't name.
   occurrence alone. With the removal step taken out, that test fails.
 - **The reference's own app-connector example**, `routes` included, is
   understood, and its connector's tag is found. A user inside a grant's
-  application payload is found.
+  application payload is found, as a value or as a key, and a tag there
+  loses its `:port`.
 - **Fuzz tests** (parse, list unknown keys, parse again, resolve every
-  reference) ran 5.7 million inputs, and 2 million more after these
-  changes, with no failure. The first run found the repeated-name case
+  reference) ran 5.7 million inputs, 2 million more after the first
+  review's changes, and 2.4 million after the second's, with no failure. The first run found the repeated-name case
   above within seconds; that input stays as a regression case.
 - **Unit tests** cover:
-  - capitalised keys, duplicates, and case-distinct map keys;
+  - capitalised keys, duplicates, case-distinct map keys, and an
+    overridden occurrence of the wrong type;
   - both posture syntaxes, and bad shapes refused;
   - the startup project loading, with every load check failing on its
     own input, a second YAML document and bad logins, tags and roles

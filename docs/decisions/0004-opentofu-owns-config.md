@@ -1,6 +1,9 @@
 # 0004: OpenTofu owns the tailnet config; tailsuite owns the machines
 
 Status: **accepted** (2026-10-24). How headscale is driven is open (#20).
+Amended by [0014](0014-tailnet-model-and-project-layout.md): on headscale,
+M1 reads the values from `tofu/tailnet.auto.tfvars`, not from
+`tofu plan -json`, because a plan needs a Tailscale API.
 
 ## Decision
 

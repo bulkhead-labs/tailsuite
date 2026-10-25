@@ -26,14 +26,16 @@ request as any change to it.
 - **OpenTofu**, with the official Tailscale provider, applies the tailnet's
   configuration: the policy, device tags, routes, DNS and settings. It
   applies the same module to the lab and, at deploy time, to production.
+  On headscale, until #20, tailsuite reads the module's values and applies
+  them itself ([0014](decisions/0014-tailnet-model-and-project-layout.md)).
 
 ## Layers
 
 | Layer | Interface | Implementations | Notes |
 |---|---|---|---|
-| **Sources** | `Source → TailnetModel` | Policy file; Tailscale API (read-only); OpenTofu plan JSON; later Pulumi and headscale | [#15](https://github.com/bulkhead-labs/tailsuite/issues/15) |
-| **Tailnet model** | Plain data | One vendor-neutral model: policy (raw HuJSON and parsed), devices, users and groups, routes, DNS, settings | [#15](https://github.com/bulkhead-labs/tailsuite/issues/15) |
-| **Planner** | `TailnetModel → LabPlan` | Pure and deterministic. It chooses one representative node per equivalence class, the networks and the services. It lowers the policy for the chosen engine and records every rewrite | [#22](https://github.com/bulkhead-labs/tailsuite/issues/22) |
+| **Sources** | `Source → TailnetModel` | The project's files; Tailscale API (read-only); OpenTofu plan JSON; later Pulumi and headscale | [0014](decisions/0014-tailnet-model-and-project-layout.md) |
+| **Tailnet model** | Plain data | Our own types, in Tailscale's terms, independent of the source. The policy is the user's file as read, plus a read-only typed copy that lists every key it doesn't understand. Devices are keyed by MagicDNS name; users, DNS and settings follow. Each record says whether it was observed, declared or inferred. Only inputs are stored; effective state is computed | [0014](decisions/0014-tailnet-model-and-project-layout.md) |
+| **Planner** | `TailnetModel + LabConfig → LabPlan` | Pure and deterministic. It chooses one representative node per equivalence class, the networks and the listeners. It lowers the policy for the chosen engine as a patch on the user's file, which records every rewrite | [0014](decisions/0014-tailnet-model-and-project-layout.md), [#22](https://github.com/bulkhead-labs/tailsuite/issues/22) |
 | **Engines** | `Capabilities()`, `Create(plan)`, `Teardown()` | headscale; Tailscale throwaway tailnet; later NetBird | [0002](decisions/0002-two-engines.md), [#17](https://github.com/bulkhead-labs/tailsuite/issues/17) |
 | **Sandbox** | Networks, nodes, exec, teardown | Docker (default); Podman through the same API; later a VM driver (Lima) and real macOS or Windows nodes for verify runs | [0003](decisions/0003-docker-one-container-per-node.md), [0009](decisions/0009-os-mimicry.md) |
 | **Node agent** | Control over an out-of-band network, never over the tailnet | One small Go binary in every node, running its services and probes | [#7](https://github.com/bulkhead-labs/tailsuite/issues/7) |
@@ -56,17 +58,23 @@ UNKNOWN and REFUSED are never shown as a pass or a deny.
 
 ## A user's project
 
-A folder the user owns. Nobody clones tailsuite. Which file owns which
-fact is open ([#18](https://github.com/bulkhead-labs/tailsuite/issues/18)):
+A folder the user owns. Nobody clones tailsuite. **A fact lives in the
+file for whatever makes it true in production**, so no fact has two homes
+([0014](decisions/0014-tailnet-model-and-project-layout.md)):
 
 ```
 my-tailnet/
-  policy.hujson     # the policy: the same file in the lab and production
-  tofu/             # the OpenTofu module: tailnet config for the lab and production
-  lab.yaml          # lab-only facts: services on each node, OS mimicry, engine profiles
-  tests/*.yaml
-  flake.nix         # only with --nix: pins tailsuite and OpenTofu
+  policy.hujson          # the policy, the only copy: Tailscale's policy engine applies it
+  tofu/
+    tailsuite.tf         # tailsuite's module: logic only
+    tailnet.auto.tfvars  # device tags, enabled routes: the API applies them, through OpenTofu
+  lab.yaml               # never deployed: the devices as the lab rebuilds them, what listens, engines
+  tests/*.yaml           # tailsuite's tests
+  flake.nix              # only with --nix: pins tailsuite and OpenTofu
+  .tailsuite/            # gitignored: the model, the lab plan, results
 ```
+
+The project alone rebuilds the lab, with no credentials and no network.
 
 ## Commands (planned)
 

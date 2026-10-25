@@ -53,9 +53,9 @@ Live progress is on the
 | | Milestone | Status | What ships | How a user starts here |
 |---|---|---|---|---|
 | **M1** | [Walking skeleton](https://github.com/bulkhead-labs/tailsuite/milestone/1) | In progress | 3 nodes (laptop, server, db), a policy, 3 tests (allow, deny, positive control), both engines, the local UI, the OpenTofu module that configures the lab, the round-trip check, the release pipeline, the user-journey suite | `brew install` → `tailsuite init` → `tailsuite up`, about 5 minutes |
-| **M2** | [Tags, grants and the diff](https://github.com/bulkhead-labs/tailsuite/milestone/2) | Not started | Tags, grants and ports; the reachability matrix; the blast-radius diff; the headline (#33); the baseline pack (#32); test file v1; the GitHub Action; the generated quick-start repo; the first sample configs | Add tailsuite to their repo's CI |
-| **M3** | [SSH, subnets and exit nodes](https://github.com/bulkhead-labs/tailsuite/milestone/3) | Not started | Tailscale SSH (root vs nonroot, check mode); subnet routers with fake LANs; exit nodes with a fake internet; differential fuzzing across the engines (#42); **engine scorecard #1** | The scenarios people get burned by |
-| **M4** | [Users and posture](https://github.com/bulkhead-labs/tailsuite/milestone/4) | Not started | Users and groups; posture (OS mimicked, real client versions); equivalence classes; **engine scorecard #2**. The lab is feature complete | |
+| **M2** | [Tags, grants and the diff](https://github.com/bulkhead-labs/tailsuite/milestone/2) | Not started | Tags, grants and ports; the reachability matrix; the blast-radius diff; the headline (#33); the baseline pack (#32), with any additions it needs in the test format (0015); the GitHub Action; the generated quick-start repo; the first sample configs | Add tailsuite to their repo's CI |
+| **M3** | [SSH, subnets and exit nodes](https://github.com/bulkhead-labs/tailsuite/milestone/3) | Not started | Tailscale SSH (root vs nonroot, check mode, session recording); subnet routers with fake LANs; exit nodes with a fake internet; differential fuzzing across the engines (#42); **engine scorecard #1** | The scenarios people get burned by |
+| **M4** | [Users and posture](https://github.com/bulkhead-labs/tailsuite/milestone/4) | Not started | Users and groups; posture (OS mimicked, real client versions) and `attrConfig`; equivalence classes; **engine scorecard #2**. The lab is feature complete | |
 | **M5** | [Import](https://github.com/bulkhead-labs/tailsuite/milestone/5) | Not started | Read-only import from the Tailscale API or an OpenTofu plan (#36); onboarding with no credentials: a pasted policy or a demo (#35); a library of synthetic sample configs (a wide-open startup, a homelab, a segmented startup, contractors, subnet-heavy); import to OpenTofu with a zero-change plan as the proof | Connect read-only: their tailnet in 2 minutes, on IaC in 10 |
 | **M6** | [Deploy](https://github.com/bulkhead-labs/tailsuite/milestone/6) | Not started | Editing the policy in the UI (#34); `tailsuite deploy` with the apply gates; PR mode for GitOps or Terraform-managed tailnets; deploy from the Action | Ship a change safely |
 | **M7** | [Public launch](https://github.com/bulkhead-labs/tailsuite/milestone/7) | Not started | Docs site, the in-browser paste page, the launch post | Zero install |
@@ -134,7 +134,7 @@ ready starts the heavy tiers. Any branch can run them by hand
 | Prerequisite | Blocks |
 |---|---|
 | **Done (2026-10-24):** the CI trust model's settings (#39, [0013](decisions/0013-ci-trust-model.md)) | CI in #1; #2, #13, #14; #30's CI step |
-| A dedicated Tailscale test organization, and an OAuth client with the `tailnets` scope, stored in the `nightly` and `branch-run` environments | #3, #6, #13's nightly tier |
+| **Done (2026-10-25):** a dedicated Tailscale test organization, and an OAuth client with only the `tailnets` scope, stored in the `nightly` and `branch-run` environments | #3, #6, #13's nightly tier |
 | `bulkhead-labs/homebrew-tap` and the container package, created by the maintainer, and the credentials goreleaser publishes with, stored in the `release` environment | #2 |
 
 **Order:**
@@ -143,9 +143,12 @@ ready starts the heavy tiers. Any branch can run them by hand
    - #15, the tailnet model, together with #18 (the project layout, and
      explicit listeners in `lab.yaml` for M1): settled in
      [0014](decisions/0014-tailnet-model-and-project-layout.md);
-   - #16, the test format;
-   - #17, the engine interface and capability matrix.
-2. **Run the #3 spike**, as soon as the test organization exists.
+   - #16, the test format: settled in
+     [0015](decisions/0015-test-file-labels-profiles.md);
+   - #17, the engine interface and capability matrix: settled in
+     [0016](decisions/0016-engine-interface-capabilities.md);
+   - #19, the UI stack: settled in [0017](decisions/0017-local-ui.md).
+2. **Run the #3 spike**: the test organization exists (2026-10-25).
 3. **Build:**
    - #1, the Go module and the flake: Go first, then CI (#39 is in place);
    - #4, the Docker sandbox;
@@ -153,7 +156,7 @@ ready starts the heavy tiers. Any branch can run them by hand
    - #7, the node agent;
    - #8, the test runner;
    - #12, the CLI;
-   - #19 (settles the UI stack), then #11, the UI;
+   - #11, the UI;
    - #9, the OpenTofu module;
    - #10, the round trip.
 4. **#6**, the Tailscale engine, after #3. M1 needs only the minimal

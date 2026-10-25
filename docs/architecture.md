@@ -1,6 +1,8 @@
 # Architecture
 
-**Status: designed, not built.** This describes the intended design; the
+**Status: designed; M1 is being built.** So far the code is the Go module
+and its CI ([0018](decisions/0018-go-toolchain-flake-ci.md)): `cmd/tailsuite`
+only prints its version. The rest describes the intended design, and the
 open questions are linked where they apply. Update it in the same pull
 request as any change to it.
 

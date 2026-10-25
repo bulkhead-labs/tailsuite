@@ -1,7 +1,7 @@
 # Contributing
 
-Thanks for looking. tailsuite is in its planning stage, so the most useful
-thing right now is a view on the
+Thanks for looking. tailsuite is early in its first milestone, so the most
+useful thing right now is a view on the
 [open design questions](https://github.com/bulkhead-labs/tailsuite/issues?q=is%3Aopen+label%3Atype%3Adesign).
 
 ## How work flows
@@ -11,8 +11,8 @@ thing right now is a view on the
 1. Every change starts from an issue. Open one if it doesn't exist.
 2. Open your pull request **as a draft**, with `Closes #n`, and fill in the
    template's checklist.
-3. Mark it ready when the checklist is done. The heavier test tiers run
-   then, once CI exists (#1, #13).
+3. Mark it ready when the checklist is done. The heavier test tiers will
+   run then, once they exist (#13).
 4. Maintainers squash-merge.
 
 ## Sign your commits off (DCO)
@@ -31,9 +31,24 @@ There is no CLA. Contributions are under the project's
 
 ## Development environment
 
-The repo has a Nix flake. `nix develop` gives the toolchain that CI will
-use once it exists (#1). Plain `go build` will work without Nix once there
-is code.
+The repo has a Nix flake:
+
+- `nix develop` gives the toolchain CI uses: Go, golangci-lint, OpenTofu,
+  goreleaser, the Docker CLI and the rest.
+- `nix build` builds the binary into `result/bin/tailsuite`.
+
+Plain `go build ./...` and `go test ./...` work without Nix, with Go 1.27
+or later. CI runs both ways on every push
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)). Before you push,
+in the dev shell:
+
+```
+go mod tidy -diff && golangci-lint run && go test -race ./...
+```
+
+`go test -race` needs cgo, so run it with `CGO_ENABLED=1` (the dev shell
+turns cgo off for static builds). When `go.sum` changes, update
+`vendorHash` in `flake.nix` to the hash `nix build` reports.
 
 ## Never commit
 

@@ -11,9 +11,9 @@ a disclosure date with you, and credit you unless you'd rather not be named.
 
 ## In scope today
 
-tailsuite has no code or releases yet. What exists:
+tailsuite has no releases yet. What exists:
 
-- this repository;
+- this repository, its code and its CI;
 - its docs;
 - the [status page](https://bulkhead-labs.github.io/tailsuite/).
 

@@ -35,9 +35,10 @@ and design questions live from GitHub, so it can't drift on its own.
 
 ## A pull request, start to finish
 
-CI arrives with #1 and #13. Until then, the test runs in steps 1, 2 and 4
-don't exist yet, and the `pr-ready` checklist and the reviewer agent are
-the checks.
+Lint and unit tests run on every push
+([0018](decisions/0018-go-toolchain-flake-ci.md)). The heavy tiers in steps
+2 and 4 arrive with #13. Until then, the `pr-ready` checklist and the
+reviewer agent are those checks.
 
 1. **Open it as a draft**, linked to its issue (`Closes #n`), using the
    [template](../.github/pull_request_template.md). Drafts run lint and unit

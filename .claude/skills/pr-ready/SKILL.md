@@ -80,14 +80,18 @@ for it.
 
 ## 6. Mark ready
 
-`gh pr ready <n>`. Once CI exists (#1, #13), the heavy test tiers start
-here. Until then there is no run to link: say so in the report rather than
-linking anything. Report:
+First, the `ci` workflow (lint and unit) must have passed on the PR's head
+commit:
+`gh run list --branch <branch> --workflow ci --json headSha,conclusion,url`.
+A red or missing run blocks marking it ready.
+
+Then `gh pr ready <n>`. Once #13 exists, the heavy test tiers start here.
+Report:
 
 - the checklist result;
 - the doc changes made;
 - the reviewer's findings and what happened to each;
-- the CI run link, or "no CI yet".
+- the CI run link (and, once #13 exists, the heavy tiers' runs).
 
 Merging needs the maintainer's approving review (decision 0013), and their
 say-so. Don't merge unless asked.

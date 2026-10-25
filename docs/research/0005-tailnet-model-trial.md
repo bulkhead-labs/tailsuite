@@ -253,7 +253,10 @@ then fail for the same reason as policy 2's tests: no devices.
 ## Not checked yet
 
 - **Whether Tailscale accepts each policy.** That needs `/acl/validate` on a
-  tailnet, which the test organization provides (#3).
+  tailnet, which the test organization provides (#3). Checked on
+  2026-10-25 in [research 0006](0006-throwaway-tailnets-spike.md):
+  Tailscale accepts policies 1 and 2, and rejects policy 3's `attrConfig`
+  entry (`broadcastToPeers` must be `*` or absent).
 - **More than three policies.** The M2 sample configs can grow from these.
 - **Capitalised keys** (`ACLs`, `Groups`), which older policies use. Go's
   decoder matches them to the typed copy ignoring case, so the comparison

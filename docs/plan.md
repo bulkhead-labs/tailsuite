@@ -149,7 +149,9 @@ ready starts the heavy tiers. Any branch can run them by hand
    - #17, the engine interface and capability matrix: settled in
      [0016](decisions/0016-engine-interface-capabilities.md);
    - #19, the UI stack: settled in [0017](decisions/0017-local-ui.md).
-2. **Run the #3 spike**: the test organization exists (2026-10-25).
+2. **Run the #3 spike**: done (2026-10-25), and the Tailscale engine is a
+   go ([research 0006](research/0006-throwaway-tailnets-spike.md)). Its
+   findings for #6 are listed there.
 3. **Build:**
    - #1, the Go module, the flake and CI for lint and unit tests: done
      ([0018](decisions/0018-go-toolchain-flake-ci.md));

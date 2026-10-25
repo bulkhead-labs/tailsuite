@@ -22,7 +22,14 @@ const LabVersion = 1
 type Lab struct {
 	Version  int                  `yaml:"version"`
 	Devices  map[string]LabDevice `yaml:"devices"`
+	Users    map[string]LabUser   `yaml:"users"`
 	Profiles map[string]Profile   `yaml:"profiles"`
+}
+
+// LabUser is a user's entry in lab.yaml, by login. Its roles are what
+// role autogroups (autogroup:admin…) lower to on headscale (0016).
+type LabUser struct {
+	Roles []string `yaml:"roles"`
 }
 
 // LabDevice is one device in lab.yaml.
@@ -65,16 +72,19 @@ type Profile struct {
 	Unproven string   `yaml:"unproven"`
 }
 
-// Values the lab accepts. Listeners are what the node agent serves today
-// (decision 0020); more come with #56.
+// Values the lab accepts. Listeners are what the node agent serves (decision
+// 0020, in #53); more come with #56.
 var (
 	osNames      = []string{"linux", "macos", "windows", "ios", "android"}
 	listenProtos = []string{"tcp", "http"}
 	engines      = []string{"headscale", "tailscale"}
+	roles        = []string{"owner", "admin", "it-admin", "network-admin", "billing-admin", "auditor", "member"}
 	unproven     = []string{"report", "fail"}
 
 	dnsLabel = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 	version  = regexp.MustCompile(`^[0-9]+\.[0-9]+(\.[0-9]+)?$`)
+	login    = regexp.MustCompile(`^[^@\s]+@[^@\s]+$`)
+	tagName  = regexp.MustCompile(`^tag:[A-Za-z0-9][A-Za-z0-9-]*$`)
 	cgnat    = netip.MustParsePrefix("100.64.0.0/10")
 )
 
@@ -90,6 +100,11 @@ func ReadLab(r io.Reader) (Lab, error) {
 		}
 		return lab, fmt.Errorf("lab.yaml: %w", err)
 	}
+	// One document only: a second would be ignored, typos and all.
+	var more yaml.Node
+	if err := dec.Decode(&more); !errors.Is(err, io.EOF) {
+		return lab, errors.New("lab.yaml: more than one YAML document; want one")
+	}
 	return lab, lab.check()
 }
 
@@ -104,7 +119,7 @@ func (lab Lab) check() error {
 		if !dnsLabel.MatchString(name) {
 			bad("device %q: a name is a MagicDNS label: lower-case letters, digits and hyphens", name)
 		}
-		if d.User != "" && !strings.Contains(d.User, "@") {
+		if d.User != "" && !login.MatchString(d.User) {
 			bad("device %s: user %q isn't a login, such as alice@example.com", name, d.User)
 		}
 		if d.OS != "" && !slices.Contains(osNames, d.OS) {
@@ -130,6 +145,16 @@ func (lab Lab) check() error {
 				bad("device %s: two listeners on port %d", name, l.Port)
 			}
 			seen[Listen{Port: l.Port}] = true
+		}
+	}
+	for _, name := range sortedKeys(lab.Users) {
+		if !login.MatchString(name) {
+			bad("user %q isn't a login, such as alice@example.com", name)
+		}
+		for _, r := range lab.Users[name].Roles {
+			if !slices.Contains(roles, r) {
+				bad("user %s: role %q; want one of %s", name, r, strings.Join(roles, ", "))
+			}
 		}
 	}
 	for _, name := range sortedKeys(lab.Profiles) {

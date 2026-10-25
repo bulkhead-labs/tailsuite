@@ -47,7 +47,7 @@ type UnknownKey struct {
 // Reasons an UnknownKey gives.
 const (
 	NotUnderstood = "not understood"
-	DuplicateKey  = "duplicate key" // the decoder keeps only the last occurrence
+	DuplicateKey  = "duplicate key" // the typed copy holds only the last occurrence
 )
 
 // Parse reads a policy file. An error means the file isn't HuJSON, or a
@@ -61,20 +61,110 @@ func Parse(raw []byte) (*File, error) {
 	std := tree.Clone()
 	std.Standardize()
 	f := &File{Raw: slices.Clone(raw), tree: tree, canon: map[string]string{"": ""}}
+
+	// Go's decoder decodes a repeated key into the earlier occurrence: maps
+	// and objects merge, and list elements are reused. So the typed copy
+	// would hold a policy the file doesn't state. A first decode finds
+	// which occurrences are overridden, they're removed from a copy, and
+	// the typed copy is decoded from that: the last occurrence, alone.
+	first, err := decode(std)
+	if err != nil {
+		return nil, err
+	}
+	var drop [][]int
+	overridden(&tree, first, nil, &drop)
+	for i := len(drop) - 1; i >= 0; i-- { // deepest and latest first, so indices hold
+		remove(&std, drop[i])
+	}
+	understood, err := decodeInto(std, &f.Policy)
+	if err != nil {
+		return nil, err
+	}
+	f.walk(&f.tree, understood, "", "", true)
+	return f, nil
+}
+
+// decode decodes a standardized tree into a Policy, and returns what the
+// Policy understood, encoded again as a generic value.
+func decode(std hujson.Value) (any, error) {
+	var p Policy
+	return decodeInto(std, &p)
+}
+
+func decodeInto(std hujson.Value, p *Policy) (any, error) {
+	// UseNumber keeps numbers, such as posture attribute values, exactly
+	// as written.
 	dec := json.NewDecoder(bytes.NewReader(std.Pack()))
-	if err := dec.Decode(&f.Policy); err != nil {
+	dec.UseNumber()
+	if err := dec.Decode(p); err != nil {
 		return nil, fmt.Errorf("policy: %w", err)
 	}
-	encoded, err := json.Marshal(f.Policy)
+	encoded, err := json.Marshal(p)
 	if err != nil {
 		return nil, fmt.Errorf("policy: encoding the typed copy: %w", err)
 	}
 	var understood any
-	if err := json.Unmarshal(encoded, &understood); err != nil {
+	udec := json.NewDecoder(bytes.NewReader(encoded))
+	udec.UseNumber()
+	if err := udec.Decode(&understood); err != nil {
 		return nil, fmt.Errorf("policy: decoding the typed copy: %w", err)
 	}
-	f.walk(&f.tree, understood, "", "", true)
-	return f, nil
+	return understood, nil
+}
+
+// overridden collects the index paths of members a later occurrence of
+// the same key overrides, by the same rule as walk.
+func overridden(v *hujson.Value, understood any, path []int, out *[][]int) {
+	switch node := v.Value.(type) {
+	case *hujson.Object:
+		known, _ := understood.(map[string]any)
+		keys := make([]string, len(node.Members))
+		found := make([]bool, len(node.Members))
+		last := map[string]int{}
+		for i := range node.Members {
+			keys[i], _, found[i] = lookupFold(known, memberName(&node.Members[i]))
+			if found[i] {
+				last[keys[i]] = i
+			}
+		}
+		for i := range node.Members {
+			here := append(slices.Clone(path), i)
+			switch {
+			case !found[i]:
+			case last[keys[i]] != i:
+				*out = append(*out, here)
+			default:
+				overridden(&node.Members[i].Value, known[keys[i]], here, out)
+			}
+		}
+	case *hujson.Array:
+		list, _ := understood.([]any)
+		for i := range node.Elements {
+			var sub any
+			if i < len(list) {
+				sub = list[i]
+			}
+			overridden(&node.Elements[i], sub, append(slices.Clone(path), i), out)
+		}
+	}
+}
+
+// remove deletes the object member at an index path.
+func remove(v *hujson.Value, path []int) {
+	for _, i := range path[:len(path)-1] {
+		switch node := v.Value.(type) {
+		case *hujson.Object:
+			v = &node.Members[i].Value
+		case *hujson.Array:
+			v = &node.Elements[i]
+		default:
+			return
+		}
+	}
+	if obj, ok := v.Value.(*hujson.Object); ok {
+		i := path[len(path)-1]
+		obj.Members = slices.Delete(obj.Members, i, i+1)
+	}
 }
 
 // walk compares the file's tree with what the typed copy understood,

@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"encoding/json"
 	"net/netip"
 	"slices"
 	"strconv"
@@ -32,16 +33,23 @@ type Ref struct {
 	Value string
 	Kind  Kind
 	// Role says what the place is for: src, dst, via, owner, member,
-	// approver, target, recorder, test-src or broadcast.
+	// approver, target, recorder, test-src, broadcast, external, defines
+	// (a group or tag's own name, as a key) or payload (a string inside an
+	// application's payload, which tailsuite doesn't interpret).
 	Role string
 }
 
-// References lists every reference in the policy, in a stable order. It
-// knows every place Tailscale's policy reference lets a user, group or tag
-// appear. Two kinds of place aren't covered, and both are in Unknown,
-// which makes 0014 refuse an identity rewrite: places inside keys the
-// typed copy doesn't understand, and places under a key whose exact name
-// is written twice, which no pointer can address.
+// References lists every reference in the policy, in a stable order: every
+// place Tailscale's policy reference lets a user, group or tag appear, the
+// names that define groups and tags, and, inside application payloads,
+// which tailsuite carries without interpreting, every string shaped like
+// a user, group, tag or autogroup (role "payload").
+//
+// Not covered: SSH logins (`users`), which are host accounts, and whose
+// localpart:*@domain form 0016 refuses; and two kinds of place that are in
+// Unknown, which makes 0014 refuse an identity rewrite: inside keys the
+// typed copy doesn't understand, and under a key whose exact name is
+// written twice, which no pointer can address.
 func (f *File) References() []Ref {
 	var refs []Ref
 	add := func(canonical, value, role string) {
@@ -59,6 +67,22 @@ func (f *File) References() []Ref {
 			add(base+"/"+strconv.Itoa(i), v, role)
 		}
 	}
+	payload := func(base string, caps AppCaps) {
+		for _, name := range sortedKeys(caps) {
+			for j, raw := range caps[name] {
+				var v any
+				if json.Unmarshal(raw, &v) != nil {
+					continue
+				}
+				walkStrings(v, base+"/"+escape(name)+"/"+strconv.Itoa(j), func(ptr, s string) {
+					switch KindOf(s, nil) {
+					case User, Group, Tag, Autogroup:
+						add(ptr, s, "payload")
+					}
+				})
+			}
+		}
+	}
 	p := &f.Policy
 	for i, r := range p.ACLs {
 		b := "/acls/" + strconv.Itoa(i)
@@ -72,6 +96,7 @@ func (f *File) References() []Ref {
 		list(b+"/src", r.Src, "src", false)
 		list(b+"/dst", r.Dst, "dst", false)
 		list(b+"/via", r.Via, "via", false)
+		payload(b+"/app", r.App)
 	}
 	for i, r := range p.SSH {
 		b := "/ssh/" + strconv.Itoa(i)
@@ -80,9 +105,11 @@ func (f *File) References() []Ref {
 		list(b+"/recorder", r.Recorder, "recorder", false)
 	}
 	for _, name := range sortedKeys(p.Groups) {
+		add("/groups/"+escape(name), name, "defines")
 		list("/groups/"+escape(name), p.Groups[name], "member", false)
 	}
 	for _, tag := range sortedKeys(p.TagOwners) {
+		add("/tagOwners/"+escape(tag), tag, "defines")
 		list("/tagOwners/"+escape(tag), p.TagOwners[tag], "owner", false)
 	}
 	for _, route := range sortedKeys(p.AutoApprovers.Routes) {
@@ -94,6 +121,7 @@ func (f *File) References() []Ref {
 	}
 	for i, a := range p.NodeAttrs {
 		list("/nodeAttrs/"+strconv.Itoa(i)+"/target", a.Target, "target", false)
+		payload("/nodeAttrs/"+strconv.Itoa(i)+"/app", a.App)
 	}
 	for i, t := range p.Tests {
 		b := "/tests/" + strconv.Itoa(i)
@@ -117,7 +145,27 @@ func (f *File) References() []Ref {
 	for _, name := range sortedKeys(p.AttrConfig) {
 		list("/attrConfig/"+escape(name)+"/broadcastToPeers", p.AttrConfig[name].BroadcastToPeers, "broadcast", false)
 	}
+	for _, name := range sortedKeys(p.ExternalTailnets) {
+		list("/externalTailnets/"+escape(name)+"/allowExternalReferencesTo", p.ExternalTailnets[name].AllowExternalReferencesTo, "external", false)
+	}
 	return refs
+}
+
+// walkStrings calls fn for every string in a decoded JSON value, with its
+// pointer under base.
+func walkStrings(v any, base string, fn func(ptr, s string)) {
+	switch x := v.(type) {
+	case string:
+		fn(base, x)
+	case []any:
+		for i, e := range x {
+			walkStrings(e, base+"/"+strconv.Itoa(i), fn)
+		}
+	case map[string]any:
+		for _, k := range sortedKeys(x) {
+			walkStrings(x[k], base+"/"+escape(k), fn)
+		}
+	}
 }
 
 // Identities is References limited to users, groups, tags and autogroups:

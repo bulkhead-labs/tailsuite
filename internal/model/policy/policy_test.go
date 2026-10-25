@@ -259,3 +259,101 @@ func TestRawIsKeptByteForByte(t *testing.T) {
 		t.Error("Raw isn't an exact copy of the file")
 	}
 }
+
+// A repeated key never merges into the typed copy: Go's decoder would
+// decode the second occurrence into the first, giving a rule the file
+// doesn't state. These are the review's three inputs.
+func TestDuplicatesDontMerge(t *testing.T) {
+	f, err := Parse([]byte(`{
+		"acls": [{"action": "accept", "users": ["alice@example.com"], "proto": "tcp", "dst": ["tag:a:22"]}],
+		"ACLs": [{"action": "accept", "src": ["tag:b"], "dst": ["tag:a:22"]}],
+		"groups": {"group:a": ["alice@example.com"]},
+		"groups": {"group:b": ["bob@example.com"]},
+		"autoApprovers": {"routes": {"192.0.2.0/24": ["tag:r"]}},
+		"autoApprovers": {"exitNode": ["tag:x"]},
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := f.Policy
+	if len(p.ACLs) != 1 || p.ACLs[0].Proto != "" || p.ACLs[0].Users != nil || !slices.Equal(p.ACLs[0].Src, []string{"tag:b"}) {
+		t.Errorf("acls merged: %+v", p.ACLs)
+	}
+	if len(p.Groups) != 1 || p.Groups["group:b"] == nil {
+		t.Errorf("groups merged: %v", p.Groups)
+	}
+	if p.AutoApprovers.Routes != nil || !slices.Equal(p.AutoApprovers.ExitNode, []string{"tag:x"}) {
+		t.Errorf("autoApprovers merged: %+v", p.AutoApprovers)
+	}
+	for _, r := range f.References() {
+		if r.Value == "alice@example.com" {
+			t.Errorf("a reference into an overridden occurrence: %+v", r)
+		}
+	}
+	if len(f.Unknown) != 3 {
+		t.Errorf("unknown = %+v, want the three overridden occurrences", f.Unknown)
+	}
+}
+
+// The reference's own nodeAttrs app example, routes included, is
+// understood, and the connectors' tags are found.
+func TestNodeAttrsAppIsCarried(t *testing.T) {
+	f, err := Parse([]byte(`{"nodeAttrs": [{"target": ["*"], "app": {"tailscale.com/app-connectors": [
+		{"name": "github", "connectors": ["tag:github-connector"], "domains": ["github.com"], "routes": ["192.0.2.0/24"]}
+	]}}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.Unknown) != 0 {
+		t.Errorf("unknown = %+v", f.Unknown)
+	}
+	if !slices.ContainsFunc(f.References(), func(r Ref) bool {
+		return r.Value == "tag:github-connector" && r.Role == "payload" && r.Pointer == "/nodeAttrs/0/app/tailscale.com~1app-connectors/0/connectors/0"
+	}) {
+		t.Errorf("the connector's tag isn't referenced: %+v", f.References())
+	}
+}
+
+// Identities inside application payloads, which tailsuite doesn't
+// interpret, are still found, so a rewrite can't miss them.
+func TestPayloadIdentities(t *testing.T) {
+	f, err := Parse([]byte(`{"grants": [{"src": ["tag:a"], "dst": ["tag:b"], "app": {"example.com/cap/x": [{"users": ["alice@example.com"], "count": 3}]}}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, r := range f.Identities() {
+		if r.Value == "alice@example.com" && r.Role == "payload" && r.Kind == User {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("alice in a payload wasn't found: %+v", f.Identities())
+	}
+}
+
+func TestDefinitionsAndExternalReferences(t *testing.T) {
+	f, err := Parse([]byte(`{
+		"groups": {"group:eng": []},
+		"tagOwners": {"tag:prod": []},
+		"externalTailnets": {"partner": {"allowExternalReferencesTo": ["tag:shared"]}},
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]Ref{
+		"/groups/group:eng":   {Value: "group:eng", Kind: Group, Role: "defines"},
+		"/tagOwners/tag:prod": {Value: "tag:prod", Kind: Tag, Role: "defines"},
+		"/externalTailnets/partner/allowExternalReferencesTo/0": {Value: "tag:shared", Kind: Tag, Role: "external"},
+	}
+	got := map[string]Ref{}
+	for _, r := range f.References() {
+		got[r.Pointer] = r
+	}
+	for ptr, w := range want {
+		w.Pointer = ptr
+		if got[ptr] != w {
+			t.Errorf("%s: %+v, want %+v", ptr, got[ptr], w)
+		}
+	}
+}

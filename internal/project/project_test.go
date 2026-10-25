@@ -139,6 +139,16 @@ func TestLoadChecks(t *testing.T) {
 			map[string]string{LabFile: "version: 1\ndevices:\n  db: { user: a@example.com, ip: 192.0.2.1 }\n", TFVarsFile: ""}, "100.64.0.0/10"},
 		"an unknown engine": {
 			map[string]string{LabFile: "version: 1\ndevices: {}\nprofiles:\n  pr: { engine: netbird }\n", TFVarsFile: ""}, `engine "netbird"`},
+		"a second YAML document": {
+			map[string]string{LabFile: "version: 1\ndevices:\n  db: { user: a@example.com }\n---\nbogus: 1\n", TFVarsFile: ""}, "more than one YAML document"},
+		"a login that isn't one": {
+			map[string]string{LabFile: "version: 1\ndevices:\n  db: { user: \"@\" }\n", TFVarsFile: ""}, "isn't a login"},
+		"an unknown role": {
+			map[string]string{LabFile: "version: 1\ndevices: {}\nusers:\n  alice@example.com: { roles: [wizard] }\n", TFVarsFile: ""}, `role "wizard"`},
+		"a tag with a space": {
+			map[string]string{TFVarsFile: `devices = { server = { tags = ["tag:a b"] }, db = { tags = ["tag:db"] } }`}, `"tag:a b" isn't a tag`},
+		"a tag twice": {
+			map[string]string{TFVarsFile: `devices = { server = { tags = ["tag:prod", "tag:prod"] }, db = { tags = ["tag:db"] } }`}, "tag:prod twice"},
 		"no policy": {
 			map[string]string{PolicyFile: ""}, "policy.hujson"},
 		"a policy that isn't HuJSON": {
@@ -163,6 +173,12 @@ func TestTFVars(t *testing.T) {
 		"another variable":         `devices = {}` + "\n" + `policy_file = "../other.hujson"`,
 		"a value the module lacks": `devices = { server = { tags = ["tag:prod"], routes = ["192.0.2.0/24"] } }`,
 		"tags that aren't a list":  `devices = { server = { tags = "tag:prod" } }`,
+		"interpolation":            `devices = { server = { tags = ["tag:${"prod"}"] } }`,
+		"a for expression":         `devices = { server = { tags = [for x in ["prod"] : "tag:${x}"] } }`,
+		"a conditional":            `devices = { server = { tags = true ? ["tag:a"] : ["tag:b"] } }`,
+		"a computed key":           `devices = { ("ser${"ver"}") = { tags = ["tag:prod"] } }`,
+		"a device twice":           `devices = { db = { tags = ["tag:a"] }, db = { tags = ["tag:b"] } }`,
+		"tags twice":               `devices = { db = { tags = ["tag:a"], tags = ["tag:b"] } }`,
 		"not HCL":                  `devices = {`,
 	}
 	for name, src := range bad {
@@ -183,5 +199,43 @@ func TestPolicyUnknownKeysDontFailALoad(t *testing.T) {
 	}
 	if len(p.Tailnet.Policy.Unknown) != 1 {
 		t.Errorf("unknown = %+v", p.Tailnet.Policy.Unknown)
+	}
+}
+
+func TestUsers(t *testing.T) {
+	dir := project(t, map[string]string{LabFile: `version: 1
+devices:
+  laptop: { user: alice@example.com }
+  server: {}
+  db: {}
+users:
+  alice@example.com: { roles: [admin] }
+  carol@example.com: { roles: [auditor, it-admin] }
+`})
+	p, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, u := range p.Tailnet.Users {
+		got = append(got, u.Login+":"+strings.Join(u.Roles, ","))
+	}
+	if want := []string{"alice@example.com:admin", "carol@example.com:auditor,it-admin"}; !slices.Equal(got, want) {
+		t.Errorf("users %v, want %v", got, want)
+	}
+}
+
+func TestModelJSONKeepsNumbers(t *testing.T) {
+	dir := project(t, map[string]string{PolicyFile: `{"tests": [{"src": "tag:a", "accept": ["tag:b:1"], "srcPostureAttrs": {"custom:n": 9007199254740993}}]}`})
+	p, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := p.Tailnet.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "9007199254740993") {
+		t.Error("model.json changed a large number")
 	}
 }

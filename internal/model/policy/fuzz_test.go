@@ -43,6 +43,9 @@ func FuzzParse(f *testing.F) {
 			if !ok {
 				t.Fatalf("reference %s doesn't resolve", r.Pointer)
 			}
+			if r.Role == "defines" {
+				continue // points at the key's value; the name is the key
+			}
 			var s string
 			if err := json.Unmarshal(raw[start:end], &s); err != nil || (s != r.Value && stripPort(s) != r.Value) {
 				t.Fatalf("reference %s's span %q doesn't hold %q (%v)", r.Pointer, raw[start:end], r.Value, err)

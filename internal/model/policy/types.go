@@ -135,18 +135,12 @@ type AutoApprovers struct {
 
 // NodeAttr is an entry of the nodeAttrs section.
 type NodeAttr struct {
-	Target []string                 `json:"target"`
-	Attr   []string                 `json:"attr"`
-	App    map[string][]NodeAttrApp `json:"app"`
-	IPPool []string                 `json:"ipPool"`
-}
-
-// NodeAttrApp configures an app connector.
-type NodeAttrApp struct {
-	Name        string   `json:"name"`
-	Connectors  []string `json:"connectors"`
-	Domains     []string `json:"domains"`
-	PresetAppID string   `json:"presetAppID"`
+	Target []string `json:"target"`
+	Attr   []string `json:"attr"`
+	// App holds application capabilities, such as app connectors, whose
+	// payloads belong to each application, as a grant's do.
+	App    AppCaps  `json:"app"`
+	IPPool []string `json:"ipPool"`
 }
 
 // Test is an entry of the tests section: Tailscale's own assertions,

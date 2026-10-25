@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/zclconf/go-cty/cty"
 )
 
@@ -26,9 +27,12 @@ type TFDevice struct {
 // settings join as their milestones land.
 var tfvarsVariables = []string{"devices"}
 
-// ReadTFVars reads a tfvars file without running OpenTofu. A tfvars file
-// holds literal values only (0014): with no evaluation context, a
-// variable or function call is an error, as OpenTofu makes it.
+// ReadTFVars reads a tfvars file without running OpenTofu. tailsuite takes
+// literal values only (0014), stricter than OpenTofu, which also accepts
+// constant expressions such as templates and for loops: #9 edits this
+// file with hclwrite, which needs what's written to be what's meant. A
+// variable, function call or any expression is an error, and so is a
+// name or key written twice.
 func ReadTFVars(src []byte, filename string) (TFVars, error) {
 	vars := TFVars{Devices: map[string]TFDevice{}}
 	file, diags := hclparse.NewParser().ParseHCL(src, filename)
@@ -44,6 +48,10 @@ func ReadTFVars(src []byte, filename string) (TFVars, error) {
 		attr := attrs[name]
 		if !slices.Contains(tfvarsVariables, name) {
 			errs = append(errs, fmt.Errorf("%s: sets %q, which tailsuite.tf doesn't declare; it sets only %s", filename, name, strings.Join(tfvarsVariables, ", ")))
+			continue
+		}
+		if err := literal(attr.Expr); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %s: %w", filename, name, err))
 			continue
 		}
 		val, diags := attr.Expr.Value(nil)
@@ -111,4 +119,71 @@ func stringList(v cty.Value) ([]string, error) {
 		out = append(out, s.AsString())
 	}
 	return out, nil
+}
+
+// literal accepts only literal syntax: objects with literal keys, written
+// once each; lists; strings with no interpolation; numbers and booleans.
+func literal(expr hcl.Expression) error {
+	switch e := expr.(type) {
+	case *hclsyntax.LiteralValueExpr:
+		return nil
+	case *hclsyntax.TemplateExpr:
+		if len(e.Parts) == 0 {
+			return nil
+		}
+		if len(e.Parts) == 1 {
+			if _, ok := e.Parts[0].(*hclsyntax.LiteralValueExpr); ok {
+				return nil
+			}
+		}
+		return fmt.Errorf("line %d: a string with interpolation; want a literal value", e.SrcRange.Start.Line)
+	case *hclsyntax.TupleConsExpr:
+		for _, item := range e.Exprs {
+			if err := literal(item); err != nil {
+				return err
+			}
+		}
+		return nil
+	case *hclsyntax.ObjectConsExpr:
+		seen := map[string]bool{}
+		for _, item := range e.Items {
+			key, err := literalKey(item.KeyExpr)
+			if err != nil {
+				return err
+			}
+			if seen[key] {
+				return fmt.Errorf("line %d: %q is written twice", item.KeyExpr.Range().Start.Line, key)
+			}
+			seen[key] = true
+			if err := literal(item.ValueExpr); err != nil {
+				return err
+			}
+		}
+		return nil
+	default:
+		return fmt.Errorf("line %d: an expression; a tfvars file for tailsuite holds literal values only", expr.Range().Start.Line)
+	}
+}
+
+func literalKey(expr hcl.Expression) (string, error) {
+	if k, ok := expr.(*hclsyntax.ObjectConsKeyExpr); ok {
+		if k.ForceNonLiteral {
+			return "", fmt.Errorf("line %d: a computed key; want a literal name", expr.Range().Start.Line)
+		}
+		if name := hcl.ExprAsKeyword(k.Wrapped); name != "" {
+			return name, nil
+		}
+		expr = k.Wrapped
+	}
+	if err := literal(expr); err != nil {
+		return "", err
+	}
+	if _, ok := expr.(*hclsyntax.TemplateExpr); !ok {
+		return "", fmt.Errorf("line %d: a key that isn't a name or a string", expr.Range().Start.Line)
+	}
+	v, diags := expr.Value(nil)
+	if diags.HasErrors() || v.Type() != cty.String {
+		return "", fmt.Errorf("line %d: a key that isn't a name or a string", expr.Range().Start.Line)
+	}
+	return v.AsString(), nil
 }

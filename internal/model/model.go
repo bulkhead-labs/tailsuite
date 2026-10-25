@@ -13,6 +13,7 @@
 package model
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -49,6 +50,21 @@ type Tailnet struct {
 
 	// Devices are keyed by their MagicDNS name, and sorted by it.
 	Devices []Device `json:"devices"`
+
+	// Users are the tailnet's users, by login, sorted.
+	Users []User `json:"users"`
+}
+
+// User is one user of the tailnet.
+type User struct {
+	Login string `json:"login"`
+	// Roles are the user's tailnet roles, such as admin, which role
+	// autogroups name.
+	Roles []string `json:"roles,omitempty"`
+
+	Origin Origin `json:"origin"`
+	// Inferred lists the fields tailsuite filled in.
+	Inferred []string `json:"inferred,omitempty"`
 }
 
 // Device is one device of the tailnet.
@@ -86,6 +102,7 @@ type document struct {
 	SchemaVersion int                 `json:"schemaVersion"`
 	Name          string              `json:"name,omitempty"`
 	Devices       []Device            `json:"devices"`
+	Users         []User              `json:"users"`
 	Policy        *policy.Policy      `json:"policy"`
 	Unknown       []policy.UnknownKey `json:"unknownPolicyKeys"`
 }
@@ -93,9 +110,12 @@ type document struct {
 // MarshalJSON writes the model for the UI, golden tests and fuzzing:
 // schema-versioned, with every object's keys sorted.
 func (t *Tailnet) MarshalJSON() ([]byte, error) {
-	doc := document{SchemaVersion: SchemaVersion, Name: t.Name, Devices: t.Devices, Unknown: []policy.UnknownKey{}}
+	doc := document{SchemaVersion: SchemaVersion, Name: t.Name, Devices: t.Devices, Users: t.Users, Unknown: []policy.UnknownKey{}}
 	if doc.Devices == nil {
 		doc.Devices = []Device{}
+	}
+	if doc.Users == nil {
+		doc.Users = []User{}
 	}
 	if t.Policy != nil {
 		doc.Policy = &t.Policy.Policy
@@ -109,8 +129,11 @@ func (t *Tailnet) MarshalJSON() ([]byte, error) {
 	}
 	// Through a generic value and back: encoding/json sorts map keys, so
 	// struct fields come out sorted too.
+	// UseNumber keeps numbers exactly as written, past float64's precision.
 	var generic any
-	if err := json.Unmarshal(b, &generic); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.UseNumber()
+	if err := dec.Decode(&generic); err != nil {
 		return nil, err
 	}
 	return json.MarshalIndent(generic, "", "  ")

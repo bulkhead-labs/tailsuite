@@ -16,7 +16,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 
 	"github.com/bulkhead-labs/tailsuite/internal/model"
 	"github.com/bulkhead-labs/tailsuite/internal/model/policy"
@@ -91,10 +90,15 @@ func check(lab Lab, tfvars TFVars) error {
 		if _, ok := lab.Devices[name]; !ok {
 			errs = append(errs, fmt.Errorf("%s: device %s isn't in %s", TFVarsFile, name, LabFile))
 		}
+		seen := map[string]bool{}
 		for _, tag := range tfvars.Devices[name].Tags {
-			if !strings.HasPrefix(tag, "tag:") || len(tag) == len("tag:") {
+			if !tagName.MatchString(tag) {
 				errs = append(errs, fmt.Errorf("%s: device %s: %q isn't a tag, such as tag:prod", TFVarsFile, name, tag))
 			}
+			if seen[tag] {
+				errs = append(errs, fmt.Errorf("%s: device %s: %s twice", TFVarsFile, name, tag))
+			}
+			seen[tag] = true
 		}
 	}
 	for _, name := range sortedKeys(lab.Devices) {
@@ -102,14 +106,28 @@ func check(lab Lab, tfvars TFVars) error {
 			errs = append(errs, fmt.Errorf("%s: device %s has neither a user nor tags (in %s)", LabFile, name, TFVarsFile))
 		}
 	}
-	// Names are unique: lab.yaml's decoder refuses a repeated key, and
-	// MagicDNS names are lower-case, so two spellings of one name can't
-	// both pass.
+	// Names are unique: lab.yaml's decoder and the tfvars reader both
+	// refuse a repeated key, and MagicDNS names are lower-case, so two
+	// spellings of one name can't both pass.
 	return errors.Join(errs...)
 }
 
 func build(pol *policy.File, lab Lab, tfvars TFVars) model.Tailnet {
 	t := model.Tailnet{Policy: pol}
+	users := map[string]model.User{}
+	for login, u := range lab.Users {
+		r := slices.Clone(u.Roles)
+		slices.Sort(r)
+		users[login] = model.User{Login: login, Roles: r, Origin: model.Declared}
+	}
+	for _, d := range lab.Devices {
+		if _, ok := users[d.User]; d.User != "" && !ok {
+			users[d.User] = model.User{Login: d.User, Origin: model.Declared}
+		}
+	}
+	for _, login := range sortedKeys(users) {
+		t.Users = append(t.Users, users[login])
+	}
 	for _, name := range sortedKeys(lab.Devices) {
 		d := lab.Devices[name]
 		tags := slices.Clone(tfvars.Devices[name].Tags)

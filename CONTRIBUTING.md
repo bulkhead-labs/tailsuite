@@ -47,15 +47,15 @@ go mod tidy -diff && golangci-lint run && CGO_ENABLED=1 go test -race ./...
 ```
 
 The race detector needs cgo, which the dev shell turns off for static
-builds.
+builds. When `go.sum` changes, update `vendorHash` in `flake.nix` to the
+hash `nix build` reports.
 
 Tests that need Docker sit behind the `integration` build tag. They create
 containers and networks named `tailsuite-<run>-…`, and remove them:
 
 ```
 go test -tags integration ./internal/sandbox/docker/
-``` When `go.sum` changes, update
-`vendorHash` in `flake.nix` to the hash `nix build` reports.
+```
 
 ## Never commit
 

@@ -52,11 +52,14 @@ type Sandbox interface {
   - Labels are `com.bulkheadlabs.tailsuite.run`, `.name` and `.role`.
 - **Teardown finds a run by its label**, so it needs no state file.
   - It force-removes the containers, then the networks, and is idempotent.
+  - It looks again until a pass finds nothing, up to five passes. A node
+    whose create was in flight when a run was interrupted can appear after
+    the first pass.
   - `TeardownRun` does the same from a run ID alone, for `tailsuite down`
     after a crash. `Runs` lists the runs that still have anything.
 - **`sandbox.Run(ctx, sb, fn)` always tears down:** when `fn` returns,
-  fails or panics, and when `ctx` is cancelled, as by an interrupt through
-  `signal.NotifyContext`.
+  fails or panics. `fn` must return when `ctx` is cancelled, as by an
+  interrupt through `signal.NotifyContext`; then `Run` tears down too.
   - Teardown gets a context of its own, bounded to two minutes, so a
     cancelled `ctx` doesn't stop it.
   - A process killed outright (SIGKILL) can't tear down. That's what
@@ -84,18 +87,28 @@ type Sandbox interface {
     `userspace-networking` in its command, its entrypoint or
     `TS_TAILSCALED_EXTRA_ARGS`.
 - **Checked once it runs:** `CheckKernelTUN` reads
-  `/sys/class/net/tailscale0/tun_flags` in the node. In userspace mode
-  there's no such interface, and the result is `ErrUserspace`. Engines
-  call it after tailscaled starts, so a userspace node can't slip through
-  as a false deny.
+  `/sys/class/net/tailscale0/tun_flags` in the node.
+  - In userspace mode there's no such interface (`cat` exits 1), and the
+    result is `ErrUserspace`. Any other failure is a failed check, not a
+    diagnosis.
+  - **Engines must call it on every tailnet node once tailscaled is up,
+    and fail the run if it fails** (#5, #6). The spec check can't see what
+    an image's own scripts do.
 
 ### Agents are controlled through exec, not a network (amends 0003)
 
 - **`Exec` runs a command in a node through the sandbox's API**, with
   stdin, stdout and stderr, and returns its exit code.
-- **The node agent (#7) is controlled the same way:** a long-lived exec
-  session whose stdin and stdout carry the agent's protocol. So there is
-  no control network.
+  - It runs only in the run's own nodes.
+  - An exit code is trusted only from a command the daemon says started
+    (it reports a PID).
+- **The node agent (#7) is controlled the same way.** Each tailsuite
+  process that needs an agent opens its own exec session to it, and the
+  session's stdin and stdout carry the agent's protocol. So there is no
+  control network.
+  - `tailsuite up` and `tailsuite test` are separate processes, and the
+    lab outlives both. So the agent's state, such as its listeners, can't
+    belong to any one session (#7 decides how).
 - **It meets 0003's reason**, that a deny rule must never cut off the
   test's own control traffic. That traffic doesn't touch any network in
   the lab, the tailnet included.
@@ -137,22 +150,27 @@ type Sandbox interface {
     new for the two-week rule.
   - The engines pin their own client versions (#5, #6).
 - **Integration tests** (`go test -tags integration ./internal/sandbox/docker/`),
-  against Docker 26.1.5 (API 1.45). All ten pass in 5 s:
+  against Docker 26.1.5 (API 1.45). All nine pass in about 7 s:
   - a tailnet node's tailscaled creates `tailscale0` as a kernel TUN
-    device;
-  - an internal network gives no default route;
+    device, both when started directly and through the official image's
+    own entrypoint, which honours `TS_USERSPACE=false`;
+  - an internal network gives no default route, and a network with
+    `Internet` does (the positive control);
   - a userspace tailnet node is refused, and `CheckKernelTUN` flags a
     service that runs tailscaled in userspace mode;
-  - `Exec` carries stdin, stdout, stderr and exit codes, and stops waiting
-    when its context ends;
-  - files are copied in before a node starts;
+  - `Exec` carries stdin, stdout, stderr and exit codes, stops waiting
+    when its context ends, and refuses other runs' nodes;
+  - files are copied in before a node starts, and `/tmp` keeps its mode
+    1777 when one is copied there;
   - names and labels are right, and duplicates and other runs' networks
     are refused;
   - tearing one run down leaves another alone, and a second teardown
     succeeds;
   - SIGINT to a process with a running lab leaves nothing behind.
-- **The tests fail when the code is broken.** Three faults were planted,
+- **The tests fail when the code is broken.** Four faults were planted,
   one at a time:
+  - with directory entries in the archive, `/tmp` became 0755, and the
+    test caught it;
   - without the TUN device, tailscaled exits, and the TUN test fails;
   - without `sandbox.Run`, the interrupt test finds the run still there;
   - with the network not internal, the test finds a default route via
@@ -183,6 +201,11 @@ type Sandbox interface {
 - **A cancelled `Exec` leaves its process running**, because the Docker
   Engine can't stop an exec'd process. It ends when the node is torn
   down.
+- **Copied files arrive without their parent directories' modes.**
+  Docker creates a missing parent root-owned, with mode 0755. The archive
+  holds no directory entries, because Docker would apply them to
+  directories that already exist: copying a file into `/tmp` would make
+  `/tmp` 0755.
 - **The integration tests need Docker**, so they sit behind a build tag.
   CI lints and compiles them. Running them in CI is #13's integration
   tier.

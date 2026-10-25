@@ -148,7 +148,9 @@ type ExecSpec struct {
 	Cmd []string
 
 	// Stdin, if set, is copied to the command until it ends; then the
-	// command's stdin is closed.
+	// command's stdin is closed. If the command exits first, Exec returns
+	// while the copy may still be waiting in Stdin's Read: close Stdin
+	// then, so the copy ends rather than taking the next write.
 	Stdin io.Reader
 
 	// Stdout and Stderr receive the command's output. Nil discards it.
@@ -157,10 +159,11 @@ type ExecSpec struct {
 }
 
 // Run calls fn, then tears the sandbox down however fn ends: when it
-// returns, fails or panics, and when ctx is cancelled, as by an interrupt
-// through signal.NotifyContext. Teardown gets a context of its own, so a
-// cancelled ctx doesn't stop it. A process that's killed outright (SIGKILL)
-// can't tear down; removing the run by its ID cleans up after it.
+// returns, fails or panics. fn must return when ctx is cancelled, as by an
+// interrupt through signal.NotifyContext; then Run tears down too.
+// Teardown gets a context of its own, so a cancelled ctx doesn't stop it. A
+// process that's killed outright (SIGKILL) can't tear down; removing the
+// run by its ID cleans up after it.
 func Run(ctx context.Context, sb Sandbox, fn func(context.Context) error) (err error) {
 	defer func() {
 		tctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), TeardownTimeout)
@@ -267,17 +270,25 @@ func checkKernelMode(spec NodeSpec) error {
 
 // CheckKernelTUN checks that a running node has a kernel TUN interface named
 // iface, as tailscaled creates in kernel mode ("tailscale0" by default). A
-// node in userspace mode has none. It runs `cat` in the node.
+// node in userspace mode has none, and gets ErrUserspace. It runs `cat` in
+// the node. Engines call it on every tailnet node once tailscaled is up
+// (#5, #6): CheckNodeSpec only sees the spec, not what the image's own
+// scripts do.
 func CheckKernelTUN(ctx context.Context, sb Sandbox, node Node, iface string) error {
 	if err := CheckName(iface); err != nil {
 		return fmt.Errorf("interface: %w", err)
 	}
-	code, err := sb.Exec(ctx, node, ExecSpec{Cmd: []string{"cat", "/sys/class/net/" + iface + "/tun_flags"}})
+	var stderr strings.Builder
+	code, err := sb.Exec(ctx, node, ExecSpec{Cmd: []string{"cat", "/sys/class/net/" + iface + "/tun_flags"}, Stderr: &stderr})
 	if err != nil {
 		return fmt.Errorf("checking node %s for a TUN interface: %w", node.Name, err)
 	}
-	if code != 0 {
+	switch code {
+	case 0:
+		return nil
+	case 1: // cat: no such file
 		return fmt.Errorf("node %s has no TUN interface %s: %w", node.Name, iface, ErrUserspace)
+	default:
+		return fmt.Errorf("couldn't check node %s for a TUN interface: cat exited %d: %s", node.Name, code, strings.TrimSpace(stderr.String()))
 	}
-	return nil
 }

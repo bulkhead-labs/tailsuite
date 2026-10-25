@@ -110,12 +110,80 @@ func TestTailnetNodeRunsKernelTUN(t *testing.T) {
 	}
 
 	// The lab network is internal: no default route out of the lab.
-	var routes bytes.Buffer
-	if code, err := sb.Exec(ctx, node, sandbox.ExecSpec{Cmd: []string{"ip", "route", "show", "default"}, Stdout: &routes}); err != nil || code != 0 {
-		t.Fatalf("ip route: code %d, %v", code, err)
+	if got := defaultRoute(t, sb, node); got != "" {
+		t.Errorf("an internal network has a default route: %q", got)
 	}
-	if strings.TrimSpace(routes.String()) != "" {
-		t.Errorf("an internal network has a default route: %q", routes.String())
+}
+
+// defaultRoute reads a node's default route. It only reads the routing
+// table; nothing leaves the node.
+func defaultRoute(t *testing.T, sb *Sandbox, node sandbox.Node) string {
+	t.Helper()
+	var routes bytes.Buffer
+	if code, err := sb.Exec(context.Background(), node, sandbox.ExecSpec{Cmd: []string{"ip", "route", "show", "default"}, Stdout: &routes}); err != nil || code != 0 {
+		t.Fatalf("ip route in %s: code %d, %v", node.Name, code, err)
+	}
+	return strings.TrimSpace(routes.String())
+}
+
+// The positive control for the route check: a network with Internet has a
+// default route.
+func TestInternetNetworkHasARoute(t *testing.T) {
+	ctx := context.Background()
+	sb := newSandbox(t)
+	wan, err := sb.CreateNetwork(ctx, sandbox.NetworkSpec{Name: "wan", Internet: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	node, err := sb.StartNode(ctx, sandbox.NodeSpec{Name: "box", Role: sandbox.RoleService, Image: tailscaleImage, Networks: []sandbox.Network{wan}, Entrypoint: []string{"sleep", "infinity"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := defaultRoute(t, sb, node); !strings.HasPrefix(got, "default via") {
+		t.Errorf("a network with Internet has no default route: %q", got)
+	}
+}
+
+// The path the engines will use: the official image's own entrypoint
+// (containerboot), which honours the TS_USERSPACE=false the sandbox sets.
+// There's no auth key, and the network is internal, so it never logs in.
+func TestOfficialEntrypointRunsKernelTUN(t *testing.T) {
+	ctx := context.Background()
+	sb := newSandbox(t)
+	lan, err := sb.CreateNetwork(ctx, sandbox.NetworkSpec{Name: "lan"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	node, err := sb.StartNode(ctx, sandbox.NodeSpec{
+		Name: "laptop", Image: tailscaleImage, Networks: []sandbox.Network{lan},
+		Env: map[string]string{"TS_TAILSCALED_EXTRA_ARGS": "--no-logs-no-support"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := waitFor(ctx, 20*time.Second, func() error {
+		return sandbox.CheckKernelTUN(ctx, sb, node, "tailscale0")
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Exec runs commands only in this run's own nodes.
+func TestExecRefusesOtherNodes(t *testing.T) {
+	ctx := context.Background()
+	a, b := newSandbox(t), newSandbox(t)
+	lan, err := b.CreateNetwork(ctx, sandbox.NetworkSpec{Name: "lan"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	theirs, err := b.StartNode(ctx, sandbox.NodeSpec{Name: "db", Role: sandbox.RoleService, Image: tailscaleImage, Networks: []sandbox.Network{lan}, Entrypoint: []string{"sleep", "infinity"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []sandbox.Node{theirs, {Name: "db", ID: "0123456789ab"}} {
+		if _, err := a.Exec(ctx, n, sandbox.ExecSpec{Cmd: []string{"true"}}); err == nil {
+			t.Errorf("Exec ran in node %s (%s), which run %s didn't start", n.Name, n.ID, a.RunID())
+		}
 	}
 }
 
@@ -166,7 +234,10 @@ func TestExec(t *testing.T) {
 		Name: "box", Role: sandbox.RoleService, Image: tailscaleImage,
 		Networks:   []sandbox.Network{lan},
 		Entrypoint: []string{"sleep", "infinity"},
-		Files:      []sandbox.File{{Path: "/opt/tailsuite/greet", Mode: 0o755, Content: []byte("#!/bin/sh\necho \"hello, $1\"\n")}},
+		Files: []sandbox.File{
+			{Path: "/opt/tailsuite/greet", Mode: 0o755, Content: []byte("#!/bin/sh\necho \"hello, $1\"\n")},
+			{Path: "/tmp/lab.json", Mode: 0o644, Content: []byte("{}")},
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -191,6 +262,15 @@ func TestExec(t *testing.T) {
 	}
 	if out.String() != "hello, lab\n" {
 		t.Errorf("the copied file said %q", out.String())
+	}
+
+	// Copying a file into an existing directory leaves the directory alone.
+	out.Reset()
+	if code, err := sb.Exec(ctx, node, sandbox.ExecSpec{Cmd: []string{"stat", "-c", "%a %U", "/tmp"}, Stdout: &out}); err != nil || code != 0 {
+		t.Fatalf("stat /tmp: code %d, %v", code, err)
+	}
+	if got := strings.TrimSpace(out.String()); got != "1777 root" {
+		t.Errorf("/tmp after a copy = %q, want 1777 root", got)
 	}
 
 	// A cancelled context stops the wait.

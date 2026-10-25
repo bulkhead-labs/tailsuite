@@ -115,11 +115,9 @@ func TestTarFiles(t *testing.T) {
 		}
 		got = append(got, entry{hdr.Name, hdr.Typeflag == tar.TypeDir, hdr.Mode, string(body)})
 	}
+	// No directory entries: Docker would apply their mode and owner to
+	// directories that already exist.
 	want := []entry{
-		{"etc/", true, 0o755, ""},
-		{"opt/", true, 0o755, ""},
-		{"opt/tailsuite/", true, 0o755, ""},
-		{"opt/tailsuite/bin/", true, 0o755, ""},
 		{"opt/tailsuite/bin/agent", false, 0o755, "binary"},
 		{"opt/tailsuite/agent.json", false, 0o644, "{}"},
 		{"etc/motd", false, 0o644, ""},

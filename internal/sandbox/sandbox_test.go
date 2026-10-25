@@ -147,6 +147,9 @@ type fake struct {
 	teardowns   int
 	teardownErr error
 
+	execCode int
+	execErr  error
+
 	// The teardown context's state during the call.
 	ctxErr      error
 	ctxDeadline bool
@@ -157,7 +160,9 @@ func (f *fake) CreateNetwork(context.Context, NetworkSpec) (Network, error) {
 	return Network{}, nil
 }
 func (f *fake) StartNode(context.Context, NodeSpec) (Node, error) { return Node{}, nil }
-func (f *fake) Exec(context.Context, Node, ExecSpec) (int, error) { return 0, nil }
+func (f *fake) Exec(context.Context, Node, ExecSpec) (int, error) {
+	return f.execCode, f.execErr
+}
 func (f *fake) Teardown(ctx context.Context) error {
 	f.teardowns++
 	f.ctxErr = ctx.Err()
@@ -221,5 +226,26 @@ func TestRunTearsDownWithALiveContextAfterCancel(t *testing.T) {
 	}
 	if !f.ctxDeadline {
 		t.Fatal("teardown's context has no deadline")
+	}
+}
+
+func TestCheckKernelTUN(t *testing.T) {
+	ctx := context.Background()
+	node := Node{Name: "laptop"}
+	if err := CheckKernelTUN(ctx, &fake{execCode: 0}, node, "tailscale0"); err != nil {
+		t.Errorf("a TUN interface: %v", err)
+	}
+	if err := CheckKernelTUN(ctx, &fake{execCode: 1}, node, "tailscale0"); !errors.Is(err, ErrUserspace) {
+		t.Errorf("no interface: %v, want ErrUserspace", err)
+	}
+	// Anything else is a failed check, not a diagnosis.
+	for _, f := range []*fake{{execCode: 127}, {execCode: 137}, {execErr: errors.New("daemon gone")}} {
+		err := CheckKernelTUN(ctx, f, node, "tailscale0")
+		if err == nil || errors.Is(err, ErrUserspace) {
+			t.Errorf("exec %d, %v: CheckKernelTUN = %v, want an error that isn't ErrUserspace", f.execCode, f.execErr, err)
+		}
+	}
+	if err := CheckKernelTUN(ctx, &fake{}, node, "../etc"); err == nil {
+		t.Error("a path as the interface name was accepted")
 	}
 }

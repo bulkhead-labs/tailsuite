@@ -208,6 +208,12 @@ func (s *Sandbox) Exec(ctx context.Context, node sandbox.Node, spec sandbox.Exec
 	if len(spec.Cmd) == 0 {
 		return -1, errors.New("exec: no command")
 	}
+	s.mu.Lock()
+	known, ok := s.nodes[node.Name]
+	s.mu.Unlock()
+	if !ok || known.ID != node.ID {
+		return -1, fmt.Errorf("exec: node %s wasn't started by run %s", node.Name, s.runID)
+	}
 	created, err := s.cli.ExecCreate(ctx, node.ID, client.ExecCreateOptions{
 		Cmd:          spec.Cmd,
 		AttachStdin:  spec.Stdin != nil,
@@ -243,25 +249,35 @@ func (s *Sandbox) Exec(ctx context.Context, node sandbox.Node, spec sandbox.Exec
 	return s.exitCode(ctx, node, created.ID)
 }
 
-// exitCode waits, briefly, for the Docker Engine to record that an exec'd
-// process has exited, after its output has closed.
+// exitWait bounds how long Exec waits for the Docker Engine to record an
+// exit after the command's output has closed. It's usually milliseconds;
+// the bound is for a daemon that never records one.
+const exitWait = 30 * time.Second
+
+// exitCode waits for the Docker Engine to record that an exec'd process has
+// exited, after its output has closed.
 func (s *Sandbox) exitCode(ctx context.Context, node sandbox.Node, execID string) (int, error) {
-	const tries, pause = 50, 20 * time.Millisecond
-	for range tries {
+	ctx, cancel := context.WithTimeout(ctx, exitWait)
+	defer cancel()
+	for {
 		res, err := s.cli.ExecInspect(ctx, execID, client.ExecInspectOptions{})
 		if err != nil {
 			return -1, fmt.Errorf("exec in node %s: %w", node.Name, err)
 		}
 		if !res.Running {
+			// The daemon reports a PID for every exec that started. Without
+			// one, the exit code is the client's default, not the command's.
+			if res.PID == 0 && res.ExitCode == 0 {
+				return -1, fmt.Errorf("exec in node %s: the command never started", node.Name)
+			}
 			return res.ExitCode, nil
 		}
 		select {
 		case <-ctx.Done():
-			return -1, fmt.Errorf("exec in node %s: %w", node.Name, ctx.Err())
-		case <-time.After(pause):
+			return -1, fmt.Errorf("exec in node %s: waiting for its exit code: %w", node.Name, ctx.Err())
+		case <-time.After(20 * time.Millisecond):
 		}
 	}
-	return -1, fmt.Errorf("exec in node %s: its output closed, but it still hadn't exited after %s", node.Name, tries*pause)
 }
 
 // Teardown implements sandbox.Sandbox.
@@ -276,18 +292,43 @@ func (s *Sandbox) Teardown(ctx context.Context) error {
 	return err
 }
 
+// teardownPasses bounds how many times TeardownRun looks again. A node
+// whose create was in flight when the run was interrupted can appear after
+// the first pass has listed the run.
+const teardownPasses = 5
+
 // TeardownRun removes every container and network labelled with a run's
-// ID, as `tailsuite down` does after a crash. It's idempotent.
+// ID, as `tailsuite down` does after a crash. It's idempotent. It looks
+// again after each pass, until a pass finds nothing, at most
+// teardownPasses times.
 func TeardownRun(ctx context.Context, cli *client.Client, runID string) error {
 	if err := sandbox.CheckRunID(runID); err != nil {
 		return err
 	}
+	for pass := range teardownPasses {
+		found, err := teardownPass(ctx, cli, runID)
+		if err != nil || found == 0 {
+			return err
+		}
+		if pass < teardownPasses-1 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(200 * time.Millisecond):
+			}
+		}
+	}
+	return fmt.Errorf("run %s: still finding nodes or networks after %d passes", runID, teardownPasses)
+}
+
+// teardownPass removes what it finds of a run, and says how much it found.
+func teardownPass(ctx context.Context, cli *client.Client, runID string) (int, error) {
 	filter := client.Filters{}.Add("label", sandbox.LabelRun+"="+runID)
 	var errs []error
 
 	containers, err := cli.ContainerList(ctx, client.ContainerListOptions{All: true, Filters: filter})
 	if err != nil {
-		return fmt.Errorf("listing run %s's nodes: %w", runID, err)
+		return 0, fmt.Errorf("listing run %s's nodes: %w", runID, err)
 	}
 	for _, c := range containers.Items {
 		if _, err := cli.ContainerRemove(ctx, c.ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); err != nil && !gone(err) {
@@ -297,14 +338,14 @@ func TeardownRun(ctx context.Context, cli *client.Client, runID string) error {
 
 	networks, err := cli.NetworkList(ctx, client.NetworkListOptions{Filters: filter})
 	if err != nil {
-		return errors.Join(append(errs, fmt.Errorf("listing run %s's networks: %w", runID, err))...)
+		return 0, errors.Join(append(errs, fmt.Errorf("listing run %s's networks: %w", runID, err))...)
 	}
 	for _, n := range networks.Items {
 		if _, err := cli.NetworkRemove(ctx, n.ID, client.NetworkRemoveOptions{}); err != nil && !gone(err) {
 			errs = append(errs, fmt.Errorf("removing network %s: %w", n.Labels[sandbox.LabelName], err))
 		}
 	}
-	return errors.Join(errs...)
+	return len(containers.Items) + len(networks.Items), errors.Join(errs...)
 }
 
 // Runs lists the IDs of runs that still have containers or networks.
@@ -394,35 +435,21 @@ func envList(env map[string]string) []string {
 	return list
 }
 
-// tarFiles packs files, and the directories above them, into a tar archive
-// to extract at /.
+// tarFiles packs files into a tar archive to extract at /. It holds no
+// directory entries: Docker would apply their mode and owner to a directory
+// that already exists, such as /tmp. Docker creates missing parents itself,
+// root-owned with mode 0755, and leaves existing ones alone.
 func tarFiles(files []sandbox.File) (io.Reader, error) {
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
-	dirs := map[string]bool{}
 	for _, f := range files {
 		name := strings.TrimPrefix(path.Clean(f.Path), "/")
 		if name == "" || name == "." {
 			return nil, fmt.Errorf("file path %q names no file", f.Path)
 		}
-		for dir := path.Dir(name); dir != "." && !dirs[dir]; dir = path.Dir(dir) {
-			dirs[dir] = true
-		}
-	}
-	sortedDirs := make([]string, 0, len(dirs))
-	for d := range dirs {
-		sortedDirs = append(sortedDirs, d)
-	}
-	slices.Sort(sortedDirs) // parents sort before their children
-	for _, d := range sortedDirs {
-		if err := tw.WriteHeader(&tar.Header{Typeflag: tar.TypeDir, Name: d + "/", Mode: 0o755}); err != nil {
-			return nil, err
-		}
-	}
-	for _, f := range files {
 		hdr := &tar.Header{
 			Typeflag: tar.TypeReg,
-			Name:     strings.TrimPrefix(path.Clean(f.Path), "/"),
+			Name:     name,
 			Mode:     int64(f.Mode.Perm()),
 			Size:     int64(len(f.Content)),
 		}

@@ -43,7 +43,7 @@ func FuzzParse(f *testing.F) {
 			if !ok {
 				t.Fatalf("reference %s doesn't resolve", r.Pointer)
 			}
-			if r.Role == "defines" {
+			if r.Role == "defines" || r.Role == "payload-key" {
 				continue // points at the key's value; the name is the key
 			}
 			var s string

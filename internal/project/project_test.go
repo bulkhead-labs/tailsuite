@@ -143,6 +143,10 @@ func TestLoadChecks(t *testing.T) {
 			map[string]string{LabFile: "version: 1\ndevices:\n  db: { user: a@example.com }\n---\nbogus: 1\n", TFVarsFile: ""}, "more than one YAML document"},
 		"a login that isn't one": {
 			map[string]string{LabFile: "version: 1\ndevices:\n  db: { user: \"@\" }\n", TFVarsFile: ""}, "isn't a login"},
+		"a login shaped like a tag": {
+			map[string]string{LabFile: "version: 1\ndevices:\n  db: { user: \"tag:a@b\" }\n", TFVarsFile: ""}, "isn't a login"},
+		"a role twice": {
+			map[string]string{LabFile: "version: 1\ndevices: {}\nusers:\n  alice@example.com: { roles: [admin, admin] }\n", TFVarsFile: ""}, "role admin twice"},
 		"an unknown role": {
 			map[string]string{LabFile: "version: 1\ndevices: {}\nusers:\n  alice@example.com: { roles: [wizard] }\n", TFVarsFile: ""}, `role "wizard"`},
 		"a tag with a space": {

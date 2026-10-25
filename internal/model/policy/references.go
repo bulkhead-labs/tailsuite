@@ -3,6 +3,7 @@ package policy
 import (
 	"encoding/json"
 	"net/netip"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -34,8 +35,9 @@ type Ref struct {
 	Kind  Kind
 	// Role says what the place is for: src, dst, via, owner, member,
 	// approver, target, recorder, test-src, broadcast, external, defines
-	// (a group or tag's own name, as a key) or payload (a string inside an
-	// application's payload, which tailsuite doesn't interpret).
+	// (a group or tag's own name, as a key), payload (a string inside an
+	// application's payload, which tailsuite doesn't interpret, without any
+	// :port) or payload-key (a key there, whose pointer is its value).
 	Role string
 }
 
@@ -74,10 +76,15 @@ func (f *File) References() []Ref {
 				if json.Unmarshal(raw, &v) != nil {
 					continue
 				}
-				walkStrings(v, base+"/"+escape(name)+"/"+strconv.Itoa(j), func(ptr, s string) {
-					switch KindOf(s, nil) {
+				walkStrings(v, base+"/"+escape(name)+"/"+strconv.Itoa(j), func(ptr, s string, isKey bool) {
+					value := portSuffix.ReplaceAllString(s, "")
+					switch KindOf(value, nil) {
 					case User, Group, Tag, Autogroup:
-						add(ptr, s, "payload")
+						role := "payload"
+						if isKey {
+							role = "payload-key" // the pointer is the key's value
+						}
+						add(ptr, value, role)
 					}
 				})
 			}
@@ -151,22 +158,27 @@ func (f *File) References() []Ref {
 	return refs
 }
 
-// walkStrings calls fn for every string in a decoded JSON value, with its
-// pointer under base.
-func walkStrings(v any, base string, fn func(ptr, s string)) {
+// walkStrings calls fn for every string in a decoded JSON value, values
+// and object keys alike, with its pointer under base. For a key, the
+// pointer is the key's value.
+func walkStrings(v any, base string, fn func(ptr, s string, isKey bool)) {
 	switch x := v.(type) {
 	case string:
-		fn(base, x)
+		fn(base, x, false)
 	case []any:
 		for i, e := range x {
 			walkStrings(e, base+"/"+strconv.Itoa(i), fn)
 		}
 	case map[string]any:
 		for _, k := range sortedKeys(x) {
+			fn(base+"/"+escape(k), k, true)
 			walkStrings(x[k], base+"/"+escape(k), fn)
 		}
 	}
 }
+
+// portSuffix is a :port, :* or :range list at the end of a name.
+var portSuffix = regexp.MustCompile(`:(\*|[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*)$`)
 
 // Identities is References limited to users, groups, tags and autogroups:
 // what a rewrite of identities, such as users to tags (#6), has to find.

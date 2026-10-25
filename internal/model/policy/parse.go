@@ -3,6 +3,7 @@ package policy
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -67,8 +68,12 @@ func Parse(raw []byte) (*File, error) {
 	// would hold a policy the file doesn't state. A first decode finds
 	// which occurrences are overridden, they're removed from a copy, and
 	// the typed copy is decoded from that: the last occurrence, alone.
+	// An overridden occurrence may have the wrong type; the first decode
+	// only needs the structure, so a type error doesn't stop it. The
+	// second, of the last occurrences alone, still refuses one.
 	first, err := decode(std)
-	if err != nil {
+	var typeErr *json.UnmarshalTypeError
+	if err != nil && !errors.As(err, &typeErr) {
 		return nil, err
 	}
 	var drop [][]int
@@ -84,20 +89,34 @@ func Parse(raw []byte) (*File, error) {
 	return f, nil
 }
 
-// decode decodes a standardized tree into a Policy, and returns what the
-// Policy understood, encoded again as a generic value.
+// decode decodes a standardized tree into a throwaway Policy, and returns
+// what the Policy understood, encoded again as a generic value. After a
+// type error, which Go's decoder reports only once it has decoded the
+// rest, it returns that error with what was understood.
 func decode(std hujson.Value) (any, error) {
 	var p Policy
-	return decodeInto(std, &p)
+	return decodeLenient(std, &p)
 }
 
+// decodeInto decodes a standardized tree into p, and returns what p
+// understood, encoded again as a generic value.
 func decodeInto(std hujson.Value, p *Policy) (any, error) {
+	understood, err := decodeLenient(std, p)
+	if err != nil {
+		return nil, err
+	}
+	return understood, nil
+}
+
+func decodeLenient(std hujson.Value, p *Policy) (any, error) {
 	// UseNumber keeps numbers, such as posture attribute values, exactly
 	// as written.
 	dec := json.NewDecoder(bytes.NewReader(std.Pack()))
 	dec.UseNumber()
-	if err := dec.Decode(p); err != nil {
-		return nil, fmt.Errorf("policy: %w", err)
+	decodeErr := dec.Decode(p)
+	var typeErr *json.UnmarshalTypeError
+	if decodeErr != nil && !errors.As(decodeErr, &typeErr) {
+		return nil, fmt.Errorf("policy: %w", decodeErr)
 	}
 	encoded, err := json.Marshal(p)
 	if err != nil {
@@ -108,6 +127,9 @@ func decodeInto(std hujson.Value, p *Policy) (any, error) {
 	udec.UseNumber()
 	if err := udec.Decode(&understood); err != nil {
 		return nil, fmt.Errorf("policy: decoding the typed copy: %w", err)
+	}
+	if decodeErr != nil {
+		return understood, fmt.Errorf("policy: %w", decodeErr)
 	}
 	return understood, nil
 }

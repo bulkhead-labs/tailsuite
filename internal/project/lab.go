@@ -83,7 +83,7 @@ var (
 
 	dnsLabel = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 	version  = regexp.MustCompile(`^[0-9]+\.[0-9]+(\.[0-9]+)?$`)
-	login    = regexp.MustCompile(`^[^@\s]+@[^@\s]+$`)
+	login    = regexp.MustCompile(`^[^@:\s]+@[^@\s]+$`) // not group:… or tag:…
 	tagName  = regexp.MustCompile(`^tag:[A-Za-z0-9][A-Za-z0-9-]*$`)
 	cgnat    = netip.MustParsePrefix("100.64.0.0/10")
 )
@@ -151,10 +151,15 @@ func (lab Lab) check() error {
 		if !login.MatchString(name) {
 			bad("user %q isn't a login, such as alice@example.com", name)
 		}
+		seen := map[string]bool{}
 		for _, r := range lab.Users[name].Roles {
 			if !slices.Contains(roles, r) {
 				bad("user %s: role %q; want one of %s", name, r, strings.Join(roles, ", "))
 			}
+			if seen[r] {
+				bad("user %s: role %s twice", name, r)
+			}
+			seen[r] = true
 		}
 	}
 	for _, name := range sortedKeys(lab.Profiles) {

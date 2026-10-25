@@ -38,7 +38,8 @@ Building it raised cases 0014 doesn't name.
   - So a first pass finds the overridden occurrences, they're removed
     from a copy, and the typed copy is decoded from that.
   - Each earlier occurrence is listed as a duplicate key, "overridden
-    by" the last.
+    by" the last. An overridden occurrence of the wrong type doesn't stop
+    the parse; the last one must have the right type.
   - Two keys are the same key when they land on one key of the typed
     copy. For a field, that's ignoring case (`acls`, `ACLs`). Map keys
     are case-sensitive, so `group:Eng` and `group:eng` are two groups.
@@ -62,7 +63,8 @@ Building it raised cases 0014 doesn't name.
     - `attrConfig` broadcasts;
     - `externalTailnets` references.
   - Inside application payloads, every string shaped like a user, group,
-    tag or autogroup, so a rewrite can't miss one there.
+    tag or autogroup, values and object keys alike, without any `:port`,
+    so a rewrite can't miss one there.
   - Not covered: SSH logins (`users`), which are host accounts. Their
     `localpart:*@domain` form is refused by 0016.
 
@@ -77,8 +79,9 @@ Building it raised cases 0014 doesn't name.
     0016 lowers role autogroups to on headscale;
   - profiles (0015): `engine`, `only`, `skip`, `unproven`.
 - **Logins and tags are checked by shape:** a login is `local@domain`,
-  and a tag is `tag:` and a name of letters, digits and hyphens. A tag
-  given twice is an error.
+  with no `:` before the `@` (so not `group:…` or `tag:…`), and a tag is
+  `tag:` and a name of letters, digits and hyphens. A tag or a role given
+  twice is an error.
 - **`listen` takes only what the node agent serves:** `tcp` and `http`
   (decision 0020, in #53). Others fail to load, naming #56, rather than
   giving a test a port nothing can listen on.

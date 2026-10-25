@@ -357,3 +357,38 @@ func TestDefinitionsAndExternalReferences(t *testing.T) {
 		}
 	}
 }
+
+// Identity-shaped keys in a payload are found too, and payload values lose
+// their port, as other references do.
+func TestPayloadKeysAndPorts(t *testing.T) {
+	f, err := Parse([]byte(`{"grants": [{"src": ["*"], "dst": ["*"], "app": {"example.com/cap/x": [
+		{"alice@example.com": {"role": "admin"}, "group:eng": true, "target": "tag:prod:443"}
+	]}}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, r := range f.Identities() {
+		got[r.Value] = r.Role
+	}
+	want := map[string]string{"alice@example.com": "payload-key", "group:eng": "payload-key", "tag:prod": "payload"}
+	for v, role := range want {
+		if got[v] != role {
+			t.Errorf("%s: role %q, want %q (all: %v)", v, got[v], role, got)
+		}
+	}
+}
+
+// An overridden occurrence of the wrong shape doesn't stop the parse.
+func TestOverriddenWrongShape(t *testing.T) {
+	f, err := Parse([]byte(`{"acls": "nope", "acls": [{"action": "accept", "src": "x", "src": ["a@example.com"], "dst": ["*:*"]}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.Policy.ACLs) != 1 || !slices.Equal(f.Policy.ACLs[0].Src, []string{"a@example.com"}) {
+		t.Errorf("acls = %+v", f.Policy.ACLs)
+	}
+	if _, err := Parse([]byte(`{"acls": [], "acls": "nope"}`)); err == nil {
+		t.Error("a winner of the wrong shape was accepted")
+	}
+}

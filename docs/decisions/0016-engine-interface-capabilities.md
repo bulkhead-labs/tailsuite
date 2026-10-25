@@ -67,6 +67,11 @@ type Lab interface {
       the marker alone, they'd allow only the marker.
     - An empty section, such as `"acls": []`, is different: both engines
       deny everything. Such a policy gets no default.
+    - **An empty `grants` section with no `acls` section is REFUSED on
+      both engines for now.** headscale denies everything for it.
+      Tailscale's docs, read literally ("in the absence of an acls
+      section"), might allow everything. The #3 spike checks how Tailscale
+      reads it.
     - So the patch first adds `{"src": ["*"], "dst": ["*"], "ip": ["*"]}`,
       which is exact, and then the marker.
   - **tailsuite waits** until every node's compiled filter holds the

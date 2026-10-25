@@ -36,6 +36,11 @@ record's.
   - It opens the browser on a local redirect file, mode 0600, in the
     user's runtime directory, so the secret never appears on a command
     line. Jupyter Server does the same by default.
+  - Some browsers can't read that file. Jupyter's docs name WSL and
+    Chromebooks, and sandboxed browsers may be affected too. If the page
+    hasn't traded its secret within a few seconds, `tailsuite up` prints
+    the link and says why. `--no-redirect-file` opens the browser on the
+    link directly. Both are covered by the race under Given up.
 - **The UI is read-only in M1.** Editing the policy arrives with #34 (M6),
   behind 0007's gates.
 
@@ -163,8 +168,10 @@ on a redirect file so that the launch token isn't visible to other users
   passes the two-week rule.
 - **A new browser tab needs a fresh link.** `sessionStorage` isn't shared
   between tabs.
-- **A race of a few seconds, when the link is printed.** This happens
-  with `--no-browser`, or when someone copies the printed link.
+- **A race of a few seconds, when the link is printed or passed
+  directly.** This happens with `--no-browser`, with
+  `--no-redirect-file`, when the browser can't read the redirect file, or
+  when someone copies the printed link.
   - A local user who reads it from the terminal before the page loads
     could trade it first, and see the map until the real page loads.
   - The real page's trade then ends that user's session, and the page asks

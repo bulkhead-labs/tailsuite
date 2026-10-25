@@ -12,19 +12,21 @@ The questions:
 Evidence for #6, the Tailscale engine, and for
 [0021](../decisions/0021-empty-grants-and-the-marker-on-tailscale.md).
 
-**Verdict: go.** Every step the spike tried works, both of 0016's checks
-came out in the engine's favour, and six findings change how #6 has to be
-built (below).
+**Verdict: go.** Every step of the engine's flow works, both of 0016's
+checks came out in the engine's favour, and six findings change how #6
+has to be built (below).
 
 ## How it was run
 
 - **Throwaway programs** (not committed), using only Python's standard
-  library, ran six times. The tables name each run.
+  library, ran seven times. The tables name each run.
   - **Run 1** stopped early on a bug in the program, after creating its
     tailnet. Its cleanup still deleted it.
   - **Runs 2–4** ran the whole flow below.
   - **Run 5** ran 0016's checks and the review's questions.
   - **Run 6** only validated policies.
+  - **Run 7** validated the check that 0021 puts in every Tailscale-engine
+    run.
 - **The whole flow:**
   1. create an API-only tailnet with the test organization's OAuth client
      (scope `tailnets` only);
@@ -52,7 +54,7 @@ built (below).
 - **Where traffic went:**
   - Probes went only to the other node's Tailscale address.
   - The nodes' egress wasn't restricted or recorded.
-  - In runs 1–4, tailscaled ran with its default logging, so it also sent
+  - In runs 2–4, tailscaled ran with its default logging, so it also sent
     its client logs to Tailscale. Run 5 used `--no-logs-no-support`.
 
 ## Results
@@ -63,7 +65,7 @@ built (below).
 |---|---|---|
 | Token for the organization's client | 200, scope `tailnets` | 0.27 s |
 | Create a tailnet | 200. The response has `id`, `displayName`, `orgId`, `dnsName`, `createdAt` and `oauthClient`. The client has the `all` scope, and its secret is shown once. There's no `alreadyExists` field, though the schema lists one | Runs 2–4: 3.96, 3.08, 4.30 s. Run 5: 0.27 s |
-| Create again, with a name that exists | **500, "failed to create tailnet"**, in runs 1–4. The schema documents neither a 500 nor this case: it lists `alreadyExists` and a 400 | 0.26–0.29 s |
+| Create again, with a name that exists | **500, "failed to create tailnet"**, in runs 1–4. The schema documents this case as a 400 ("already in use"), and has an `alreadyExists` field; it lists a 500 only as a generic error | 0.26–0.29 s |
 | Create a second tailnet with another name, while the first exists (run 5) | 200. So the 500 is about the name, not about two live tailnets | 0.27 s |
 | A token for the new tailnet from the **organization's** client (`tailnet` parameter) | **Refused:** 403 "client does not have the all scope" (runs 2 and 4), 404 "not found" (runs 1 and 3) | 0.26 s |
 | A token from the **new tailnet's** client | 200, scope `all` | 0.26 s |
@@ -71,7 +73,7 @@ built (below).
 | Two auth keys: tagged, ephemeral, pre-authorized, 15-minute expiry | 200 | 0.27 s each |
 | Delete the tailnet with its own token | 200 | Runs 2–4: 0.27, 0.28, **26.2 s**. Run 5: 0.28 s each |
 | The deleted tailnet's token afterwards | 401 | |
-| **List the organization's tailnets** | **Lags.** Right after run 5 created a second tailnet, the list held 1. Right after it deleted both, the list still held 2, one of them its own. Two minutes later it held 1. Every run ended with only the original listed | |
+| **List the organization's tailnets** | **Lagged in run 5.** Right after it created a second tailnet, the list's count was 1. Right after it deleted both, the list still held 2, one of them its own. Checked again about a minute later, it held only the original. Runs 1–4's lists were right at once, and so were the checks after runs 6 and 7 | |
 
 ### Nodes and traffic
 
@@ -79,7 +81,7 @@ built (below).
 |---|---|
 | `tailscale up` to Running, with its tag, per node | 5.4, 6.1, 12.2, 8.7, 5.3, 14.2 s (runs 2–4); 7.6, 5.6 s (run 5) |
 | tailscaled in kernel TUN mode under the agent | Yes: `tailscale0` is a TUN device on the node checked (node a) |
-| Each node's view of the other, right after both were Running (run 5) | Online, in the network map, and not yet in the WireGuard engine. Tailscale adds peers to the engine when traffic needs them |
+| Each node's view of the other, right after both were Running (run 5) | Online, in the network map, and not yet in the WireGuard engine. Likely Tailscale adds a peer to the engine only when traffic needs it; that wasn't measured |
 | The first probe of an allowed port, right after both were Running | **Timed out (3 s) in run 2**. It succeeded at once in runs 3–5. Run 2 didn't record why; the next probe of that port, about 9 s later, succeeded |
 | A grant added (TCP 8081), seen in real traffic, from the API call | 6.27, 1.48, 2.41 s |
 | The grant removed, seen in real traffic | within 1.5 s each time (the probes' 1 s timeout limits the precision) |
@@ -114,6 +116,15 @@ node.
 | One explicit grant (8080) | Both markers, within 0.13 s of the call returning |
 | An allow-all grant | **Both markers, as rules of their own**, within 0.12 s of the call returning |
 
+A marker beside an allow-all in `acls`, rather than in `grants`, wasn't
+tried.
+
+**The check 0021 adds to every run (run 7).** A deny test from
+`tag:tailsuite-check` to itself, through `/acl/validate`, with no
+devices: valid with `"grants": []` and with `"acls": []`; "test(s)
+failed" (`want: Drop, got: Accept`) with neither section, and with an
+allow-all in `acls`. So the check tells the readings apart.
+
 ### Policies through `/acl/validate`
 
 **Validation runs the policy's own tests.** A grant from `tag:spike-a`
@@ -141,10 +152,17 @@ three synthetic policies.
    - posture native, through custom attributes and `srcPosture`;
    - pinned IPv4 native;
    - the compiled filter dump native.
+
+   One row didn't hold: **a throwaway tailnet in this organization can't
+   use `attrConfig`** ("tailnet is not permitted to use attrConfig"),
+   which the matrix calls native from M4. Whether that's the plan, a flag,
+   or API-only tailnets is unknown; #57 settles it before M4.
 2. **Both of 0016's checks came out in the engine's favour.**
    - `{"grants": []}` denies everything on Tailscale, as on headscale. So
      it no longer has to be REFUSED: it's handled like `"acls": []`, with
-     no default added.
+     no default added. No lab ever applies the shape bare, so running labs
+     couldn't see a change in that reading. So every Tailscale-engine run
+     checks it through `/acl/validate` (run 7), and #5 tests headscale's.
    - The marker survives beside an allow-all rule on Tailscale, so the
      readiness wait can rely on it there. #5 checks it on headscale.
    - Both are recorded in
@@ -190,8 +208,8 @@ three synthetic policies.
 
 Also:
 
-- **Listing tailnets lags creates and deletes**, by up to two minutes. A
-  cleanup job has to allow for it.
+- **Listing tailnets can lag creates and deletes** (run 5). A cleanup job
+  has to allow for it.
 - **Lab nodes should run tailscaled with `--no-logs-no-support`**, so a
   lab sends nothing to Tailscale beyond what the engine needs.
 - **Tailscale and headscale treat a policy's own tests differently.**
@@ -214,6 +232,8 @@ Also:
 ## Not checked yet
 
 - **The 9-tailnet limit itself.** The organization was never filled.
+- **A marker beside an allow-all in `acls`.**
+- **How long the list's lag can last.** One run saw it.
 - **More than two nodes**, joining in parallel.
 - **Pinning to an address another device holds.**
 - **Why run 2's first probe timed out.**

@@ -9,7 +9,9 @@ Status: **accepted** (2026-10-24). Settles #15 and #18. Amends
   Tailscale engine with the engine's copy of the policy, so the policy
   file it reads differs from production's.
 
-Evidence: [research 0005](../research/0005-tailnet-model-trial.md).
+Evidence: [research 0005](../research/0005-tailnet-model-trial.md). The
+`profiles` in its `lab.yaml` sketch are refined by
+[0015](0015-test-file-labels-profiles.md).
 
 ## Context
 

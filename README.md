@@ -24,7 +24,7 @@ between what a policy says and what a network does.
 ```
 tailsuite init --template startup   # a project folder you own; --nix for a pinned dev shell
 tailsuite up                        # the lab plus a local UI in your browser
-tailsuite test                      # real SSH, HTTP(S), TCP and more; allow and deny, both proven
+tailsuite test --profile pr         # real SSH, HTTP(S), TCP and more; allow and deny, both proven
 tailsuite import tailscale          # read-only: your tailnet as a project, with OpenTofu
 tailsuite deploy                    # lab tests → tofu plan → blast-radius diff → apply
 ```

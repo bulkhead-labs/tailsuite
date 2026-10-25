@@ -134,7 +134,7 @@ ready starts the heavy tiers. Any branch can run them by hand
 | Prerequisite | Blocks |
 |---|---|
 | **Done (2026-10-24):** the CI trust model's settings (#39, [0013](decisions/0013-ci-trust-model.md)) | CI in #1; #2, #13, #14; #30's CI step |
-| A dedicated Tailscale test organization, and an OAuth client with the `tailnets` scope, stored in the `nightly` and `branch-run` environments | #3, #6, #13's nightly tier |
+| **Done (2026-10-25):** a dedicated Tailscale test organization, and an OAuth client with only the `tailnets` scope, stored in the `nightly` and `branch-run` environments | #3, #6, #13's nightly tier |
 | `bulkhead-labs/homebrew-tap` and the container package, created by the maintainer, and the credentials goreleaser publishes with, stored in the `release` environment | #2 |
 
 **Order:**
@@ -143,8 +143,11 @@ ready starts the heavy tiers. Any branch can run them by hand
    - #15, the tailnet model, together with #18 (the project layout, and
      explicit listeners in `lab.yaml` for M1): settled in
      [0014](decisions/0014-tailnet-model-and-project-layout.md);
-   - #16, the test format;
-   - #17, the engine interface and capability matrix.
+   - #16, the test format: settled in
+     [0015](decisions/0015-test-file-labels-profiles.md);
+   - #17, the engine interface and capability matrix: settled in
+     [0016](decisions/0016-engine-interface-capabilities.md);
+   - #19, the UI stack: settled in [0017](decisions/0017-local-ui.md).
 2. **Run the #3 spike**, as soon as the test organization exists.
 3. **Build:**
    - #1, the Go module and the flake: Go first, then CI (#39 is in place);
@@ -153,7 +156,7 @@ ready starts the heavy tiers. Any branch can run them by hand
    - #7, the node agent;
    - #8, the test runner;
    - #12, the CLI;
-   - #19 (settles the UI stack), then #11, the UI;
+   - #11, the UI;
    - #9, the OpenTofu module;
    - #10, the round trip.
 4. **#6**, the Tailscale engine, after #3. M1 needs only the minimal

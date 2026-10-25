@@ -39,11 +39,11 @@ request as any change to it.
 | **Sources** | `Source → TailnetModel` | The project's files; Tailscale API (read-only); OpenTofu plan JSON; later Pulumi and headscale | [0014](decisions/0014-tailnet-model-and-project-layout.md) |
 | **Tailnet model** | Plain data | Our own types, in Tailscale's terms, independent of the source. The policy is the user's file as read, plus a read-only typed copy that lists every key it doesn't understand. Devices are keyed by MagicDNS name; users, DNS and settings follow. Each record says whether it was observed, declared or inferred. Only inputs are stored; effective state is computed | [0014](decisions/0014-tailnet-model-and-project-layout.md) |
 | **Planner** | `TailnetModel + LabConfig → LabPlan` | Pure and deterministic. It chooses one representative node per equivalence class, the networks and the listeners. It lowers the policy for the chosen engine as a patch on the user's file, which records every rewrite | [0014](decisions/0014-tailnet-model-and-project-layout.md), [#22](https://github.com/bulkhead-labs/tailsuite/issues/22) |
-| **Engines** | `Capabilities()`, `Create(plan)`, `Teardown()` | headscale; Tailscale throwaway tailnet; later NetBird | [0002](decisions/0002-two-engines.md), [#17](https://github.com/bulkhead-labs/tailsuite/issues/17) |
+| **Engines** | `Capabilities()`, `Lower(model)`, `Start(plan)`; the lab: `CompiledFilter(node)`, `Teardown()` | headscale; Tailscale throwaway tailnet; later NetBird. Each declares every capability as native, lowered (after a recorded rewrite) or refused. Lowering is pure, and errs toward more access, never less | [0002](decisions/0002-two-engines.md), [0016](decisions/0016-engine-interface-capabilities.md) |
 | **Sandbox** | Networks, nodes, exec, teardown | Docker (default); Podman through the same API; later a VM driver (Lima) and real macOS or Windows nodes for verify runs | [0003](decisions/0003-docker-one-container-per-node.md), [0009](decisions/0009-os-mimicry.md) |
 | **Node agent** | Control over an out-of-band network, never over the tailnet | One small Go binary in every node, running its listeners and probes | [#7](https://github.com/bulkhead-labs/tailsuite/issues/7) |
-| **Tests** | Each test declares the capabilities it needs | The runner turns a missing capability into REFUSED or UNKNOWN before anything runs; every deny gets a positive control | [#8](https://github.com/bulkhead-labs/tailsuite/issues/8), [#16](https://github.com/bulkhead-labs/tailsuite/issues/16) |
-| **Outputs** | Reporters and writers | CLI, JSON, JUnit, PR comment, the UI; a policy file, a checklist, OpenTofu | |
+| **Tests** | YAML files in `tests/`, plus the policy's own `tests` and `sshTests` | A test names devices or identities (every matching device), probes the real protocol, and expects allow, deny or, for SSH, check. The planner computes each test's needs, and turns a missing capability into REFUSED or UNKNOWN before anything runs. Every deny gets a positive control. Labels and profiles choose what runs where | [0015](decisions/0015-test-file-labels-profiles.md), [0016](decisions/0016-engine-interface-capabilities.md) |
+| **Outputs** | Reporters and writers | CLI, JSON, JUnit, PR comment; the local UI, which reads the same JSON over Server-Sent Events; a policy file, a checklist, OpenTofu | [0015](decisions/0015-test-file-labels-profiles.md), [0017](decisions/0017-local-ui.md) |
 
 ## Results
 
@@ -57,7 +57,13 @@ Every test ends in one of four results:
 - **REFUSED**: the engine doesn't support a feature the test needs, such as
   posture on headscale.
 
-UNKNOWN and REFUSED are never shown as a pass or a deny.
+UNKNOWN and REFUSED are never shown as a pass or a deny. A test that a
+profile or flag leaves out is counted as skipped, never dropped silently.
+
+**In CI** ([0015](decisions/0015-test-file-labels-profiles.md)), a FAIL
+always fails the run. UNKNOWN and REFUSED are listed separately, with where
+they can be proven. They fail the run only under `unproven: fail` or
+`--strict`, which nightly runs and release gates use.
 
 ## A user's project
 
@@ -72,7 +78,7 @@ my-tailnet/
   tofu/
     tailsuite.tf         # tailsuite's module: logic only
     tailnet.auto.tfvars  # device tags, enabled routes: the API applies them, through OpenTofu
-  lab.yaml               # never deployed: the devices as the lab rebuilds them, what listens, engines
+  lab.yaml               # never deployed: the devices as the lab rebuilds them, what listens, profiles
   tests/*.yaml           # tailsuite's tests
   flake.nix              # only with --nix: pins tailsuite and OpenTofu
   .tailsuite/            # gitignored: the model, the lab plan, results
@@ -86,8 +92,9 @@ headscale it needs no credentials at all.
 | Command | Does |
 |---|---|
 | `tailsuite init --template <name> [--nix]` | Writes a project from a template embedded in the binary |
-| `tailsuite up` | Starts the lab and the local UI |
-| `tailsuite test` | Runs the suite; exit codes suit CI |
+| `tailsuite up` | Starts the lab and the local UI, and opens it in the browser (not in CI, or with `--no-browser`); localhost only, behind a one-time link ([0017](decisions/0017-local-ui.md)) |
+| `tailsuite test [--profile <name>] [--only <label>] [--skip <label>] [--run <regex>] [--strict]` | Runs the suite: the profile picks the engine, the tests and the strictness. Exit codes: 0 fine, 1 a FAIL, 2 unproven under strict, 3 couldn't run ([0015](decisions/0015-test-file-labels-profiles.md)) |
+| `tailsuite capabilities` | Prints what each engine does natively, after a rewrite, or refuses ([0016](decisions/0016-engine-interface-capabilities.md)) |
 | `tailsuite down` | Tears the lab down |
 | `tailsuite export tofu` | Writes `tofu/` (tailsuite's module and the values) from the current model, once; `init` and `import` use it, and the user owns the result |
 | `tailsuite import tailscale` | Reads a real tailnet read-only into a project, with OpenTofu import blocks |

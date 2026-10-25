@@ -35,8 +35,9 @@ Status: **accepted** (2026-10-25). Built in #1. Refines
   - what Go recorded: the module version from `go install`, or a
     pseudo-version from the commit for a build in a git checkout;
   - `devel`.
-- **An unknown command exits 3**, "couldn't run", the code decision 0015
-  (in #47) gives `tailsuite test` for the same case.
+- **An unknown command exits 3**, "couldn't run", the code
+  [0015](0015-test-file-labels-profiles.md) gives `tailsuite test` for the
+  same case.
 - **No CLI framework yet.** #12 picks one.
 
 ### The flake

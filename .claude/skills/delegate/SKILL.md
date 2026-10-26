@@ -1,6 +1,6 @@
 ---
 name: delegate
-description: Hand work in tailsuite to a subagent, choosing its model and effort by the kind of work. Every subagent runs on Opus; design and review get the highest effort, hard building one step below (decision 0023). Use whenever you start a subagent or an agent from .claude/agents/ (the pr-reviewer included), or when asked to "delegate", "fan out", "use a subagent" or "run agents in parallel".
+description: Hand work in tailsuite to a subagent, choosing its model and effort by the kind of work. Every subagent runs on Opus; design gets the highest effort, hard building one step below, and reviews high or, for critical paths, xhigh (decisions 0023, 0028). Use whenever you start a subagent or an agent from .claude/agents/ (the pr-reviewer included), or when asked to "delegate", "fan out", "use a subagent" or "run agents in parallel".
 ---
 
 # delegate

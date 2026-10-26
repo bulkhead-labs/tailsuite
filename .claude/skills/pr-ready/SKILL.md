@@ -93,8 +93,8 @@ Run the [`pr-review`](../pr-review/SKILL.md) skill. It starts the
 review tier (light, standard or critical), as the
 [`delegate`](../delegate/SKILL.md) skill says for review. The agent is read-only and
 reviews against the same checklist without seeing your conclusions. It
-runs another round after substantial fixes, and links every round in the
-template's Review box. Don't mark the PR ready until a round finds
+runs another round only for a blocking finding, within the PR's tier,
+and links every round in the template's Review box. Don't mark the PR ready until a round finds
 nothing blocking.
 
 ## 6. Mark ready

@@ -43,6 +43,10 @@ use `origin/pr-<n>`.
   `gh pr view <n> --json comments --jq '.comments[]|select(.body|startswith("## pr-reviewer"))|.url'`.
 - CI on the head: `gh run list --branch <branch> -L 1`.
 - Issues the work filed, or whose bodies it changed.
+- **The milestone it belongs to**, for the map at the top:
+  `gh api 'repos/bulkhead-labs/tailsuite/issues?milestone=<number>&state=all&per_page=100' --jq '.[]|select(.pull_request|not)|[.number,.state,.title]|@tsv'`,
+  `docs/plan.md`'s order for that milestone, and the maintainer
+  prerequisites that block any of it.
 - For a group: the base of each PR, and the order they must merge in.
 
 Every fact on the page must come from one of these. If a claim can't be
@@ -68,24 +72,38 @@ nothing to say, say that in one line ("No plan changes.").
    checked <date> at <short SHA>`. The `<h1>` names what was built, in the
    maintainer's terms. One lede paragraph says what it delivers and the
    verdict.
-2. **Verdict box.** Ready or not, the review rounds, CI. What to do: merge
+2. **Where the milestone stands.** Before any PR detail, so the
+   maintainer sees the macro first. One compact view, from the facts
+   above:
+   - the milestone's goal in one line, and a count: issues done, in
+     review (these PRs), not started;
+   - every issue in the plan's order, one row or chip each, marked done,
+     in review (and which PR), next, or blocked (and on what, naming any
+     maintainer prerequisite);
+   - one sentence: what these PRs move, and what's next on the critical
+     path to the milestone being done (its definition in the plan:
+     every issue closed and the user-journey suite passing on a
+     release).
+
+   Keep it to what fits on a phone screen; the detail is below.
+3. **Verdict box.** Ready or not, the review rounds, CI. What to do: merge
    order, and anything waiting on the maintainer. Below it, a table of
    every open PR the merge order touches (each one's base, when it merges,
    its state), even for a one-PR page, since stacked PRs merge together.
-3. **Scope.** The issue's "Done when" items, one row each: the item, what
+4. **Scope.** The issue's "Done when" items, one row each: the item, what
    delivers it (file, test or doc), and a chip: `done`, `partly` or
    `moved to #n`. Then anything delivered **beyond** the scope, and why.
    This is the section the maintainer checks the work against.
-4. **What changed.** By area, in plain words: what each part does and the
+5. **What changed.** By area, in plain words: what each part does and the
    files that hold it, with line counts. Code blocks only where the shape
    matters (a type, a file format, a command).
-5. **Choices made.** The implementation choices with trade-offs (each in
+6. **Choices made.** The implementation choices with trade-offs (each in
    a decision record), what was given up, and the alternative. Link the
    record on the branch.
-6. **What it sets up.** Each downstream issue it unblocks, and exactly
+7. **What it sets up.** Each downstream issue it unblocks, and exactly
    what that issue will use from this work. For a group, how the PRs fit
    together.
-7. **Plan changes.** Everything that changes the plan of record:
+8. **Plan changes.** Everything that changes the plan of record:
    - new issues, and where they sit in the milestone order;
    - work moved between milestones, narrowed or deferred;
    - decisions added, amended or superseded;
@@ -110,17 +128,17 @@ nothing to say, say that in one line ("No plan changes.").
      recommendation marked.
 
    A two-column layout (`.two`) holds the pair, and stacks on a phone.
-8. **Review trail.** Each reviewer round: verdict, the findings, and how
+9. **Review trail.** Each reviewer round: verdict, the findings, and how
    each was fixed or answered, linked to the PR comment. Then the tests:
    what ran, where, with numbers.
-9. **Risks and what to watch.** What could still be wrong, and what would
+10. **Risks and what to watch.** What could still be wrong, and what would
    show it.
-10. **Reading guide.** If the maintainer reads the diff: which files, in
+11. **Reading guide.** If the maintainer reads the diff: which files, in
     which order, and what to check in each. Link each file on the branch.
-11. **Also waiting on you** (only if there's something): open questions
+12. **Also waiting on you** (only if there's something): open questions
     from the same body of work that aren't about these PRs, each with a
     recommendation, in one box at the end.
-12. **Questions** (only if there are any). Ask the maintainer only
+13. **Questions** (only if there are any). Ask the maintainer only
     product questions: what users get, how they use it, the overall
     design. Settle implementation yourself, and record the choice. Give
     each question a recommendation and what it changes. If the maintainer

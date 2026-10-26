@@ -44,10 +44,10 @@ a PR merges isn't signed off) and [0018](0018-go-toolchain-flake-ci.md)
   `commit_title` and `commit_message`. The repo's defaults for web merges
   are the maintainer's to set (today GitHub's "Merge pull request #n
   from …").
-- **Only the merge commit GitHub makes when a PR merges is exempt from sign-off.** It
-  adds no content. A merge on a branch is signed off like any other commit
-  (`git merge --signoff`), since one that resolves conflicts does add
-  content.
+- **Only the merge commit GitHub makes when a PR merges is exempt from
+  sign-off.** It adds no content. A merge on a branch is signed off like
+  any other commit (`git merge --signoff`), since one that resolves
+  conflicts does add content.
 - **Stacked PRs:**
   - every base is `main`; never another PR's branch;
   - each branch is built on the branch below it;
@@ -57,11 +57,13 @@ a PR merges isn't signed off) and [0018](0018-go-toolchain-flake-ci.md)
     with no push, so its approval holds;
   - nothing in GitHub enforces the order, or stops a PR above bringing
     old commits of a lower branch that was rewritten after it was built.
-    So before a stacked PR merges, `git log origin/main..origin/<branch>`
-    must list only its own commits;
+    So before a stacked PR merges, after a fetch,
+    `git log origin/main..origin/<branch>` must list only its own commits;
   - a lower PR is fixed with a new commit, which leaves the ranges above
-    it as they were. Rewriting a lower branch means rebuilding every
-    branch above it.
+    it as they were. A fix that conflicts with a PR above, neighbouring
+    lines included, means a signed-off merge of the branch below into it,
+    a push, and a fresh approval. Rewriting a lower branch means
+    rebuilding every branch above it.
 - **To undo a PR, revert its merge commit:** `git revert -m 1 <merge>`.
 - **Commit identities are checked before review:** `pr-ready` lists every
   commit's author and committer address, and only `noreply` addresses or
@@ -73,7 +75,8 @@ a PR merges isn't signed off) and [0018](0018-go-toolchain-flake-ci.md)
 - **An approval holds across a stack.** A merge commit keeps the lower
   PR's commits with their hashes, so the branch above still contains them
   and merges with no rebase. A fix to a lower PR, made as a new commit,
-  forces nothing above it; only a rewrite does.
+  forces nothing above it unless it conflicts with a PR there,
+  neighbouring lines included; a rewrite always does.
 - **Nothing is lost.** Each commit keeps its own message and sign-off,
   instead of all of them folded into one body.
 - **One method, set in the repo**, so nobody picks per PR.
@@ -122,7 +125,8 @@ a PR merges isn't signed off) and [0018](0018-go-toolchain-flake-ci.md)
 - **`git bisect` can land on a commit in the middle of a PR**, which may
   not build. `git bisect --first-parent` steps by PR.
 - **On `main`, only the merge commit gets a CI run.** The branch's own
-  commits ran on the PR only where each was a push's head. So [0018](0018-go-toolchain-flake-ci.md)'s
-  "every commit on `main` keeps its run" now means every push to `main`.
+  commits ran on the PR only where each was a push's head. So
+  [0018](0018-go-toolchain-flake-ci.md)'s "every commit on `main` keeps
+  its run" now means every push to `main`.
 - **Until the stack below merges, a stacked PR's GitHub diff** shows the
   lower PRs' commits too. Reviewers read the range above the branch below.

@@ -92,13 +92,20 @@ When one PR builds on another that hasn't merged yet:
   approval that read only its own. It would also bring old commits of a
   lower branch that was rewritten after this one was built. So, after a
   fetch, `git log --oneline origin/main..origin/<branch>` must list only
-  the PR's own commits before it merges. Then it merges cleanly with no
-  push, so its approval holds.
+  the PR's own commits before it merges. Then, unless a fix below
+  conflicts with it (next point), it merges cleanly with no push, so its
+  approval holds.
 - **Fix a lower PR with a new commit.** The PRs above keep the same
-  range, and merge with no push once it has. A rewrite of a lower branch
-  (a reword, an amend, a rebase) means rebuilding every branch above it,
-  and a push to each, which dismisses their approvals; rewrite only
-  before the maintainer reviews the stack.
+  range, and merge with no push once it has, unless the fix conflicts
+  with one of them. git counts edits to neighbouring lines as a conflict,
+  as in the decision index, the plan's M1 list or the architecture's
+  status list; post-merge's `mergeable` check finds it. That PR then needs
+  a push and a fresh approval: fix it with a signed-off merge of the
+  branch below (`git merge --signoff`), which keeps the ranges above it,
+  never a rebase. A rewrite of a lower branch (a reword, an amend, a
+  rebase) means rebuilding every branch above it, and a push to each,
+  which dismisses their approvals; rewrite only before the maintainer
+  reviews the stack.
 
 Humans can do every step by hand. The skills exist so agents and people
 follow the same checklist.
@@ -152,4 +159,5 @@ Every commit is signed off under the
 [Developer Certificate of Origin](https://developercertificate.org/)
 (`git commit -s`). See [CONTRIBUTING.md](../CONTRIBUTING.md). A merge
 commit on a branch is signed off like any other (`git merge --signoff`).
-Only the merge commit GitHub makes when a PR merges is exempt: it adds no content.
+Only the merge commit GitHub makes when a PR merges is exempt: it adds no
+content.

@@ -19,7 +19,8 @@ deleted that branch. Point it back before anything else:
 
 ## 1. What merged
 
-- `git fetch origin main && git log --oneline -5 origin/main`
+- `git fetch origin && git log --oneline -5 origin/main`: every `origin/`
+  ref, since the stack check below reads the branches too
 - `gh pr view <n> --json title,body,mergedAt`, and the issues it closed:
   `gh api graphql -f query='query{repository(owner:"bulkhead-labs",name:"tailsuite"){pullRequest(number:<n>){closingIssuesReferences(first:20){nodes{number title state}}}}}'`
 - **The merge commit's author** must be the merging account's `noreply`

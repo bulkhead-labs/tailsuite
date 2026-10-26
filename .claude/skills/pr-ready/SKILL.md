@@ -21,8 +21,8 @@ what each step found.
 - **Stacked on another PR?** Its base must be `main`, its branch built on
   the branch below, and its body must say "Builds on #n"
   ([process](../../../docs/process.md#stacked-pull-requests)).
-  `git log --oneline origin/<branch below>..HEAD` must list only its own
-  commits; check those in the steps below.
+  After `git fetch origin`, `git log --oneline origin/<branch below>..HEAD`
+  must list only its own commits; check those in the steps below.
 - Read the issue's "Done when" list. Every item is either done in this PR
   or moved to a new issue (linked in the PR).
 
@@ -81,6 +81,8 @@ Search the diff and the PR text:
     address. Anything else blocks.
 
   Reword before review, not after approval: a force-push dismisses it.
+  Rewording a PR with others stacked on it means rebuilding each of them
+  ([process](../../../docs/process.md#stacked-pull-requests)).
 
 Anything else found blocks the PR. Fix it and say so.
 

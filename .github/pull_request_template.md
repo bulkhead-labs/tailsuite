@@ -30,4 +30,4 @@ Tick each, or write N/A with the reason. See [the plan](https://github.com/bulkh
 
 ## Review
 
-- [ ] `pr-ready` checklist run, and the `pr-reviewer` agent's findings addressed (link the comment)
+- [ ] `pr-ready` checklist run, and the `pr-reviewer` agent's findings addressed: one line per review round, with its link, its verdict, and what was done about its findings, with the commits

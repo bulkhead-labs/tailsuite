@@ -48,11 +48,19 @@ reviewer agent are those checks.
 3. **Before marking it ready, run the `pr-ready` skill**
    (`.claude/skills/pr-ready`). It walks the
    [definition of done](plan.md#definition-of-done) and updates the docs,
-   then starts the **`pr-reviewer` agent**. The agent is a separate,
-   read-only reviewer: it checks the PR against the checklist and the docs
-   against the code, and posts its findings on the PR.
+   then runs the **`pr-review` skill**, which starts the **`pr-reviewer`
+   agent** round after round until it finds nothing blocking. The agent is
+   a separate, read-only reviewer: it checks the PR against the checklist
+   and the docs against the code, and posts its findings on the PR. Like
+   every subagent, it runs as the **`delegate` skill** says: on Opus, with
+   the highest effort for review and design.
 4. **Fix the findings, then mark it ready.** The integration and
    user-journey tiers run, and must pass.
+   When the maintainer will review later, the **`review-artifact` skill**
+   builds a review page for one PR or a group: the scope against the
+   issue, what it sets up, and what it changes in the plan. The page is
+   private to the maintainer, so it's never linked from the repo, and
+   anything settled on it is written into the repo before it's acted on.
 5. **The maintainer approves, then it's squash-merged.** The PR title becomes the commit title, and the
    branch's commit messages its body, so every `Signed-off-by` is kept. The
    branch is deleted.

@@ -1,6 +1,6 @@
 ---
 name: pr-ready
-description: Take a tailsuite pull request from draft to ready. Walk the definition of done, make the docs true, check the public-repo safety rules, then start the independent pr-reviewer agent and address its findings. Use when asked to "get this PR ready", "mark ready", "pr-ready", "finish the PR", or before marking any tailsuite PR ready for review.
+description: Take a tailsuite pull request from draft to ready. Walk the definition of done, make the docs true, check the public-repo safety rules, then run the pr-review skill (the independent pr-reviewer agent, round after round) and address its findings. Use when asked to "get this PR ready", "mark ready", "pr-ready", "finish the PR", or before marking any tailsuite PR ready for review.
 ---
 
 # pr-ready
@@ -69,14 +69,13 @@ Anything found blocks the PR. Fix it and say so.
 
 ## 5. Independent review
 
-Start the `pr-reviewer` agent with the PR number. It is read-only and
-reviews against the same checklist without seeing your conclusions. Wait
-for it.
-
-- Fix every finding it marks **blocking**. For anything else, fix it or
-  answer it in the PR.
-- Re-run the reviewer if the fixes were substantial.
-- Link its comment in the template's Review box.
+Run the [`pr-review`](../pr-review/SKILL.md) skill. It starts the
+`pr-reviewer` agent on Opus at the highest effort, as the
+[`delegate`](../delegate/SKILL.md) skill says for review. The agent is read-only and
+reviews against the same checklist without seeing your conclusions. It
+runs another round after substantial fixes, and links every round in the
+template's Review box. Don't mark the PR ready until a round finds
+nothing blocking.
 
 ## 6. Mark ready
 
@@ -92,6 +91,9 @@ Report:
 - the doc changes made;
 - the reviewer's findings and what happened to each;
 - the CI run link (and, once #13 exists, the heavy tiers' runs).
+
+When the maintainer will review later, or asks for it, build a review
+page with the `review-artifact` skill, and give its link in the report.
 
 Merging needs the maintainer's approving review (decision 0013), and their
 say-so. Don't merge unless asked.

@@ -29,3 +29,4 @@ table in the same PR.
 | [0020](0020-node-agent.md) | The node agent: it lives with the node, and sessions come and go | Accepted 2026-10-25 |
 | [0021](0021-empty-grants-and-the-marker-on-tailscale.md) | An empty `grants` section denies everything, and the marker holds on Tailscale | Accepted 2026-10-25 |
 | [0022](0022-reading-a-project.md) | Reading a project: the policy's edge cases, and strict project files | Accepted 2026-10-25 |
+| [0023](0023-subagents-on-opus.md) | Subagents run on Opus, with the effort set by the work | Accepted 2026-10-26 |

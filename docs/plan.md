@@ -173,7 +173,9 @@ ready starts the heavy tiers. Any branch can run them by hand
      ([0027](decisions/0027-embedded-agent.md));
    - #8, the test runner: done ([0026](decisions/0026-test-runner.md));
    - #12, the CLI;
-   - #11, the UI;
+   - #11, the UI: its server and page are built
+     ([0031](decisions/0031-the-local-ui-built.md)); `tailsuite up`
+     serves it once #12 has merged;
    - #9, the OpenTofu module;
    - #10, the round trip.
 4. **#6**, the Tailscale engine, after #3. M1 needs only the minimal

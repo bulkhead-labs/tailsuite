@@ -4,6 +4,9 @@ Status: **accepted** (2026-10-25). Settles the two checks
 [0016](0016-engine-interface-capabilities.md) gave the #3 spike, and amends
 0016 accordingly. Evidence:
 [research 0006](../research/0006-throwaway-tailnets-spike.md), runs 5 and 7.
+Its open point, the marker's source, is settled by
+[0025](0025-headscale-engine.md): `192.0.2.77/32`, outside the tailnet's
+range, after #5 checked both candidates on headscale.
 
 The spike also found that one line of 0016 can't hold on the Tailscale
 engine as things stand: "`tailsuite down` can also run it after a crash,

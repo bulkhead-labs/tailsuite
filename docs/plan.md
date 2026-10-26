@@ -164,7 +164,9 @@ ready starts the heavy tiers. Any branch can run them by hand
      ([0019](decisions/0019-docker-sandbox.md));
    - #58, the tailnet model and loading a project: done
      ([0022](decisions/0022-reading-a-project.md));
-   - #5, headscale;
+   - #5, headscale: done ([0025](decisions/0025-headscale-engine.md)).
+     Pinned addresses on headscale are #67, on M2; headscale 0.29.6 is
+     #68, from 2026-11-07;
    - #7, the node agent: done
      ([0020](decisions/0020-node-agent.md));
    - #8, the test runner;

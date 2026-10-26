@@ -7,7 +7,9 @@ empty `grants` section with no `acls` section denies everything on both
 engines, so it's no longer REFUSED once each engine's reading is checked;
 and the marker holds on Tailscale. 0021 also notes that "`tailsuite down`
 can also run it after a crash" doesn't hold on the Tailscale engine until
-#6 settles how lost throwaway tailnets are deleted.
+#6 settles how lost throwaway tailnets are deleted. Amended by
+[0025](0025-headscale-engine.md): on headscale, role autogroups are
+lowered from M1, and pinned IPv4 addresses are refused until #67.
 
 Refines earlier records:
 

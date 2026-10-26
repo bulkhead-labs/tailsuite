@@ -10,9 +10,11 @@ it, and CLAUDE.md rule 6.
   titled with the PR, with the branch's messages, sign-offs included, as
   its body.
 - **The maintainer's approval doesn't survive a change.** The `main`
-  ruleset dismisses an approval on every push (`dismiss_stale_reviews_on_push`,
-  `require_last_push_approval`), and a base change dismisses it too,
-  GitHub's automatic retarget after a merge included.
+  ruleset dismisses an approval on every push
+  (`dismiss_stale_reviews_on_push`), and requires the last push to be
+  approved by someone other than its pusher (`require_last_push_approval`).
+  A base change dismisses it too, GitHub's automatic retarget after a
+  merge included.
 - **M1's first PRs were a stack** (#55, #60, #51, #62), each built on the
   one below. A squash gives the lower PR's commits new hashes on `main`, so
   every branch above it no longer contains them. Wherever two PRs touched
@@ -35,19 +37,26 @@ it, and CLAUDE.md rule 6.
   - is reworded before review, never after approval, since a force-push
     dismisses it.
 - **The merge commit's title is the PR's title and number**, and its body
-  the PR's description. An agent merging through the API passes both
-  (`commit_title`, `commit_message`). The repo's defaults are the
-  maintainer's to match.
+  the PR's description. Whoever merges passes both; through the API,
+  `commit_title` and `commit_message`. The repo's defaults for web merges
+  are the maintainer's to set (today GitHub's "Merge pull request #n
+  from …").
+- **Merge commits are exempt from sign-off.** GitHub makes them, and they
+  add no content. A DCO check over `main` skips merges.
 - **Stacked PRs:**
   - every base is `main`; never another PR's branch;
   - each branch is built on the branch below it;
   - the body says "Builds on #n", and reviewers read only the commits
     above that branch;
   - they merge bottom up, and each merges cleanly once the one below has,
-    with no push, so its approval holds.
+    with no push, so its approval holds;
+  - nothing in GitHub enforces the order, so whoever merges checks that
+    the one below shows `MERGED` first.
 - **To undo a PR, revert its merge commit:** `git revert -m 1 <merge>`.
-- **`post-merge` checks the merge commit's author** is the account's
-  `noreply` address, as before.
+- **Commit identities are checked before review:** `pr-ready` lists every
+  commit's author and committer address, and only `noreply` addresses or
+  a contributor's own sign-off address pass. `post-merge` checks the
+  merge commit's author.
 
 ## Why
 
@@ -93,9 +102,17 @@ it, and CLAUDE.md rule 6.
   line per PR.
 - **Reverting a PR** takes `-m 1`, and reverting a revert, to re-land a
   PR, needs care.
-- **Every commit message is public and permanent.** Work-in-progress
-  messages have to be reworded before review.
+- **Every commit message and identity is public and permanent.**
+  Work-in-progress messages have to be reworded before review. Under
+  squash, a branch commit's committer never reached `main` (GitHub
+  committed every squash); now every author and committer does, and so
+  does whoever merges, as the merge commit's author. A merge from the web
+  UI uses the maintainer's web-commit address, which stays private only
+  while "Keep my email addresses private" is on.
 - **`git bisect` can land on a commit in the middle of a PR**, which may
   not build. `git bisect --first-parent` steps by PR.
+- **On `main`, only the merge commit gets a CI run.** The branch's own
+  commits ran on the PR. So [0018](0018-go-toolchain-flake-ci.md)'s
+  "every commit on `main` keeps its run" now means every push to `main`.
 - **Until the stack below merges, a stacked PR's GitHub diff** shows the
   lower PRs' commits too. Reviewers read the range above the branch below.

@@ -19,7 +19,8 @@ what each step found.
   classic Projects), use
   `gh api -X PATCH repos/bulkhead-labs/tailsuite/pulls/<n> -F body=@<file>`.
 - **Stacked on another PR?** Its base must be `main`, its branch built on
-  the branch below, and its body must say "Builds on #n"
+  the branch below (`git merge-base --is-ancestor origin/<branch below>
+  HEAD`), and its body must say "Builds on #n"
   ([process](../../../docs/process.md#stacked-pull-requests)). Its own
   commits are `origin/<branch below>..HEAD`; check those in the steps
   below.
@@ -69,10 +70,17 @@ Search the diff and the PR text:
 - **Secrets, and names of companies or people.**
 - **Sign-offs**: every commit has `Signed-off-by` (`git log --format=%B
   origin/main..HEAD`).
-- **Commit messages**: PRs merge with merge commits
-  ([0024](../../../docs/decisions/0024-merge-commits.md)), so every commit
-  reaches `main` as it is. Each says what it does, with no "wip" or
-  "fix review" alone, and nothing in it the public-repo rules forbid.
+- **Commits reach `main` as they are**: PRs merge with merge commits
+  ([0024](../../../docs/decisions/0024-merge-commits.md)), and `main`'s
+  ruleset forbids rewriting it, so each commit's text and identities are
+  public for good.
+  - **Messages:** nothing in one the public-repo rules forbid (that
+    blocks). Each should say what it does, with no "wip" or "fix review"
+    alone.
+  - **Addresses:** `git log --format='%ae%n%ce' origin/main..HEAD | sort -u`
+    lists only `noreply` addresses, or a contributor's own sign-off
+    address. Anything else blocks.
+
   Reword before review, not after approval: a force-push dismisses it.
 
 Anything found blocks the PR. Fix it and say so.

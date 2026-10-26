@@ -32,7 +32,9 @@ use `origin/pr-<n>`.
 - `git diff --stat origin/<base>...origin/<head>` and
   `git log --format='%h %s' origin/<base>..origin/<head>`. The totals must
   match `gh pr view`'s `additions`, `deletions` and `changedFiles`; if they
-  don't, a ref is stale.
+  don't, a ref is stale. For a stacked PR, use `origin/<branch below>` in
+  place of `origin/<base>` until the one below merges; its totals then
+  differ from `gh pr view`'s, which count the lower PR's commits too.
 - Changes to `docs/plan.md`, `docs/architecture.md`, `README.md` and
   `docs/decisions/`: `git diff origin/<base>...origin/<head> -- docs README.md`.
 - Each `pr-reviewer` comment, its verdict, its findings, and what was done

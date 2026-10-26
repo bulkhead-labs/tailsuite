@@ -1,7 +1,8 @@
 # 0029: A stacked pull request needs a fresh approval once the one below merges
 
 Status: **accepted** (2026-10-26). Amends
-[0024](0024-merge-commits.md)'s "Stacked PRs". Settles the rest of #64.
+[0024](0024-merge-commits.md)'s "Stacked PRs". Settles the stacking part of #64; the default
+merge-commit message for web merges is still open there.
 
 ## Context
 

@@ -87,7 +87,7 @@ merged yet:
 
 - **Every PR's base is `main`.** Never base a PR on another PR's branch.
   GitHub retargets such a PR when the one below merges, and a base change
-  dismisses the maintainer's approval.
+  makes the maintainer's approval stale.
 - **Each branch is built on the branch below it**, so its commits sit on
   top of that branch's.
 - **The PR body says "Builds on #n"**, and its own commits are
@@ -116,7 +116,7 @@ merged yet:
   branch below (`git merge --signoff`), which keeps the ranges above it,
   never a rebase. A rewrite of a lower branch (a reword, an amend, a
   rebase) means rebuilding every branch above it, and a push to each,
-  which dismisses their approvals; rewrite only before the maintainer
+  which makes their approvals stale; rewrite only before the maintainer
   reviews the stack.
 
 Humans can do every step by hand. The skills exist so agents and people

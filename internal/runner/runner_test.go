@@ -206,6 +206,7 @@ func TestLabsFault(t *testing.T) {
 		"a CIDR destination with db": {rule(laptop.String(), "100.64.0.0/24"), nil, true},
 		"an unreadable filter":       {engine.Filter{}, errors.New("exec failed"), true},
 		"an empty filter":            {engine.Filter{}, nil, false},
+		"another port only":          {engine.Filter{Rules: []engine.FilterRule{{SrcIPs: []string{"*"}, DstPorts: []engine.DstPort{{IP: "*", Ports: engine.PortRange{First: 80, Last: 80}}}}}}, nil, false},
 	} {
 		if got := labsFault(c.f, c.err, 5432, laptop, db) != ""; got != c.fault {
 			t.Errorf("%s: fault %v, want %v", name, got, c.fault)

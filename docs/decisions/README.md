@@ -30,9 +30,10 @@ table in the same PR.
 | [0021](0021-empty-grants-and-the-marker-on-tailscale.md) | An empty `grants` section denies everything, and the marker holds on Tailscale | Accepted 2026-10-25 |
 | [0022](0022-reading-a-project.md) | Reading a project: the policy's edge cases, and strict project files | Accepted 2026-10-25 |
 | [0023](0023-subagents-on-opus.md) | Subagents run on Opus, with the effort set by the work | Accepted 2026-10-26; amended by 0028 |
-| [0024](0024-merge-commits.md) | Pull requests merge with merge commits, not squash | Accepted 2026-10-26 |
+| [0024](0024-merge-commits.md) | Pull requests merge with merge commits, not squash | Accepted 2026-10-26; amended by 0029 |
 | [0025](0025-headscale-engine.md) | The headscale engine: its lab, its copy of the policy, and readiness | Accepted 2026-10-26 |
 | [0026](0026-test-runner.md) | The test runner: reading traffic into results | Accepted 2026-10-26 |
 | [0027](0027-embedded-agent.md) | The tailsuite binary carries the node agent | Accepted 2026-10-26 |
 | [0028](0028-review-tiers.md) | Reviews are sized to the PR | Accepted 2026-10-26 |
+| [0029](0029-stacked-prs-need-reapproval.md) | A stacked pull request needs a fresh approval once the one below merges | Accepted 2026-10-26 |
 | [0030](0030-the-cli.md) | The CLI, and how its commands share a lab | Accepted 2026-10-26 |

@@ -18,8 +18,11 @@ what each step found.
   or stop and ask. If `gh pr edit` fails on an older `gh` (GitHub retired
   classic Projects), use
   `gh api -X PATCH repos/bulkhead-labs/tailsuite/pulls/<n> -F body=@<file>`.
-- **Stacked on another PR?** Its base must be `main`, its branch built on
-  the branch below, and its body must say "Builds on #n"
+- **Stacked on another PR?** Only when the two would conflict
+  ([0029](../../../docs/decisions/0029-stacked-prs-need-reapproval.md));
+  otherwise rebuild it on `main` once the one below merges. Its base must
+  be `main`, its branch built on the branch below, and its body must say
+  "Builds on #n"
   ([process](../../../docs/process.md#stacked-pull-requests)).
   After `git fetch origin`, `git log --oneline origin/<branch below>..HEAD`
   must list only its own commits; check those in the steps below.

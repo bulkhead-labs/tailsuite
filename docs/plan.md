@@ -153,9 +153,10 @@ ready starts the heavy tiers. Any branch can run them by hand
    ([research 0006](research/0006-throwaway-tailnets-spike.md)), and
    0016's two checks for it are settled in
    [0021](decisions/0021-empty-grants-and-the-marker-on-tailscale.md).
-   Its findings for #6 are listed in research 0006, with one open
-   question for the maintainer on #6: how leaked throwaway tailnets get
-   cleaned up.
+   Its findings for #6 are listed in research 0006. Leaked throwaway
+   tailnets are deleted by a scheduled cleanup job, with a second OAuth
+   client (`all` scope) held only in the `nightly` environment
+   (maintainer, 2026-10-26, on #6).
 3. **Build:**
    - #1, the Go module, the flake and CI for lint and unit tests: done
      ([0018](decisions/0018-go-toolchain-flake-ci.md));

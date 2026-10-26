@@ -186,8 +186,10 @@ three synthetic policies.
      With credentials off disk and a `tailnets`-only client, `down` can't
      delete the tailnet. It also corrects #3's comment of 2026-10-25
      14:53, which said the `tailnets` client could delete leftovers.
-   - **How leaked tailnets get cleaned up is a question for the
-     maintainer, on #6**, with options. Its answer becomes #6's decision.
+   - **How leaked tailnets get cleaned up was a question for the
+     maintainer, on #6.** Answered 2026-10-26: a scheduled cleanup job
+     deletes them, with a second OAuth client (`all` scope) held only in
+     the `nightly` environment. #6 records it as a decision.
 4. **Names must be unique.** A name that exists gets a 500, rather than
    the documented `alreadyExists` or 400. The run ID goes in the name.
 5. **Wait for the nodes before any probe.** Run 2's allowed port timed out
@@ -240,5 +242,5 @@ Also:
 - **More than two nodes**, joining in parallel.
 - **Pinning to an address another device holds.**
 - **Why run 2's first probe timed out.**
-- **Recovering a leaked tailnet** with an `all`-scope client. That needs
-  the maintainer's decision on #6, and the client.
+- **Recovering a leaked tailnet** with an `all`-scope client. The
+  approach is decided (above); it needs the client, and #6's cleanup job.

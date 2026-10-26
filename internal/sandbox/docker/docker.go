@@ -67,7 +67,7 @@ func New(ctx context.Context) (*Sandbox, error) {
 }
 
 // Attach returns a sandbox for a run that's already up, such as the lab
-// `tailsuite up` left running, with its nodes and networks as the Docker
+// `tailsuite up` holds, with its nodes and networks as the Docker
 // Engine reports them. Every node must be running. Teardown tears that run
 // down.
 func Attach(ctx context.Context, runID string) (*Sandbox, error) {

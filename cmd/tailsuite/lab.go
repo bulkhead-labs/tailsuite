@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/bulkhead-labs/tailsuite/internal/agentbin"
 	"github.com/bulkhead-labs/tailsuite/internal/engine"
@@ -103,8 +104,15 @@ func writeState(dir string, st labState) error {
 	return os.Rename(tmp, statePath(dir))
 }
 
-func removeState(dir string) error {
-	err := os.Remove(statePath(dir))
+// removeState removes the project's lab state if it still names run.
+// Another up may have written its own since, as after a down from
+// another terminal: that one isn't ours to remove.
+func removeState(dir, run string) error {
+	st, ok, err := readState(dir)
+	if err != nil || !ok || st.Run != run {
+		return nil //nolint:nilerr // an unreadable or foreign state isn't this run's
+	}
+	err = os.Remove(statePath(dir))
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil
 	}
@@ -236,7 +244,7 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		// Start tears down what it made. If that failed too, the state
 		// keeps the run ID for down.
 		if alive, aerr := runAlive(context.WithoutCancel(ctx), sb.RunID()); aerr == nil && !alive {
-			_ = removeState(*dir)
+			_ = removeState(*dir, sb.RunID())
 		} else {
 			_, _ = fmt.Fprintf(stderr, "tailsuite: run %s is still partly up: tailsuite down removes it\n", sb.RunID())
 		}
@@ -256,9 +264,22 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	}
 	// The maintainer's choice (2026-10-26): up holds the lab in the
 	// foreground, and Ctrl-C (or SIGTERM) tears it down.
-	<-ctx.Done()
-	_, _ = fmt.Fprintf(stderr, "Tearing down run %s...\n", sb.RunID())
-	return teardownUp(ctx, *dir, sb, stderr, exitOK)
+	// A down from another terminal ends the lab too; then there's
+	// nothing left to hold.
+	tick := time.NewTicker(5 * time.Second)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			_, _ = fmt.Fprintf(stderr, "Tearing down run %s...\n", sb.RunID())
+			return teardownUp(ctx, *dir, sb, stderr, exitOK)
+		case <-tick.C:
+			if alive, err := runAlive(ctx, sb.RunID()); err == nil && !alive {
+				_, _ = fmt.Fprintf(stderr, "Run %s was torn down from elsewhere.\n", sb.RunID())
+				return teardownUp(ctx, *dir, sb, stderr, exitOK)
+			}
+		}
+	}
 }
 
 // teardownUp removes up's lab and its state, with a context of its own
@@ -270,7 +291,7 @@ func teardownUp(ctx context.Context, dir string, sb *docker.Sandbox, stderr io.W
 	if err := sb.Teardown(tctx); err != nil {
 		return fail(stderr, fmt.Errorf("tearing down run %s: %w; tailsuite down removes what's left", sb.RunID(), err))
 	}
-	if err := removeState(dir); err != nil {
+	if err := removeState(dir, sb.RunID()); err != nil {
 		return fail(stderr, err)
 	}
 	return code
@@ -309,7 +330,7 @@ func cmdDown(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return fail(stderr, err)
 	}
 	if ok && st.Run == target {
-		if err := removeState(*dir); err != nil {
+		if err := removeState(*dir, target); err != nil {
 			return fail(stderr, err)
 		}
 	}

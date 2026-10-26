@@ -12,8 +12,8 @@ outlives `test`, not `up`, which holds it until Ctrl-C. Names the commands
   outlive both ([0019](0019-docker-sandbox.md),
   [0020](0020-node-agent.md)); the maintainer chose instead that `up`
   holds it, and Ctrl-C tears it down (2026-10-26, on this PR). The user
-  journey runs `up` headless, then `test`; a user may keep `up` open for
-  the UI and run `test` in another terminal.
+  journey runs `up` headless in the background, then `test`; a user
+  keeps `up` open for the UI and runs `test` in another terminal.
 - **The engine and the runner live in one process.** `runner.Execute`
   needs an `engine.Lab` and the sandbox, and until now only `Start` made
   either.
@@ -46,7 +46,12 @@ outlives `test`, not `up`, which holds it until Ctrl-C. Names the commands
   architecture (`agentbin.For(sandbox.Arch())`,
   [0027](0027-embedded-agent.md)), and **holds it in the foreground until
   Ctrl-C (or SIGTERM), which tears it down** (the maintainer's choice,
-  2026-10-26). From #11 it serves the UI meanwhile.
+  2026-10-26). SIGHUP, as when its terminal closes, does the same. From
+  #11 it serves the UI meanwhile.
+  - A teardown that fails keeps the state file, for `down`, and exits 3.
+  - A `down` from another terminal ends the lab; `up` notices within
+    seconds and exits. Its state is removed only if it still names its
+    own run, so it never removes a later `up`'s.
   - A build without the agent is refused before Docker is touched, with
     `agentbin.ErrNotEmbedded`'s message.
   - If the lab fails to start and its teardown fails too, the state file
@@ -155,7 +160,8 @@ outlives `test`, not `up`, which holds it until Ctrl-C. Names the commands
 - **On a build from source, the version is `devel`** or a pseudo-version
   per commit, so two source builds with the same agent and images pass
   the build check.
-- **The lab lives as long as `up`.** Closing its terminal ends it; a
+- **The lab lives as long as `up`.** Closing its terminal (SIGHUP) ends
+  it too; a
   lab for a long session needs `up` kept open.
 - **A lab is reopened only by the project folder that started it**, and
   only by the same build. After an upgrade, or a change to a device,

@@ -98,7 +98,7 @@ func runOnLab(ctx context.Context, dir string, p *project.Project, o suite.Optio
 		}
 		if !up {
 			_, _ = fmt.Fprintf(stderr, "The lab that was up (run %s) is gone; starting one for this run.\n", st.Run)
-			if err := removeState(dir); err != nil {
+			if err := removeState(dir, st.Run); err != nil {
 				return nil, err
 			}
 		}

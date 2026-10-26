@@ -195,10 +195,24 @@ func TestLabState(t *testing.T) {
 			t.Errorf("readState(%q) accepted it", bad)
 		}
 	}
-	if err := removeState(dir); err != nil {
+	// Only the run a state names may remove it: another up may have
+	// written its own since.
+	if err := writeState(dir, want); err != nil {
 		t.Fatal(err)
 	}
-	if err := removeState(dir); err != nil {
+	if err := removeState(dir, "fedc4321"); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, _ := readState(dir); !ok {
+		t.Error("another run's removeState removed the state")
+	}
+	if err := removeState(dir, want.Run); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, _ := readState(dir); ok {
+		t.Error("its own run's removeState left the state")
+	}
+	if err := removeState(dir, want.Run); err != nil {
 		t.Errorf("removing no state: %v", err)
 	}
 }

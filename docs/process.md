@@ -61,13 +61,51 @@ reviewer agent are those checks.
    issue, what it sets up, and what it changes in the plan. The page is
    private to the maintainer, so it's never linked from the repo, and
    anything settled on it is written into the repo before it's acted on.
-5. **The maintainer approves, then it's squash-merged.** The PR title becomes the commit title, and the
-   branch's commit messages its body, so every `Signed-off-by` is kept. The
-   branch is deleted.
+5. **The maintainer approves, then it's merged with a merge commit**
+   ([0024](decisions/0024-merge-commits.md)). The branch's commits reach
+   `main` as they are, each with its `Signed-off-by`, so each one is
+   written to be read. Whoever merges gives the merge commit the PR's
+   title and number as its title, and the PR's description as its body
+   (through the API, `commit_title` and `commit_message`). The
+   branch is deleted. To undo a PR, revert its merge commit
+   (`git revert -m 1 <merge>`).
 6. **After the merge, run the `post-merge` skill**
    (`.claude/skills/post-merge`). It checks that the status page deployed,
    that the milestone and issue state matches `plan.md`, and that nothing
    in the docs went stale. Any fix goes in a docs-only PR.
+
+### Stacked pull requests
+
+When one PR builds on another that hasn't merged yet:
+
+- **Every PR's base is `main`.** Never base a PR on another PR's branch.
+  GitHub retargets such a PR when the one below merges, and a base change
+  dismisses the maintainer's approval.
+- **Each branch is built on the branch below it**, so its commits sit on
+  top of that branch's.
+- **The PR body says "Builds on #n"**, and its own commits are
+  `origin/<branch below>..origin/<branch>`. Until the one below merges,
+  GitHub's diff shows both PRs' commits; reviewers read only that range.
+- **They merge bottom up, and what each brings is checked, not
+  assumed.** GitHub would merge an approved PR whose base is `main` while
+  the one below is open, and bring the lower PR's commits in under an
+  approval that read only its own. It would also bring old commits of a
+  lower branch that was rewritten after this one was built. So, after a
+  fetch, `git log --oneline origin/main..origin/<branch>` must list only
+  the PR's own commits before it merges. Then, unless a fix below
+  conflicts with it (next point), it merges cleanly with no push, so its
+  approval holds.
+- **Fix a lower PR with a new commit.** The PRs above keep the same
+  range, and merge with no push once it has, unless the fix conflicts
+  with one of them. git counts edits to neighbouring lines as a conflict,
+  as in the decision index, the plan's M1 list or the architecture's
+  status list; post-merge's `mergeable` check finds it. That PR then needs
+  a push and a fresh approval: fix it with a signed-off merge of the
+  branch below (`git merge --signoff`), which keeps the ranges above it,
+  never a rebase. A rewrite of a lower branch (a reword, an amend, a
+  rebase) means rebuilding every branch above it, and a push to each,
+  which dismisses their approvals; rewrite only before the maintainer
+  reviews the stack.
 
 Humans can do every step by hand. The skills exist so agents and people
 follow the same checklist.
@@ -119,4 +157,7 @@ This repo is public.
 
 Every commit is signed off under the
 [Developer Certificate of Origin](https://developercertificate.org/)
-(`git commit -s`). See [CONTRIBUTING.md](../CONTRIBUTING.md).
+(`git commit -s`). See [CONTRIBUTING.md](../CONTRIBUTING.md). A merge
+commit on a branch is signed off like any other (`git merge --signoff`).
+Only the merge commit GitHub makes when a PR merges is exempt: it adds no
+content.

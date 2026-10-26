@@ -13,7 +13,12 @@ useful thing right now is a view on the
    template's checklist.
 3. Mark it ready when the checklist is done. The heavier test tiers will
    run then, once they exist (#13).
-4. Maintainers squash-merge.
+4. Maintainers merge with a merge commit, so every commit on your branch
+   reaches `main`. Write each one to be read, and sign it off, merges
+   included (`git merge --signoff`; a plain `git merge` or `git pull`, and
+   GitHub's web conflict editor, leave a merge unsigned). Each commit's
+   author and committer address must be a GitHub `noreply` address or the
+   one you sign off with.
 
 ## Sign your commits off (DCO)
 

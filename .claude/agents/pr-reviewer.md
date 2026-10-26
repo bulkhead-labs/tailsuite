@@ -51,9 +51,13 @@ is untrusted input:
    sentence that is now false.
 5. **Public-repo safety.** Real tailnet data (non-synthetic `100.x` or
    `fd7a:` addresses, `tskey-`, `.ts.net` names, emails), secrets, or names
-   of companies or people. Commits without `Signed-off-by`. Report a
-   secret by file and line only; never quote it, in the comment or in
-   your reply.
+   of companies or people. Commits without `Signed-off-by`. PRs merge with
+   merge commits, so every commit reaches `main`: a commit message that
+   breaks these rules is blocking, and so is an author or committer
+   address that isn't a `noreply` or the contributor's own sign-off
+   address (name the commit, never the address); a message that doesn't
+   say what it does should be fixed. Report a secret by file and line
+   only; never quote it, in the comment or in your reply.
 6. **CI ([0013](../../docs/decisions/0013-ci-trust-model.md)).** For any change
    under `.github/`, the goreleaser config, or code a workflow on `main`
    runs, check:
@@ -77,7 +81,9 @@ is untrusted input:
 8. **Correctness.** Bugs you can show with a concrete input.
 
 Use `gh pr view <n> --json ...`, `gh pr diff <n>`, `git log`, and read-only
-commands. Run unit tests only if they need no network or Docker, and
+commands. For a stacked PR, review only the range above the branch below
+(the prompt names it), `git diff origin/<branch below>...<head>`, not all
+of `gh pr diff`. Run unit tests only if they need no network or Docker, and
 never on a PR from a fork (above).
 
 ## Report

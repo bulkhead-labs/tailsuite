@@ -3,6 +3,8 @@
 Status: **accepted** (2026-10-25). Built in #1. Refines
 [0005](0005-go-single-binary-nix.md); follows
 [0008](0008-tests-and-pr-flow.md) and [0013](0013-ci-trust-model.md).
+Amended by [0024](0024-merge-commits.md): with merge commits, "every
+commit on `main` keeps its run" means every push to `main`.
 
 ## Context
 

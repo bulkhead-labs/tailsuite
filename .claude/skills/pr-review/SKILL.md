@@ -17,6 +17,8 @@ round. This skill runs it, and closes the loop on what it finds.
   it would review its own earlier conclusions.
 - **Its prompt carries:**
   - the PR number and its head SHA;
+  - for a stacked PR, the branch below it, so it reviews only
+    `origin/<branch below>..<head>`;
   - the worktree, read-only (for a fork, the ref instead; below);
   - how to load the token;
   - for a second or later round, the earlier rounds' comment links, and

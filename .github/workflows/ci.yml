@@ -15,7 +15,7 @@ on:
 permissions:
   contents: read
 
-# A newer push to a pull request cancels the older run. Every commit on
+# A newer push to a pull request cancels the older run. Every push to
 # main keeps its run.
 concurrency:
   group: ci-${{ github.ref }}

@@ -20,16 +20,22 @@ Others can't open it, and the repo is public. Give the link in chat.
 
 ## 1. Gather the facts
 
-For each PR, at its current head:
+For each PR, at its current head. Run `git fetch origin` first and use
+`origin/` refs throughout: a local branch, a stacked base especially, can
+be stale and give the wrong diff.
 
 - `gh pr view <n> --json number,title,body,isDraft,baseRefName,headRefName,headRefOid,additions,deletions,changedFiles`
 - The issues it closes (the graphql query in `pr-ready` step 1), and
   each issue's **"Done when"** list: the scope the work is judged against.
-- `git diff --stat <base>...<head>` and `git log --format='%h %s' <base>..<head>`.
+- `git diff --stat origin/<base>...origin/<head>` and
+  `git log --format='%h %s' origin/<base>..origin/<head>`. The totals must
+  match `gh pr view`'s `additions`, `deletions` and `changedFiles`; if they
+  don't, a ref is stale.
 - Changes to `docs/plan.md`, `docs/architecture.md`, `README.md` and
-  `docs/decisions/`: `git diff <base>...<head> -- docs README.md`.
-- Each `pr-reviewer` comment: its verdict, its findings, and what was done
-  about each.
+  `docs/decisions/`: `git diff origin/<base>...origin/<head> -- docs README.md`.
+- Each `pr-reviewer` comment, its verdict, its findings, and what was done
+  about each:
+  `gh pr view <n> --json comments --jq '.comments[]|select(.body|startswith("## pr-reviewer"))|.url'`.
 - CI on the head: `gh run list --branch <branch> -L 1`.
 - Issues the work filed, or whose bodies it changed.
 - For a group: the base of each PR, and the order they must merge in.
@@ -42,9 +48,15 @@ traced to a file, a commit, a comment or an issue, leave it out.
 Start from [`template.html`](template.html) in this folder. It has the
 layout and theme every tailsuite review page uses, so pages look alike and
 read alike. Copy everything above `<div class="wrap">` unchanged except the
-`<title>`, and write the body from the template's sections. Keep the page
-file at one path for its whole life: republishing that path updates the
-same page. Fill the sections in this order. Leave none out; when one has
+`<title>`, and write the body from the template's sections.
+
+The page file lives **outside the repo**, in the session's scratchpad, and
+is never committed. Within a session, republishing the same path updates
+the same page. A later session (a fix round, `post-merge`) finds the page
+by its title with the Artifact tool's `list`, `read`s it, edits that copy,
+and publishes with the page's `url`, so the link stays the same.
+
+Fill the sections in this order. Leave none out; when one has
 nothing to say, say that in one line ("No plan changes.").
 
 1. **Header.** An eyebrow line: `tailsuite · review · PR #n (+ #m) ·
@@ -87,11 +99,12 @@ nothing to say, say that in one line ("No plan changes.").
 11. **Also waiting on you** (only if there's something): open questions
     from the same body of work that aren't about these PRs, each with a
     recommendation, in one box at the end.
-12. **Questions** (only if there are any). Product questions only
-    ([CLAUDE.md](../../../CLAUDE.md)), each with a recommendation and
-    what it changes. If the maintainer should answer on the page, load the
-    `artifact-capabilities` skill and give the page a store for answers;
-    otherwise answers come in chat.
+12. **Questions** (only if there are any). Ask the maintainer only
+    product questions: what users get, how they use it, the overall
+    design. Settle implementation yourself, and record the choice. Give
+    each question a recommendation and what it changes. If the maintainer
+    should answer on the page, load the `artifact-capabilities` skill and
+    give the page a store for answers; otherwise answers come in chat.
 
 ## 3. Rules
 
@@ -109,6 +122,12 @@ nothing to say, say that in one line ("No plan changes.").
 - **Title**: two to four words naming the work, ending in "Review", such
   as "Tailnet Model Build Review". Keep it across updates; it's how a later
   session finds the page (the Artifact tool's `list`).
+- **What's settled goes in the repo.** The page and chat are private. An
+  answer, or anything else the maintainer settles there, is written into
+  the repo before it's acted on: in a PR or issue comment, an issue's
+  "Done when" list, or a decision record
+  ([0010](../../../docs/decisions/0010-public-tracking-in-issues.md)).
+  The page summarises the repo; it's never the only record.
 - **Check before you publish.** Every number (lines, inputs, rounds), SHA
   and issue number on the page against the facts from step 1. A wrong
   claim on a review page costs more than a missing one.
@@ -119,6 +138,8 @@ nothing to say, say that in one line ("No plan changes.").
   page, with the new SHA in the eyebrow.
 - **After the merge**, as part of [`post-merge`](../post-merge/SKILL.md): add an outcome box at the
   top ("Merged <date> as <SHA>", what changed in review, follow-ups
-  filed), and repoint branch links to `main`.
-- **When the maintainer leaves comments or answers on the page**, act on
-  them, then update the page to say what was done.
+  filed), and repoint branch links to the merge commit
+  (`blob/<merge SHA>/<path>`), so the page keeps showing what merged.
+- **When the maintainer leaves comments or answers on the page**, record
+  them in the repo (see Rules), act on them, then update the page to say
+  what was done.

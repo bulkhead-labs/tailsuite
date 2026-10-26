@@ -74,7 +74,7 @@ Never change behaviour in this PR.
 
 If the PR had a review page (the `review-artifact` skill), update it to
 the outcome, as that skill's "Keep it current" says: an outcome box at the
-top, and its links repointed from the branch to `main`.
+top, and its links repointed from the branch to the merge commit.
 
 ## 7. Report
 

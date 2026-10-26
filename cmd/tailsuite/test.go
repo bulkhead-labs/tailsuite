@@ -107,7 +107,11 @@ func runOnLab(ctx context.Context, dir string, p *project.Project, o suite.Optio
 	if up {
 		r, err = onUpsLab(ctx, dir, st, plan, low, planned, cfg)
 	} else {
-		r, err = onOwnLab(ctx, plan, low, planned, cfg, stderr)
+		abs, aerr := filepath.Abs(dir)
+		if aerr != nil {
+			return nil, aerr
+		}
+		r, err = onOwnLab(ctx, projectID(abs), plan, low, planned, cfg, stderr)
 	}
 	if err == nil && ctx.Err() != nil {
 		// Interrupted: probes cut short read as failures to connect.
@@ -170,8 +174,8 @@ func onUpsLab(ctx context.Context, dir string, st labState, plan engine.LabPlan,
 // onOwnLab starts a lab for this run alone, and always tears it down. A
 // teardown that fails after the run doesn't change what was proven; it's
 // reported, with what removes the rest.
-func onOwnLab(ctx context.Context, plan engine.LabPlan, low engine.Lowering, planned []suite.Planned, cfg runner.Config, stderr io.Writer) (*runner.Run, error) {
-	sb, agent, err := newSandbox(ctx)
+func onOwnLab(ctx context.Context, project string, plan engine.LabPlan, low engine.Lowering, planned []suite.Planned, cfg runner.Config, stderr io.Writer) (*runner.Run, error) {
+	sb, agent, err := newSandbox(ctx, project)
 	if err != nil {
 		return nil, err
 	}

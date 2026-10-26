@@ -33,11 +33,13 @@ const usage = `tailsuite proves what your tailnet allows, with real traffic.
 Usage:
 
   tailsuite init --template startup [--nix] [dir]   write a project folder
-  tailsuite up [--profile <name>] [--engine <name>]  start the lab; Ctrl-C tears it down
+  tailsuite up [--profile <name>] [--engine <name>] [--detach] [--clean]
+                                                    start the lab; Ctrl-C (or down, if
+                                                    detached) tears it down
   tailsuite test [--profile <name>] [--engine <name>] [--only <label>]
                  [--skip <label>] [--run <regex>] [--strict] [--json] [--junit <file>]
                                                     run the suite
-  tailsuite down [--run <id>]                        tear down a lab left by a crash
+  tailsuite down [--run <id> | --all]                tear down the lab, a run, or every run
   tailsuite capabilities [--json]                    what each engine supports
   tailsuite version                                  print the version
 

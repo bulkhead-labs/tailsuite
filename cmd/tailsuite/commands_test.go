@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"flag"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -14,6 +15,7 @@ import (
 	"github.com/bulkhead-labs/tailsuite/internal/agentbin"
 	"github.com/bulkhead-labs/tailsuite/internal/engine"
 	"github.com/bulkhead-labs/tailsuite/internal/engine/headscale"
+	"github.com/bulkhead-labs/tailsuite/internal/project"
 	"github.com/bulkhead-labs/tailsuite/internal/runner"
 	"github.com/bulkhead-labs/tailsuite/internal/suite"
 )
@@ -335,5 +337,42 @@ func TestUpsLabRefusals(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Errorf("%s: %v, want %q", name, err, tc.want)
 		}
+	}
+}
+
+func TestUpDefaults(t *testing.T) {
+	for _, tc := range []struct {
+		args          []string
+		lab           project.Up
+		detach, clean bool
+	}{
+		{nil, project.Up{}, false, false},
+		{nil, project.Up{Detach: true, Clean: true}, true, true},
+		{[]string{"--detach"}, project.Up{}, true, false},
+		{[]string{"--detach=false"}, project.Up{Detach: true, Clean: true}, false, true},
+		{[]string{"--clean=false", "--detach"}, project.Up{Clean: true}, true, false},
+	} {
+		fs := flag.NewFlagSet("up", flag.ContinueOnError)
+		d := fs.Bool("detach", false, "")
+		c := fs.Bool("clean", false, "")
+		if err := fs.Parse(tc.args); err != nil {
+			t.Fatal(err)
+		}
+		if gd, gc := upDefaults(fs, *d, *c, tc.lab); gd != tc.detach || gc != tc.clean {
+			t.Errorf("%q with lab.yaml %+v: detach %v clean %v, want %v %v", tc.args, tc.lab, gd, gc, tc.detach, tc.clean)
+		}
+	}
+}
+
+func TestProjectID(t *testing.T) {
+	a, b := projectID("/home/u/my-tailnet"), projectID("/home/u/other")
+	if a == b || len(a) != 16 || a != projectID("/home/u/my-tailnet") || strings.Contains(a, "/") {
+		t.Errorf("projectID: %q %q", a, b)
+	}
+}
+
+func TestDownAllAndRunTogether(t *testing.T) {
+	if code, _, errOut := runCmd(t, "down", "--all", "--run", "0123abcd"); code != exitCouldNotRun || !strings.Contains(errOut, "together") {
+		t.Errorf("down --all --run: exit %d, %q", code, errOut)
 	}
 }

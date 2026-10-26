@@ -24,6 +24,16 @@ type Lab struct {
 	Devices  map[string]LabDevice `yaml:"devices"`
 	Users    map[string]LabUser   `yaml:"users"`
 	Profiles map[string]Profile   `yaml:"profiles"`
+	// Up is how `tailsuite up` starts by default; its flags override it.
+	Up Up `yaml:"up"`
+}
+
+// Up is lab.yaml's defaults for `tailsuite up` (#81).
+type Up struct {
+	// Detach runs the lab in a background process, as --detach does.
+	Detach bool `yaml:"detach"`
+	// Clean tears down this project's earlier labs first, as --clean does.
+	Clean bool `yaml:"clean"`
 }
 
 // LabUser is a user's entry in lab.yaml, by login. Its roles are what

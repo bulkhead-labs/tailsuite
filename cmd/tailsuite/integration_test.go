@@ -10,12 +10,14 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/bulkhead-labs/tailsuite/internal/agentbin"
 	"github.com/bulkhead-labs/tailsuite/internal/engine/headscale"
 	"github.com/bulkhead-labs/tailsuite/internal/runner"
+	"github.com/bulkhead-labs/tailsuite/internal/sandbox"
 	"github.com/bulkhead-labs/tailsuite/internal/sandbox/docker"
 )
 
@@ -234,4 +236,104 @@ func startUp(t *testing.T, dir string) (stop func() int) {
 		}
 	}
 	return stop
+}
+
+// up --detach and --clean, and down ending a detached lab (#81).
+func TestDetachAndClean(t *testing.T) {
+	if len(agentbin.Embedded()) == 0 {
+		t.Fatal(agentbin.ErrNotEmbedded)
+	}
+	t.Setenv(asMain, "1") // the background process is this binary
+	ctx := context.Background()
+	dir := initProject(t)
+	abs, _ := filepath.Abs(dir)
+	t.Cleanup(func() {
+		if st, ok, _ := readState(dir); ok {
+			runCmd(t, "down", "--run", st.Run)
+		}
+	})
+
+	// A leftover of this project, as a crashed up would leave, with no
+	// state file pointing at it.
+	left, err := docker.NewFor(ctx, projectID(abs))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = left.Teardown(context.Background()); _ = left.Close() })
+	if _, err := left.CreateNetwork(ctx, sandbox.NetworkSpec{Name: "leftover"}); err != nil {
+		t.Fatal(err)
+	}
+	// And another project's lab, which --clean must not touch.
+	other, err := docker.NewFor(ctx, projectID("/elsewhere"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = other.Teardown(context.Background()); _ = other.Close() })
+	if _, err := other.CreateNetwork(ctx, sandbox.NetworkSpec{Name: "theirs"}); err != nil {
+		t.Fatal(err)
+	}
+
+	code, out, errOut := runCmd(t, "up", "--dir", dir, "--detach", "--clean")
+	if code != 0 || !strings.Contains(out, "The lab is up") || !strings.Contains(out, "Held by pid") {
+		t.Fatalf("up --detach --clean: exit %d\n%s\n%s", code, out, errOut)
+	}
+	if alive, _ := runAlive(ctx, left.RunID()); alive {
+		t.Error("--clean left this project's leftover")
+	}
+	if alive, _ := runAlive(ctx, other.RunID()); !alive {
+		t.Error("--clean tore down another project's lab")
+	}
+	st, ok, _ := readState(dir)
+	if !ok || !st.Ready || st.Holder == 0 || st.Holder == os.Getpid() {
+		t.Fatalf("state after a detached up: %+v", st)
+	}
+	if err := syscall.Kill(st.Holder, 0); err != nil {
+		t.Fatalf("the holder (pid %d) isn't running: %v", st.Holder, err)
+	}
+
+	// test uses the detached lab.
+	code, _, errOut = runCmd(t, "test", "--dir", dir, "--run", "the web tier reaches the database")
+	if code != 0 || strings.Contains(errOut, "starting one") {
+		t.Errorf("test on the detached lab: exit %d, %q", code, errOut)
+	}
+
+	// down ends it, and the holder notices and exits.
+	if code, _, errOut := runCmd(t, "down", "--dir", dir); code != 0 {
+		t.Fatalf("down: exit %d: %s", code, errOut)
+	}
+	waitExit(t, st.Holder)
+	if alive, _ := runAlive(ctx, st.Run); alive {
+		t.Error("the detached lab is still up after down")
+	}
+	if log, _ := os.ReadFile(logPath(dir)); !strings.Contains(string(log), "torn down from elsewhere") {
+		t.Errorf("the holder's log:\n%s", log)
+	}
+
+	// lab.yaml's up: section sets the default.
+	lab := filepath.Join(dir, "lab.yaml")
+	b, _ := os.ReadFile(lab)
+	if err := os.WriteFile(lab, append(b, []byte("up: { detach: true }\n")...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if code, out, errOut := runCmd(t, "up", "--dir", dir); code != 0 || !strings.Contains(out, "Held by pid") {
+		t.Fatalf("up with up.detach in lab.yaml: exit %d\n%s\n%s", code, out, errOut)
+	}
+	st2, _, _ := readState(dir)
+	if code, _, errOut := runCmd(t, "down", "--dir", dir); code != 0 {
+		t.Fatalf("down: exit %d: %s", code, errOut)
+	}
+	waitExit(t, st2.Holder)
+}
+
+// waitExit waits for a holder to exit, for at most twice its poll and a
+// teardown's bound.
+func waitExit(t *testing.T, pid int) {
+	t.Helper()
+	deadline := time.Now().Add(2*holdPoll + time.Minute)
+	for syscall.Kill(pid, 0) == nil {
+		if time.Now().After(deadline) {
+			t.Fatalf("the holder (pid %d) didn't exit after down", pid)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 }

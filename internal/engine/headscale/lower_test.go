@@ -217,7 +217,7 @@ func TestLowerRefuses(t *testing.T) {
 		"null grants": `{"grants": null, "acls": [{"action": "accept", "src": ["*"], "dst": ["*:*"]}]}`,
 		// The wait couldn't tell this rule from the marker.
 		"marker address": `{"hosts": {"doc": "192.0.2.77"}, "grants": [{"src": ["doc"], "dst": ["*"], "ip": ["*"]}]}`,
-		"marker prefix":  `{"grants": [{"src": ["192.0.2.0/24"], "dst": ["*"], "ip": ["*"]}]}`,
+		"marker as /32":  `{"grants": [{"src": ["192.0.2.77/32"], "dst": ["*"], "ip": ["*"]}]}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			l := lower(t, src)
@@ -376,6 +376,19 @@ func TestLowerTailnetAddresses(t *testing.T) {
 	// Inexact places are kept.
 	if p := typed(t, l.Policy); len(p.Grants) != 4 {
 		t.Errorf("grants %d", len(p.Grants))
+	}
+}
+
+func TestLowerKeepsRulesThatOnlyCoverTheMarker(t *testing.T) {
+	// An exit-node rule, a wider source, a destination: none is the marker.
+	for _, src := range []string{
+		`{"grants": [{"src": ["*"], "dst": ["0.0.0.0/0"], "ip": ["*"]}]}`,
+		`{"acls": [{"action": "accept", "src": ["*"], "dst": ["0.0.0.0/0:*", "192.0.2.0/24:22"]}]}`,
+		`{"grants": [{"src": ["192.0.2.0/24"], "dst": ["*"], "ip": ["*"]}]}`,
+	} {
+		if l := lower(t, src); l.Refused() {
+			t.Errorf("%s: %v", src, l.Err())
+		}
 	}
 }
 

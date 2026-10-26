@@ -274,7 +274,10 @@ func TestEmptyGrantsDeniesEverything(t *testing.T) {
 	}
 	// Closed: with no rule, server and db aren't peers any more, so it's
 	// no route rather than a drop; refused would be something answering.
-	if r := l.probe("server", "db", 8080); !(r.Outcome == agent.Timeout && !r.Connected) && !(r.Outcome == agent.Error && strings.Contains(r.Detail, "unreachable")) {
+	r := l.probe("server", "db", 8080)
+	dropped := r.Outcome == agent.Timeout && !r.Connected
+	noRoute := r.Outcome == agent.Error && strings.Contains(r.Detail, "unreachable")
+	if !dropped && !noRoute {
 		t.Errorf("server → db:8080 after the bare shape: %+v", r)
 	}
 }

@@ -78,7 +78,12 @@ reviewer agent are those checks.
 
 ### Stacked pull requests
 
-When one PR builds on another that hasn't merged yet:
+**Avoid stacking** unless two PRs would conflict
+([0029](decisions/0029-stacked-prs-need-reapproval.md)). A stack saves
+rebases, not approvals: each stacked PR needs the maintainer's approval
+again once the one below merges. Otherwise, wait for the one below to
+merge and build on `main`. When one PR must build on another that hasn't
+merged yet:
 
 - **Every PR's base is `main`.** Never base a PR on another PR's branch.
   GitHub retargets such a PR when the one below merges, and a base change
@@ -95,8 +100,13 @@ When one PR builds on another that hasn't merged yet:
   lower branch that was rewritten after this one was built. So, after a
   fetch, `git log --oneline origin/main..origin/<branch>` must list only
   the PR's own commits before it merges. Then, unless a fix below
-  conflicts with it (next point), it merges cleanly with no push, so its
-  approval holds.
+  conflicts with it (next point), it merges cleanly with no push.
+- **Each one needs a fresh approval after the one below merges.** The
+  `main` ruleset requires the last push to be approved, and GitHub reads
+  an approval given before the merge base changed as stale, even with
+  no push. GitHub doesn't re-sync the stacked PR's base either, so an
+  approval given right after the merge can still read as stale; the
+  maintainer may need to merge it from the web.
 - **Fix a lower PR with a new commit.** The PRs above keep the same
   range, and merge with no push once it has, unless the fix conflicts
   with one of them. git counts edits to neighbouring lines as a conflict,

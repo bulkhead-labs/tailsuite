@@ -22,3 +22,6 @@ crash.log
 .DS_Store
 .idea/
 .vscode/
+
+# The node agent, built by go generate (internal/agentbin)
+/internal/agentbin/bin/tailsuite-agent-*

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"os"
 	"runtime"
 	"strings"
 	"testing"
@@ -59,5 +60,23 @@ func check(t *testing.T, stream, got, want string) {
 	}
 	if !strings.Contains(got, want) {
 		t.Errorf("%s = %q, want it to contain %q", stream, got, want)
+	}
+}
+
+// Release and Nix builds set TAILSUITE_REQUIRE_AGENT=1: their binary must
+// carry the node agent for both architectures (#52).
+func TestVersionNamesTheEmbeddedAgent(t *testing.T) {
+	var out, errOut strings.Builder
+	if code := run([]string{"version"}, &out, &errOut); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut.String())
+	}
+	want := "node agent: not embedded"
+	if os.Getenv("TAILSUITE_REQUIRE_AGENT") == "1" {
+		want = "node agent: linux/amd64, linux/arm64"
+	} else if !strings.Contains(out.String(), want) {
+		want = "node agent: linux/"
+	}
+	if !strings.Contains(out.String(), want) {
+		t.Errorf("got %q, want %q", out.String(), want)
 	}
 }

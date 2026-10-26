@@ -32,6 +32,7 @@ import (
 type Sandbox struct {
 	cli   *client.Client
 	runID string
+	arch  string
 
 	mu       sync.Mutex
 	networks map[string]sandbox.Network
@@ -51,9 +52,15 @@ func New(ctx context.Context) (*Sandbox, error) {
 	if err != nil {
 		return nil, err
 	}
+	v, err := cli.ServerVersion(ctx, client.ServerVersionOptions{})
+	if err != nil {
+		_ = cli.Close()
+		return nil, fmt.Errorf("docker: %w", err)
+	}
 	return &Sandbox{
 		cli:      cli,
 		runID:    runID,
+		arch:     v.Arch,
 		networks: map[string]sandbox.Network{},
 		nodes:    map[string]sandbox.Node{},
 	}, nil
@@ -123,6 +130,10 @@ func checkEngineVersion(version string) error {
 
 // Close closes the connection to the Docker Engine. It doesn't tear down.
 func (s *Sandbox) Close() error { return s.cli.Close() }
+
+// Arch is the Docker host's architecture, as Go names it (amd64, arm64):
+// the one its Linux nodes run, so the node agent must be built for it.
+func (s *Sandbox) Arch() string { return s.arch }
 
 // RunID implements sandbox.Sandbox.
 func (s *Sandbox) RunID() string { return s.runID }

@@ -27,6 +27,7 @@ func WriteText(w io.Writer, r *Run) error {
 	b.WriteString("\n\n")
 	for _, t := range r.Tests {
 		if t.Skipped != "" {
+			fmt.Fprintf(&b, "  %-7s %s (%s)\n", "skipped", t.Name, t.Skipped)
 			continue
 		}
 		fmt.Fprintf(&b, "  %-7s %s\n", t.Result, t.Name)

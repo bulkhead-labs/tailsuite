@@ -320,6 +320,12 @@ func (r *runner) half(ctx context.Context, pt suite.Planned, pp suite.PlannedPai
 	}
 	h.Outcome = &res
 	h.Saw, h.Reason = read(res, pp.To)
+	// A block the target's own filter says shouldn't happen isn't the
+	// policy's: it's the lab (a peer not yet set up, a lost packet). It
+	// can't be a proven deny.
+	if h.Saw == sawBlocked && slices.Contains(r.admitted(ctx, pp.To, uint16(pt.Port)), pp.From) { //nolint:gosec // G115: checked when the suite loaded
+		h.Saw, h.Reason = sawUnknown, "blocked, but "+pp.To+"'s compiled filter admits "+pp.From+" on that port, so the block isn't the policy's"
+	}
 	if h.Saw == sawBlocked {
 		c := r.control(ctx, pp, pt.Port)
 		h.Control = c
@@ -424,16 +430,43 @@ func (r *runner) admitted(ctx context.Context, to string, port uint16) []string 
 		r.filters[to] = f
 		r.mu.Unlock()
 	}
-	var out []string
+	addrs := map[string]netip.Addr{}
 	for name, n := range r.nodes {
+		addrs[name] = n.IPv4
+	}
+	return filterAdmits(f, port, addrs, r.nodes[to].IPv4)
+}
+
+// filterAdmits lists, by name, the nodes a filter certainly admits on a
+// port to the target's address.
+func filterAdmits(f engine.Filter, port uint16, nodes map[string]netip.Addr, target netip.Addr) []string {
+	var out []string
+	for name, a := range nodes {
 		if slices.ContainsFunc(f.Rules, func(fr engine.FilterRule) bool {
-			return fr.HasPort(port) && admitsOnly(fr, n.IPv4)
+			return reachesOn(fr, port, target) && admitsOnly(fr, a)
 		}) {
 			out = append(out, name)
 		}
 	}
 	slices.Sort(out)
 	return out
+}
+
+// reachesOn says whether a rule allows TCP to port on the target's
+// address, not only on some destination.
+func reachesOn(fr engine.FilterRule, port uint16, target netip.Addr) bool {
+	if len(fr.IPProto) > 0 && !slices.Contains(fr.IPProto, 6) {
+		return false
+	}
+	for _, d := range fr.DstPorts {
+		if d.Ports.First > port || port > d.Ports.Last {
+			continue
+		}
+		if d.IP == "*" || admitsOnly(engine.FilterRule{SrcIPs: []string{d.IP}}, target) {
+			return true
+		}
+	}
+	return false
 }
 
 // admitsOnly is SrcAdmits without its benefit of the doubt: a control

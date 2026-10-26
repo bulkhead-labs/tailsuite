@@ -172,6 +172,8 @@ func ReadFile(b []byte, name string) ([]Test, error) {
 			continue
 		case ft.From == "" || ft.To == "":
 			bad("needs from and to")
+		case ft.SSH != "" && ft.Port == 0:
+			ft.Port = 22 // an SSH test's port, unless it says otherwise
 		case ft.Port < 1 || ft.Port > 65535:
 			bad("port %d; want 1 to 65535", ft.Port)
 		}

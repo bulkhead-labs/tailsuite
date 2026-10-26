@@ -3,10 +3,13 @@ package runner
 import (
 	"bytes"
 	"encoding/xml"
+	"net/netip"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/bulkhead-labs/tailsuite/internal/agent"
+	"github.com/bulkhead-labs/tailsuite/internal/engine"
 	"github.com/bulkhead-labs/tailsuite/internal/suite"
 )
 
@@ -155,5 +158,29 @@ func TestWriteText(t *testing.T) {
 	head := out[:strings.Index(out, "Not proven")]
 	if strings.Contains(head, "PASS    policy") {
 		t.Errorf("%s", out)
+	}
+}
+
+func TestFilterAdmits(t *testing.T) {
+	db := netip.MustParseAddr("100.64.0.3")
+	nodes := map[string]netip.Addr{"laptop": netip.MustParseAddr("100.64.0.1"), "server": netip.MustParseAddr("100.64.0.2"), "db": db}
+	f := engine.Filter{Rules: []engine.FilterRule{
+		// tag:prod → tag:db on 5432, compiled for db.
+		{SrcIPs: []string{"100.64.0.2"}, DstPorts: []engine.DstPort{{IP: db.String(), Ports: engine.PortRange{First: 5432, Last: 5432}}}},
+		// A rule to another address on the same port admits no one to db.
+		{SrcIPs: []string{"100.64.0.1"}, DstPorts: []engine.DstPort{{IP: "192.0.2.9", Ports: engine.PortRange{First: 5432, Last: 5432}}}},
+		// The marker admits no node.
+		{SrcIPs: []string{"192.0.2.77"}, DstPorts: []engine.DstPort{{IP: "*", Ports: engine.PortRange{First: 41000, Last: 41000}}}, IPProto: []int{6}},
+	}}
+	if got := filterAdmits(f, 5432, nodes, db); !slices.Equal(got, []string{"server"}) {
+		t.Errorf("5432: %v", got)
+	}
+	if got := filterAdmits(f, 80, nodes, db); len(got) != 0 {
+		t.Errorf("80: %v", got)
+	}
+	// An unreadable source gets no benefit of the doubt here.
+	f.Rules = append(f.Rules, engine.FilterRule{SrcIPs: []string{"something-new"}, DstPorts: []engine.DstPort{{IP: "*", Ports: engine.PortRange{First: 0, Last: 65535}}}})
+	if got := filterAdmits(f, 80, nodes, db); len(got) != 0 {
+		t.Errorf("unreadable: %v", got)
 	}
 }

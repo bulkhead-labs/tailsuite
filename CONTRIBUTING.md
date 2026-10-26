@@ -55,6 +55,10 @@ The race detector needs cgo, which the dev shell turns off for static
 builds. When `go.sum` changes, update `vendorHash` in `flake.nix` to the
 hash `nix build` reports.
 
+`go build` alone gives a binary without the node agent, which can't start
+a lab. `go generate ./... && go build ./cmd/tailsuite` embeds it, as
+`nix build` does ([0027](docs/decisions/0027-embedded-agent.md)).
+
 Tests that need Docker sit behind the `integration` build tag. They create
 containers and networks named `tailsuite-<run>-…` on internal networks,
 and remove them. The agent's tests also build it for Linux with your Go:

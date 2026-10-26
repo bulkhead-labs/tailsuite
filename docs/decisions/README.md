@@ -33,3 +33,4 @@ table in the same PR.
 | [0024](0024-merge-commits.md) | Pull requests merge with merge commits, not squash | Accepted 2026-10-26 |
 | [0025](0025-headscale-engine.md) | The headscale engine: its lab, its copy of the policy, and readiness | Accepted 2026-10-26 |
 | [0026](0026-test-runner.md) | The test runner: reading traffic into results | Accepted 2026-10-26 |
+| [0027](0027-embedded-agent.md) | The tailsuite binary carries the node agent | Accepted 2026-10-26 |

@@ -1,6 +1,7 @@
 # 0020: The node agent: it lives with the node, and sessions come and go
 
-Status: **accepted** (2026-10-25). Built in #7. Builds on
+Status: **accepted** (2026-10-25). Built in #7. The tailsuite binary
+carries the agent since #52 ([0027](0027-embedded-agent.md)). Builds on
 [0019](0019-docker-sandbox.md), which put agent control on the sandbox's
 exec channel.
 

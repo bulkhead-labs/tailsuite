@@ -1,6 +1,6 @@
 # Plan
 
-**Last checked against the repo: 2026-10-25.** Current milestone: **M1, in
+**Last checked against the repo: 2026-10-26.** Current milestone: **M1, in
 progress.**
 
 This file is the plan of record. It changes in the same pull request as the

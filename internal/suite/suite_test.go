@@ -287,3 +287,25 @@ func TestNeedsRefuseWhatTheLoweringChanged(t *testing.T) {
 		t.Errorf("%+v", n)
 	}
 }
+
+func TestSSHPortDefaultsTo22(t *testing.T) {
+	// 0015's own example has no port.
+	ts, err := ReadFile([]byte("version: 1\ntests:\n  - {name: root on prod, from: group:eng, to: tag:prod, ssh: root, expect: check}\n"), "tests/x.yaml")
+	if err != nil || ts[0].Port != 22 {
+		t.Fatalf("%+v %v", ts, err)
+	}
+}
+
+func TestDefaultSrcPostureIsANeed(t *testing.T) {
+	p, low := startup(t)
+	f, err := policy.Parse([]byte(`{"postures": {"posture:a": ["node:os == 'linux'"]}, "defaultSrcPosture": ["posture:a"], "grants": [{"src": ["*"], "dst": ["*"], "ip": ["*"]}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Tailnet.Policy = f
+	pl := NewPlanner(p.Tailnet, headscale.New(headscale.Config{}).Capabilities(), low)
+	n := pl.Needs(Test{Name: "x", From: "laptop", To: "db", Port: 5432, Expect: Deny}, Pair{From: "laptop", To: "db"})
+	if !slices.Contains(n.All, engine.Posture) || len(n.Refused) == 0 {
+		t.Errorf("%+v", n)
+	}
+}

@@ -28,6 +28,7 @@ an allowed source or from itself".
 
 ### Reading the suite
 
+- **An SSH test's port defaults to 22.**
 - **Test files are strict**, as `lab.yaml` is (0022): an unknown key, a
   second document, a missing name, a port out of range, an `expect` that
   doesn't fit, a probe the agent doesn't have, a `when` other than `os`,
@@ -70,7 +71,8 @@ test) that could match its source and its destination counts:
   autogroup's row, IP sets, `via`, routes to addresses outside the
   tailnet's range, posture conditions, app grants;
 - **the test's own:** SSH, a check, a login tied to the source's, a
-  `when` (posture, until M4).
+  `when` (posture, until M4);
+- **the policy's `defaultSrcPosture`**, which applies to every rule.
 
 A need the engine refuses makes the pair REFUSED, naming the capability.
 **Every change in the engine's lowering that could touch the pair**
@@ -98,9 +100,10 @@ The needs become `needs:` labels.
   | any other `error` | UNKNOWN |
 
 - **A block the target's filter contradicts isn't a deny.** If the
-  target's compiled filter certainly admits the source on that port, to
-  the target's address, a blocked half is UNKNOWN: a lost packet or a peer
-  not yet set up, not the policy.
+  target's compiled filter can't be read, or might admit the source on
+  that port to the target's address (a source or destination it can't
+  parse counts as admitting), a blocked half is UNKNOWN: a lost packet or
+  a peer not yet set up, not the policy.
 - **A blocked half needs its positive control** (0001), once per target
   and port:
   1. from a lab node the target's compiled filter certainly admits on
@@ -199,4 +202,3 @@ The needs become `needs:` labels.
   second engine exists (#6). For the same reason, unproven results don't
   yet name a profile and engine that could prove them, as 0015 asks; #6
   adds that.
-- **An SSH test's port defaults to 22.**

@@ -5,8 +5,8 @@ local lab, on real Tailscale clients, sends real traffic between them, and
 shows what can actually reach what. Then it helps you lock it down, proves
 the lockdown works on every pull request, and deploys it through OpenTofu.
 
-> **Status: planning.** Nothing to install yet. The commands below are the
-> plan, not the product. Follow along on the
+> **Status: building the first milestone.** Nothing to install yet. The
+> commands below are the plan, not the product. Follow along on the
 > [status page](https://bulkhead-labs.github.io/tailsuite/), the
 > [plan](docs/plan.md) and the
 > [milestones](https://github.com/bulkhead-labs/tailsuite/milestones).

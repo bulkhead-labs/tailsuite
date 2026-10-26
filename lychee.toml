@@ -1,0 +1,9 @@
+# The docs link check that CI runs on every push (decision 0018).
+# Offline: links between files in this repo, and the headings they point
+# at. Links to other sites aren't checked, so a site being down can't fail
+# a build.
+offline = true
+include_fragments = "anchor-only"
+# .github/ and .claude/ hold docs too.
+hidden = true
+exclude_path = ["docs/assets/vendor", "(^|/)\\.git/"]

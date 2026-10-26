@@ -102,16 +102,17 @@ this list, and the `pr-ready` skill checks it before review
 
 | Tier | When | What |
 |---|---|---|
-| Lint and unit | Every push | Go tests, linters, docs link check |
+| Lint and unit | Every push to a PR or to `main` | Go tests, linters, the docs link check, the workflow audit, the Nix build; also a plain `go build` without Nix |
 | Integration | Every push to a ready PR | The lab on headscale |
 | **User journey** | When a PR is marked ready, on every push to a ready PR, on demand for any branch | Installs the binary **from the built artifacts**, the way a user would: `init --template startup` → `up` headless → `test` → `import` from a recorded "prod" → `tofu plan` shows zero changes → a scripted policy change → `test` shows the blast-radius diff → `deploy` to a second headscale → re-import → zero changes → teardown. Plus a Playwright smoke test of the UI. Steps that land in later milestones are stubbed until then |
 | Real Tailscale | Nightly, and on demand: on a branch, through `branch-run`, with the maintainer's approval each run | The same journey with "prod" as a throwaway Tailscale tailnet and import over the real API. It re-records the API fixtures the per-PR run uses |
 | Upstream canary | Nightly | Latest headscale and Tailscale client images |
 | Release | On a tag | All tiers, then install from the **published** channels (Homebrew, script, container) on Linux and macOS runners, with signatures verified |
 
-**Not running yet.** CI arrives with #1 (lint, unit, the docs link check)
-and #13 (integration and the user journey). Until then, the `pr-ready`
-skill and the reviewer agent are the checks.
+**Running:** lint and unit, on every push to a PR or to `main`
+([0018](decisions/0018-go-toolchain-flake-ci.md)). **Not running yet:**
+integration and the user journey, which arrive with #13. Until then, the
+`pr-ready` skill and the reviewer agent are those checks.
 
 **PRs open as drafts.** Drafts get lint and unit tests only. Marking a PR
 ready starts the heavy tiers. Any branch can run them by hand
@@ -150,7 +151,8 @@ ready starts the heavy tiers. Any branch can run them by hand
    - #19, the UI stack: settled in [0017](decisions/0017-local-ui.md).
 2. **Run the #3 spike**: the test organization exists (2026-10-25).
 3. **Build:**
-   - #1, the Go module and the flake: Go first, then CI (#39 is in place);
+   - #1, the Go module, the flake and CI for lint and unit tests: done
+     ([0018](decisions/0018-go-toolchain-flake-ci.md));
    - #4, the Docker sandbox;
    - #5, headscale;
    - #7, the node agent;

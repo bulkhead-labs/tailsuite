@@ -1,0 +1,73 @@
+# Lint and unit tests on every push to a pull request or to main
+# (decision 0018). Every workflow follows decision 0013: least privilege,
+# actions pinned by commit, no secrets here.
+name: ci
+
+# One run per commit. A job skipped by an `if:` reports success, so a
+# skipped twin could satisfy a required check that the real run failed.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  # Any branch, by hand, before it has a pull request. No inputs.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to a pull request cancels the older run. Every commit on
+# main keeps its run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
+
+jobs:
+  check:
+    name: Lint and unit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Installs Nix 2.35.2. It also writes this job's read-only token into
+      # nix.conf, for GitHub's rate limits.
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+      - name: Toolchain
+        run: nix develop .#ci --command sh -c 'go version && golangci-lint version'
+      - name: go.mod and go.sum are tidy
+        run: nix develop .#ci --command go mod tidy -diff
+      - name: Lint
+        run: nix develop .#ci --command golangci-lint run
+      - name: Unit tests
+        run: nix develop .#ci --command env CGO_ENABLED=1 go test -race ./...
+      - name: Docs links
+        run: nix develop .#ci --command lychee --config lychee.toml .
+      - name: Workflows
+        run: nix develop .#ci --command sh -c 'actionlint && zizmor --offline .github/workflows'
+      - name: flake.nix is formatted
+        run: nix develop .#ci --command nixfmt --check flake.nix
+      - name: nix build
+        run: |
+          nix flake check --print-build-logs
+          nix build .#tailsuite --print-build-logs
+          ./result/bin/tailsuite version
+
+  plain-go:
+    name: Plain go build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    container:
+      image: golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61
+    env:
+      # The checkout belongs to another user inside the container, so git
+      # can't stamp the build. The Nix job covers versioned builds.
+      GOFLAGS: -buildvcs=false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: go build and go test, without Nix
+        run: |
+          go build ./...
+          go test ./...

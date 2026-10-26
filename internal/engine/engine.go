@@ -155,7 +155,8 @@ type Change struct {
 	Capability Capability `json:"capability"`
 	Reason     string     `json:"reason"`
 	// Src and Dst are the identities of the rule the change is in, as
-	// written: a test whose source could match Src and whose destination
+	// written, except that an address in the tailnet's range is "*":
+	// the engine decides which lab device holds it, so it could be any. a test whose source could match Src and whose destination
 	// could match Dst is touched. Both empty with Targets empty means the
 	// change touches no test.
 	Src []string `json:"src,omitempty"`

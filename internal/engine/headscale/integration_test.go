@@ -20,6 +20,7 @@ import (
 	"github.com/bulkhead-labs/tailsuite/internal/agent/control"
 	"github.com/bulkhead-labs/tailsuite/internal/engine"
 	"github.com/bulkhead-labs/tailsuite/internal/model"
+	"github.com/bulkhead-labs/tailsuite/internal/model/policy"
 	"github.com/bulkhead-labs/tailsuite/internal/sandbox"
 	"github.com/bulkhead-labs/tailsuite/internal/sandbox/docker"
 )
@@ -272,15 +273,15 @@ func TestEmptyGrantsDeniesEverything(t *testing.T) {
 		t.Errorf("db's filter isn't empty: %+v", f.Rules)
 	}
 	// Closed: with no rule, server and db aren't peers any more, so it's
-	// no route rather than a drop. Either way nothing gets through.
-	if r := l.probe("server", "db", 8080); r.Outcome == agent.Success || r.Connected {
+	// no route rather than a drop; refused would be something answering.
+	if r := l.probe("server", "db", 8080); !(r.Outcome == agent.Timeout && !r.Connected) && !(r.Outcome == agent.Error && strings.Contains(r.Detail, "unreachable")) {
 		t.Errorf("server → db:8080 after the bare shape: %+v", r)
 	}
 }
 
 // TLS is the lab CA's: a node that doesn't trust it can't join. The
 // positive control is every node Start joined, which trusts it.
-func TestNodesTrustOnlyTheLabCA(t *testing.T) {
+func TestNodesWithoutTheLabCACantJoin(t *testing.T) {
 	l := start(t, startupPolicy, startupPlan)
 	ctx := context.Background()
 	n, err := l.sb.StartNode(ctx, sandbox.NodeSpec{
@@ -345,10 +346,30 @@ func TestRejectedPolicyIsRefused(t *testing.T) {
 	if !errors.As(err, &r) || r.Engine != Name || !strings.Contains(r.Reason, "headscale rejected") {
 		t.Fatalf("got %v", err)
 	}
-	// headscale still holds the last good policy: the allow still works.
-	l.listen("server", 80)
+	// headscale still holds the last good policy, not the rejected
+	// allow-all: what it denied is still denied, beside its positive
+	// control, and every filter still holds the last apply's marker.
+	l.listen("server", 80, 5432)
 	if res := l.probe("laptop", "server", 80); res.Outcome != agent.Success {
-		t.Errorf("after the rejection: %+v", res)
+		t.Errorf("positive control, laptop → server:80: %+v", res)
+	}
+	if res := l.probe("laptop", "server", 5432); res.Outcome != agent.Timeout || res.Connected {
+		t.Errorf("laptop → server:5432 after the rejection: %+v", res)
+	}
+	applied, _ := l.Applied()
+	ap, err := policy.Parse(applied)
+	if err != nil {
+		t.Fatal(err)
+	}
+	last := ap.Policy.Grants[len(ap.Policy.Grants)-1].IP[0] // the marker, tcp:<port>
+	var port uint16
+	if _, err := fmt.Sscanf(last, "tcp:%d", &port); err != nil {
+		t.Fatal(err)
+	}
+	for name := range l.nodes {
+		if !l.filter(name).HasMarker(port) {
+			t.Errorf("%s lost the last apply's marker", name)
+		}
 	}
 }
 

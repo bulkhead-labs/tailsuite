@@ -150,7 +150,19 @@ ol.guide { margin: 0; padding-left: 1.4em; display: grid; gap: 8px; }
 <section class="block" id="changes"><span class="eyebrow">What changed</span><h2>By area</h2></section>
 <section class="block" id="choices"><span class="eyebrow">Choices made · decision NNNN</span><h2>Choices with trade-offs</h2></section>
 <section class="block" id="setup"><span class="eyebrow">What it sets up</span><h2>What comes next can use</h2></section>
-<section class="block" id="plan"><span class="eyebrow">Plan changes</span><h2>What this changes in the plan</h2></section>
+<section class="block" id="plan">
+  <span class="eyebrow">Plan changes</span>
+  <h2>What this changes in the plan</h2>
+  <!-- One card per change. A change to what a user writes, sees or gets, or one the maintainer must agree to, shows before and after: -->
+  <div class="card">
+    <p><span class="chip agree">needs your agreement</span> <b>THE CHANGE, IN ONE LINE</b></p>
+    <div class="two">
+      <div class="stack"><span class="eyebrow">Before</span><pre><code>EXAMPLE, AS IT WAS</code></pre></div>
+      <div class="stack"><span class="eyebrow">After</span><pre><code>EXAMPLE, AS IT IS NOW</code></pre></div>
+    </div>
+    <p class="prose">THE DIFFERENCE: WHAT A USER CAN DO NOW, AND WHAT A RUN DOES DIFFERENTLY.</p>
+  </div>
+</section>
 <section class="block" id="trail"><span class="eyebrow">Review trail</span><h2>Reviews and tests</h2></section>
 <section class="block" id="risks"><span class="eyebrow">Risks</span><h2>What could still be wrong</h2></section>
 <section class="block" id="guide"><span class="eyebrow">Reading guide</span><h2>If you read the diff</h2><ol class="guide"></ol></section>

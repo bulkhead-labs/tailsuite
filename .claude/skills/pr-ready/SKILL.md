@@ -1,6 +1,6 @@
 ---
 name: pr-ready
-description: Take a tailsuite pull request from draft to ready. Walk the definition of done, make the docs true, check the public-repo safety rules, then start the independent pr-reviewer agent and address its findings. Use when asked to "get this PR ready", "mark ready", "pr-ready", "finish the PR", or before marking any tailsuite PR ready for review.
+description: Take a tailsuite pull request from draft to ready. Walk the definition of done, make the docs true, check the public-repo safety rules, then run the pr-review skill (the independent pr-reviewer agent, round after round) and address its findings. Use when asked to "get this PR ready", "mark ready", "pr-ready", "finish the PR", or before marking any tailsuite PR ready for review.
 ---
 
 # pr-ready
@@ -70,7 +70,8 @@ Anything found blocks the PR. Fix it and say so.
 ## 5. Independent review
 
 Run the [`pr-review`](../pr-review/SKILL.md) skill. It starts the
-`pr-reviewer` agent on Opus at the highest effort, which is read-only and
+`pr-reviewer` agent on Opus at the highest effort, as the
+[`delegate`](../delegate/SKILL.md) skill says for review. The agent is read-only and
 reviews against the same checklist without seeing your conclusions. It
 runs another round after substantial fixes, and links every round in the
 template's Review box. Don't mark the PR ready until a round finds

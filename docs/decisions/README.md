@@ -10,7 +10,7 @@ table in the same PR.
 | [0001](0001-truth-over-mocks.md) | Truth over mocks: real traffic, four results, positive controls | Accepted 2026-10-23 |
 | [0002](0002-two-engines.md) | Two engines from M1: headscale and Tailscale throwaway tailnets | Accepted 2026-10-23; refined by 0016 |
 | [0003](0003-docker-one-container-per-node.md) | Docker, one container per node, kernel TUN, TLS in the lab | Accepted 2026-10-23; refined by 0016; amended by 0019 |
-| [0004](0004-opentofu-owns-config.md) | OpenTofu owns the tailnet config; tailsuite owns the machines | Accepted 2026-10-24; amended by 0014 |
+| [0004](0004-opentofu-owns-config.md) | OpenTofu owns the tailnet config; tailsuite owns the machines | Accepted 2026-10-24; amended by 0014; built in 0032 |
 | [0005](0005-go-single-binary-nix.md) | Go, one signed binary, Nix for development | Accepted 2026-10-24 |
 | [0006](0006-apache-2-dco-open-core.md) | Apache-2.0, DCO sign-off, open core later | Accepted 2026-10-24; amended by 0024 |
 | [0007](0007-read-only-by-default.md) | Read-only by default; earn each permission; local first | Accepted 2026-10-24 |
@@ -35,3 +35,4 @@ table in the same PR.
 | [0026](0026-test-runner.md) | The test runner: reading traffic into results | Accepted 2026-10-26 |
 | [0027](0027-embedded-agent.md) | The tailsuite binary carries the node agent | Accepted 2026-10-26 |
 | [0028](0028-review-tiers.md) | Reviews are sized to the PR | Accepted 2026-10-26 |
+| [0032](0032-the-opentofu-module.md) | The OpenTofu module, the allow-list, and the run directory | Accepted 2026-10-26 |

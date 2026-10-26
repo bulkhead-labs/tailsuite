@@ -174,7 +174,10 @@ ready starts the heavy tiers. Any branch can run them by hand
    - #8, the test runner: done ([0026](decisions/0026-test-runner.md));
    - #12, the CLI;
    - #11, the UI;
-   - #9, the OpenTofu module;
+   - #9, the OpenTofu module: the module, the allow-list, the run
+     directory and editing the values are built
+     ([0032](decisions/0032-the-opentofu-module.md)); `init`, `upgrade
+     tofu` and REFUSED on a lab run are wired once #12 has merged;
    - #10, the round trip.
 4. **#6**, the Tailscale engine, after #3. M1 needs only the minimal
    rewrite (one user becomes one tag, and the rewrite is recorded); the

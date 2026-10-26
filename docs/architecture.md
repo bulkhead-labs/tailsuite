@@ -15,7 +15,12 @@
 - the engine interface and the headscale engine, `internal/engine` and
   `internal/engine/headscale` ([0025](decisions/0025-headscale-engine.md));
 - the test suite and the runner, `internal/suite` and `internal/runner`
-  ([0026](decisions/0026-test-runner.md)).
+  ([0026](decisions/0026-test-runner.md));
+- tailsuite's OpenTofu module, the allow-list over `tofu/`, the
+  Tailscale engine's run directory, and editing the values,
+  `internal/tofu` and `internal/project`
+  ([0032](decisions/0032-the-opentofu-module.md)). The run directory is
+  applied once the Tailscale engine lands (#6).
 
 Nothing runs these from the command line yet (#12).
 

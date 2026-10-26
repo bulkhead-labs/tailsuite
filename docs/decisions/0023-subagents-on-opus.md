@@ -49,8 +49,8 @@ review, and hard building gets one step below (#63).
   as low 0.48, medium 0.66 (the default), high 1, xhigh 1.66 and max 3.44.
   The same build accepts `low`, `medium`, `high`, `xhigh` and `max` for
   the Agent tool's `effort`, and those or an integer for an agent file's
-  `effort:`. It takes `opus` as a model alias. Checked in the binary installed on the
-  maintainer's VM.
+  `effort:`. It takes `opus` as a model alias. Checked in the binary
+  installed on the maintainer's VM.
 
 ## Alternatives
 
@@ -69,7 +69,7 @@ review, and hard building gets one step below (#63).
   - searches stay at `medium`.
 - **An environment override.** If `CLAUDE_CODE_EFFORT_LEVEL` is set, it
   wins over this table. It's unset on the maintainer's VM.
-- **Speed.** Higher effort takes longer. A review round took 2 to 13
+- **Speed.** Higher effort takes longer. A review round took 2 to 15
   minutes on #60 and #62.
 - **Forks ignore it.** The Agent tool's `fork` type always inherits the
   caller's model and effort, so the `delegate` skill doesn't use it for

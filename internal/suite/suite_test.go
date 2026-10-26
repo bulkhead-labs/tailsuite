@@ -305,7 +305,7 @@ func TestDefaultSrcPostureIsANeed(t *testing.T) {
 	p.Tailnet.Policy = f
 	pl := NewPlanner(p.Tailnet, headscale.New(headscale.Config{}).Capabilities(), low)
 	n := pl.Needs(Test{Name: "x", From: "laptop", To: "db", Port: 5432, Expect: Deny}, Pair{From: "laptop", To: "db"})
-	if !slices.Contains(n.All, engine.Posture) || len(n.Refused) == 0 {
+	if !slices.Contains(n.All, engine.Posture) || !slices.ContainsFunc(n.Refused, func(r string) bool { return strings.Contains(r, "refuses posture") }) {
 		t.Errorf("%+v", n)
 	}
 }

@@ -23,7 +23,7 @@ agent").
   compile.
 - **Nix builds generate it** in `preBuild` (not while vendoring modules),
   and the package's tests fail unless both are embedded
-  (`TAILSUITE_REQUIRE_AGENT=1`). goreleaser (#2) runs the same `go
+  (`TAILSUITE_REQUIRE_AGENT=1`). goreleaser (#2) will run the same `go
   generate`.
 - **The agent is picked by the Docker host's architecture**, from the
   Engine's version response (`docker.Sandbox.Arch`), never tailsuite's

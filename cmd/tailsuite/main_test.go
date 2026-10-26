@@ -63,7 +63,7 @@ func check(t *testing.T, stream, got, want string) {
 	}
 }
 
-// Release and Nix builds set TAILSUITE_REQUIRE_AGENT=1: their binary must
+// Nix builds, and the release build will (#2), set TAILSUITE_REQUIRE_AGENT=1: their binary must
 // carry the node agent for both architectures (#52).
 func TestVersionNamesTheEmbeddedAgent(t *testing.T) {
 	var out, errOut strings.Builder

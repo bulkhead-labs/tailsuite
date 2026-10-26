@@ -269,5 +269,5 @@ exec channel.
   catatonit on Podman. It isn't checked.
 - **Probes take IP addresses only.** The runner resolves device names
   itself.
-- **No embedded agent yet** (#52). Until then, nothing outside the tests
+- **No embedded agent yet** (#52; done since, [0027](0027-embedded-agent.md)). Until then, nothing outside the tests
   can start one.

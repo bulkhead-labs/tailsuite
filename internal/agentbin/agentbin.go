@@ -2,7 +2,8 @@
 // the tailsuite binary, built for both Linux architectures a Docker host
 // runs, since a Mac's lab nodes are Linux too (decision 0027).
 //
-// The binaries are made by go generate, which release and Nix builds run,
+// The binaries are made by go generate, which Nix builds run, and the
+// release build will (#2),
 // and land in bin/, which git ignores. A plain go build without them still
 // compiles; For then says how to get a build that has them.
 package agentbin
@@ -12,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"strings"
 )
 
 //go:generate go run ./gen
@@ -37,7 +39,7 @@ func For(arch string) ([]byte, error) {
 	case errors.Is(err, fs.ErrNotExist) && Embedded() == nil:
 		return nil, ErrNotEmbedded
 	case errors.Is(err, fs.ErrNotExist):
-		return nil, fmt.Errorf("the node agent isn't built for linux/%s; this tailsuite carries it for linux/%v", arch, Embedded())
+		return nil, fmt.Errorf("the node agent isn't built for linux/%s; this tailsuite carries it for linux/%s", arch, strings.Join(Embedded(), ", linux/"))
 	case err != nil:
 		return nil, err
 	}

@@ -60,6 +60,10 @@
           '';
           # Not while vendoring the modules: it needs the vendored tree.
           overrideModAttrs = _: { preBuild = ""; };
+          # The agents' own checks (Linux ELF, right architecture) run too.
+          postCheck = ''
+            go test ./internal/agentbin
+          '';
           # The package's tests fail unless both agents are embedded.
           env.TAILSUITE_REQUIRE_AGENT = "1";
           env.CGO_ENABLED = "0";

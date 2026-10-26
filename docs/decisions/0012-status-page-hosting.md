@@ -37,7 +37,7 @@ and GitHub Pages can serve a folder on a branch directly.
 - **A library is pinned only once its release is two weeks old**
   (CLAUDE.md rule 9).
 
-## Evidence (checked 2026-10-24)
+## Evidence (checked 2026-10-24, updated 2026-10-26)
 
 - **marked 12.0.2:** sha384 `/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi`.
 - **DOMPurify 3.4.16** (released 2026-09-23): sha384
@@ -50,6 +50,12 @@ and GitHub Pages can serve a folder on a branch directly.
     `SAFE_FOR_TEMPLATES`, `IN_PLACE` or `PARSER_MEDIA_TYPE`.
   - **3.4.17 was released 2026-10-12**, so it can be pinned from 2026-10-26
     (#31).
+- **Updated 2026-10-26 (#31): DOMPurify 3.4.17** replaces 3.4.16, sha384
+  `P0JNneQf81HOl9VwNXK76cQ9VMD6Nfsnepxb0cCOg8+UzEdzgPHAPV4wVQrvYQSx`.
+  - The cdnjs file is byte for byte the npm package's `dist/purify.min.js`,
+    and matches cdnjs's own SRI (sha512).
+  - It's the latest release, and GitHub's advisory database lists none
+    that affects it.
 - **GitHub's unauthenticated API limit is 60 requests an hour per IP.** A
   page load makes 3 calls, so about 20 loads an hour from one address, and
   fewer behind a shared NAT.

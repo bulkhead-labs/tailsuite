@@ -176,7 +176,7 @@ ready starts the heavy tiers. Any branch can run them by hand
    rewrite (one user becomes one tag, and the rewrite is recorded); the
    hard cases are #21, on M3.
 5. **#2 and #13** (releases and the journey suite), then #14.
-6. **#31** from 2026-10-26.
+6. **#31**, the status page's DOMPurify bump to 3.4.17: done.
 
 Issues say "Depends on #n" where an order matters.
 

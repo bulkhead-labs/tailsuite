@@ -70,10 +70,10 @@ func Lower(t model.Tailnet) (engine.Lowering, error) {
 	// with no other section allows everything there. Tailscale's reading
 	// isn't checked, and the marker would make the lab deny everything.
 	if l.has("/acls") && l.p.ACLs == nil {
-		l.refuse("", l.ptr("/acls"), "acls is null, which no engine's reading has been checked for; write [] to deny everything, or leave the section out")
+		l.refuse("", l.ptr("/acls"), "acls is null, which no engine's reading has been checked for; write it as a list, or leave it out")
 	}
 	if l.has("/grants") && l.p.Grants == nil {
-		l.refuse("", l.ptr("/grants"), "grants is null, which no engine's reading has been checked for; write [] to deny everything, or leave the section out")
+		l.refuse("", l.ptr("/grants"), "grants is null, which no engine's reading has been checked for; write it as a list, or leave it out")
 	}
 	l.markerSource()
 	if l.p.DisableIPv4 {
@@ -337,28 +337,22 @@ func (l *lowerer) srcPosture(base string, n int, change func(engine.ChangeKind, 
 	}
 }
 
-// markerSource refuses a policy whose rules name the readiness marker's
-// source address: the wait couldn't tell such a rule from the marker.
+// markerSource refuses a policy with a rule whose source is exactly the
+// readiness marker's address, bare or /32, or a host for it: the wait
+// couldn't tell that rule from the marker. Wider prefixes, and
+// destinations, are different rules to the wait and to headscale.
 func (l *lowerer) markerSource() {
 	marker := netip.MustParsePrefix(engine.MarkerSource).Addr()
 	for _, r := range l.f.References() {
-		if r.Role != "src" && r.Role != "dst" {
+		if r.Role != "src" {
 			continue
 		}
 		a := r.Value
 		if h, ok := l.p.Hosts[a]; ok {
 			a = h
 		}
-		var p netip.Prefix
-		if ad, err := netip.ParseAddr(a); err == nil {
-			p = netip.PrefixFrom(ad, ad.BitLen())
-		} else if q, err := netip.ParsePrefix(a); err == nil {
-			p = q
-		} else {
-			continue
-		}
-		if p.Contains(marker) {
-			l.refuse("", r.Pointer, "the rule names "+r.Value+", which holds "+marker.String()+", tailsuite's readiness marker's source; the lab couldn't tell the rule from the marker")
+		if a == marker.String() || a == engine.MarkerSource {
+			l.refuse("", r.Pointer, "the rule's source is "+r.Value+", tailsuite's readiness marker's address; the lab couldn't tell the rule from the marker")
 		}
 	}
 }

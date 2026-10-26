@@ -123,7 +123,7 @@ references, in the file's own spelling (0014, 0022):
 | A key the typed copy doesn't understand, or a duplicate key | The run is REFUSED, naming the key: headscale rejects unknown fields | Refusal |
 | `defaultSrcPosture` | The run is REFUSED: it applies to every rule (0016). An empty list is removed, exactly | Refusal, or Rewrite |
 | `acls` or `grants` written as `null` | The run is REFUSED: headscale reads it as absent (allow-all), Tailscale's reading isn't checked, and the marker would make the lab deny everything | Refusal |
-| A rule naming an address or prefix that holds the marker's source, `192.0.2.77` | The run is REFUSED: the wait couldn't tell the rule from the marker | Refusal |
+| A rule whose source is exactly the marker's address, `192.0.2.77` or `192.0.2.77/32`, or a host for it | The run is REFUSED: the wait couldn't tell the rule from the marker. Wider prefixes and destinations, such as an exit node's `0.0.0.0/0`, are different rules | Refusal |
 | `disableIPv4: true` | The run is REFUSED: the lab's probes are IPv4 | Refusal |
 | `tests`, `sshTests` | Removed: tailsuite runs them itself (0015) | Change, touching no test |
 | `ipsets`, and every rule that names an IP set | Removed | Change: the rule's tests REFUSED |

@@ -156,8 +156,9 @@ type Change struct {
 	Reason     string     `json:"reason"`
 	// Src and Dst are the identities of the rule the change is in, as
 	// written, except that an address in the tailnet's range is "*":
-	// the engine decides which lab device holds it, so it could be any. a test whose source could match Src and whose destination
-	// could match Dst is touched. Both empty with Targets empty means the
+	// the engine decides which lab device holds it, so it could be any. A
+	// test whose source could match Src and whose destination could match
+	// Dst is touched. Both empty with Targets empty means the
 	// change touches no test.
 	Src []string `json:"src,omitempty"`
 	Dst []string `json:"dst,omitempty"`

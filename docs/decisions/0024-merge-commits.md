@@ -5,7 +5,9 @@ Status: **accepted** (2026-10-26). Settles #64. Changes the merge step in
 it, and CLAUDE.md rules 6 and 7. Amends
 [0006](0006-apache-2-dco-open-core.md) (the merge commit GitHub makes when
 a PR merges isn't signed off) and [0018](0018-go-toolchain-flake-ci.md)
-(on `main`, CI runs once per push, on the merge commit).
+(on `main`, CI runs once per push, on the merge commit). Amended by
+[0029](0029-stacked-prs-need-reapproval.md): a stacked PR's approval
+doesn't hold once the one below merges.
 
 ## Context
 

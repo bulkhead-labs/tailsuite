@@ -23,7 +23,7 @@ Others can't open it, and the repo is public. Give the link in chat.
 For each PR, at its current head. Run `git fetch origin` first and use
 `origin/` refs throughout: a local branch, a stacked base especially, can
 be stale and give the wrong diff. A PR from a fork has no `origin/<head>`;
-fetch it as `git fetch origin pull/<n>/head:refs/remotes/origin/pr-<n>` and
+fetch it as `git fetch origin +pull/<n>/head:refs/remotes/origin/pr-<n>` and
 use `origin/pr-<n>`.
 
 - `gh pr view <n> --json number,title,body,isDraft,baseRefName,headRefName,headRefOid,additions,deletions,changedFiles`

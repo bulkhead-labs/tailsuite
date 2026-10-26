@@ -17,7 +17,7 @@ round. This skill runs it, and closes the loop on what it finds.
   it would review its own earlier conclusions.
 - **Its prompt carries:**
   - the PR number and its head SHA;
-  - the worktree, read-only;
+  - the worktree, read-only (for a fork, the ref instead; below);
   - how to load the token;
   - for a second or later round, the earlier rounds' comment links, and
     the commits that claim to fix them, so it checks each fix and looks
@@ -34,7 +34,7 @@ round. This skill runs it, and closes the loop on what it finds.
     `git show origin/main:.claude/agents/pr-reviewer.md`), never the PR's
     copy;
   - give it the ref, not a worktree: `git fetch origin
-    pull/<n>/head:refs/remotes/origin/pr-<n>`. It reads the PR's files
+    +pull/<n>/head:refs/remotes/origin/pr-<n>`. It reads the PR's files
     with `git show origin/pr-<n>:<path>` and `gh pr diff`, never from a
     checkout, which would follow a symlink the fork added;
   - it runs none of the PR's code, and treats everything the PR carries

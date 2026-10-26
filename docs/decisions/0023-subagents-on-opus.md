@@ -75,10 +75,12 @@ review, and hard building gets one step below (#63).
   - `CLAUDE_CODE_SUBAGENT_MODEL` replaces the caller's model when a
     subagent sets none;
   - a `maxEffortLevel` setting, or an organization's cap, clamps `max`
-    and anything above the cap.
+    and anything above the cap;
+  - an `availableModels` allowlist that leaves Opus out gives a subagent
+    the newest allowed Opus, or the caller's model.
 
-  None is set on the maintainer's VM (2026-10-26). An organization cap
-  can't be seen from there.
+  None is set on the maintainer's VM (2026-10-26). The organization's
+  cap, cached in `~/.claude.json`, is empty there.
 - **Speed.** Higher effort takes longer. A review round took 2 to 15
   minutes on #60 and #62.
 - **Forks ignore it.** The Agent tool's `fork` type always inherits the

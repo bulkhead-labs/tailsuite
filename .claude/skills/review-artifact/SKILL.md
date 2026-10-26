@@ -43,7 +43,9 @@ use `origin/pr-<n>`.
   `gh pr view <n> --json comments --jq '.comments[]|select(.body|startswith("## pr-reviewer"))|.url'`.
 - CI on the head: `gh run list --branch <branch> -L 1`.
 - Issues the work filed, or whose bodies it changed.
-- **The milestone it belongs to**, for the map at the top:
+- **The milestone it belongs to**, for the map at the top: the closed
+  issues' milestone, or, when they have none (process work), the plan's
+  current milestone.
   `gh api 'repos/bulkhead-labs/tailsuite/issues?milestone=<number>&state=all&per_page=100' --jq '.[]|select(.pull_request|not)|[.number,.state,.title]|@tsv'`,
   `docs/plan.md`'s order for that milestone, and the maintainer
   prerequisites that block any of it.

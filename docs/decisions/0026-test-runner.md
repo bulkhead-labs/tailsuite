@@ -97,6 +97,10 @@ The needs become `needs:` labels.
   | `refused` | UNKNOWN: nothing listened, though lab.yaml says something does |
   | any other `error` | UNKNOWN |
 
+- **A block the target's filter contradicts isn't a deny.** If the
+  target's compiled filter certainly admits the source on that port, to
+  the target's address, a blocked half is UNKNOWN: a lost packet or a peer
+  not yet set up, not the policy.
 - **A blocked half needs its positive control** (0001), once per target
   and port:
   1. from a lab node the target's compiled filter certainly admits on
@@ -192,4 +196,7 @@ The needs become `needs:` labels.
   any path to it works.
 - **UDP halves are UNKNOWN** until #56.
 - **Warnings about engines** cover only the engine the run used, until a
-  second engine exists (#6).
+  second engine exists (#6). For the same reason, unproven results don't
+  yet name a profile and engine that could prove them, as 0015 asks; #6
+  adds that.
+- **An SSH test's port defaults to 22.**

@@ -211,6 +211,13 @@ func TestLowerRefuses(t *testing.T) {
 		"IPv4 disabled":   `{"disableIPv4": true, "grants": [{"src": ["*"], "dst": ["*"], "ip": ["*"]}]}`,
 		"no rules left":   `{"ipsets": {"ipset:a": ["add 192.0.2.0/24"]}, "grants": [{"src": ["*"], "dst": ["ipset:a"], "ip": ["*"]}]}`,
 		"users and src":   `{"acls": [{"action": "accept", "src": ["*"], "users": ["*"], "dst": ["*:*"]}]}`,
+		// headscale reads null as absent (allow-all); the marker would
+		// make the lab deny everything.
+		"null acls":   `{"acls": null}`,
+		"null grants": `{"grants": null, "acls": [{"action": "accept", "src": ["*"], "dst": ["*:*"]}]}`,
+		// The wait couldn't tell this rule from the marker.
+		"marker address": `{"hosts": {"doc": "192.0.2.77"}, "grants": [{"src": ["doc"], "dst": ["*"], "ip": ["*"]}]}`,
+		"marker prefix":  `{"grants": [{"src": ["192.0.2.0/24"], "dst": ["*"], "ip": ["*"]}]}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			l := lower(t, src)
@@ -335,7 +342,7 @@ func TestLowerKeepsTheFilesSpelling(t *testing.T) {
 
 func TestLowerTailnetAddresses(t *testing.T) {
 	l := lower(t, `{
-	"hosts": {"db-host": "100.64.0.10", "lan": "192.0.2.0/24"},
+	"hosts": {"db-host": "100.64.0.10", "lan": "198.51.100.0/24"},
 	"grants": [
 		{"src": ["100.64.0.0/10"], "dst": ["db-host"], "ip": ["tcp:5432"]},
 		{"src": ["*"], "dst": ["lan"], "ip": ["*"]},
@@ -361,9 +368,33 @@ func TestLowerTailnetAddresses(t *testing.T) {
 			t.Errorf("%s marked inexact", ptr)
 		}
 	}
+	// A rule naming an address in the range could touch any lab device:
+	// headscale decides who holds it.
+	if c := ch["/grants/0/dst/0"]; !slices.Equal(c.Dst, []string{"*"}) || !slices.Equal(c.Src, []string{"100.64.0.0/10"}) {
+		t.Errorf("scope %+v", c)
+	}
 	// Inexact places are kept.
 	if p := typed(t, l.Policy); len(p.Grants) != 4 {
 		t.Errorf("grants %d", len(p.Grants))
+	}
+}
+
+func TestLowerEmptyPostureListsAreExact(t *testing.T) {
+	l := lower(t, `{"defaultSrcPosture": [], "grants": [{"src": ["*"], "dst": ["*"], "ip": ["*"], "srcPosture": []}], "ssh": [{"action": "accept", "src": ["tag:a"], "dst": ["tag:b"], "users": ["root"], "srcPosture": []}]}`)
+	if l.Refused() || len(l.Changes) != 0 || len(l.Rewrites) != 3 {
+		t.Fatalf("refused %v changes %+v rewrites %+v", l.Err(), l.Changes, l.Rewrites)
+	}
+	if strings.Contains(string(l.Policy), "srcPosture") || strings.Contains(string(l.Policy), "defaultSrcPosture") {
+		t.Errorf("%s", l.Policy)
+	}
+}
+
+func TestLowerNotesIgnoredPins(t *testing.T) {
+	tn := tailnet(t, `{"grants": [{"src": ["*"], "dst": ["*"], "ip": ["*"]}]}`)
+	tn.Devices = []model.Device{{Name: "db", Tags: []string{"tag:db"}, IPv4: "100.64.0.10"}}
+	l, err := Lower(tn)
+	if err != nil || len(l.Notes) != 1 || !strings.Contains(l.Notes[0], "#67") {
+		t.Fatalf("%+v %v", l.Notes, err)
 	}
 }
 

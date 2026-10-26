@@ -60,6 +60,11 @@ func WithMarker(src []byte, port uint16) ([]byte, []PatchOp, error) {
 	}
 	_, hasACLs := f.FilePointer("/acls")
 	grants, hasGrants := f.FilePointer("/grants")
+	// A section counts only as a list: null is read differently by
+	// different engines, and Lower refuses it.
+	if (hasACLs && f.Policy.ACLs == nil) || (hasGrants && f.Policy.Grants == nil) {
+		return nil, nil, errors.New("the policy has an acls or grants section that isn't a list")
+	}
 	var ops []PatchOp
 	switch {
 	case hasGrants:
@@ -102,7 +107,7 @@ func ApplyPatch(src []byte, ops []PatchOp) ([]byte, error) {
 // NewMarkerPort picks a port for the next apply's marker that no node's
 // current filter has a marker on. So a wait can't be satisfied by an
 // earlier apply's filter, even one made by another tailsuite process.
-func NewMarkerPort(current []Filter) uint16 {
+func NewMarkerPort(current []Filter) (uint16, error) {
 	used := map[uint16]bool{}
 	for _, f := range current {
 		for _, r := range f.Rules {
@@ -115,12 +120,16 @@ func NewMarkerPort(current []Filter) uint16 {
 			}
 		}
 	}
-	for {
-		p := uint16(markerPortMin + rand.IntN(markerPortMax-markerPortMin)) //nolint:gosec // G404, G115: a port, not a secret
-		if !used[p] {
-			return p
+	var free []uint16
+	for p := markerPortMin; p < markerPortMax; p++ {
+		if !used[uint16(p)] {
+			free = append(free, uint16(p))
 		}
 	}
+	if len(free) == 0 {
+		return 0, fmt.Errorf("no port left for the readiness marker: every port from %d to %d holds one", markerPortMin, markerPortMax-1)
+	}
+	return free[rand.IntN(len(free))], nil //nolint:gosec // G404: a port, not a secret
 }
 
 func isMarker(r FilterRule) bool {

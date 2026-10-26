@@ -59,9 +59,23 @@ func Lower(t model.Tailnet) (engine.Lowering, error) {
 	for _, u := range l.f.Unknown {
 		l.refuse("", u.Pointer, fmt.Sprintf("headscale rejects any policy key it doesn't know, and this one is %s", u.Reason))
 	}
-	if len(l.p.DefaultSrcPosture) > 0 {
+	switch {
+	case len(l.p.DefaultSrcPosture) > 0:
 		l.refuse(engine.Posture, l.ptr("/defaultSrcPosture"), "defaultSrcPosture applies to every rule, and headscale has no posture")
+	case l.has("/defaultSrcPosture"):
+		l.out.Rewrites = append(l.out.Rewrites, engine.Rewrite{Pointer: l.ptr("/defaultSrcPosture"), Was: "defaultSrcPosture: []", Now: "(removed)", Reason: "an empty list changes nothing, and headscale doesn't read the key"})
+		l.remove("/defaultSrcPosture", "an empty list changes nothing")
 	}
+	// A section written as null: headscale reads it as absent, so a policy
+	// with no other section allows everything there. Tailscale's reading
+	// isn't checked, and the marker would make the lab deny everything.
+	if l.has("/acls") && l.p.ACLs == nil {
+		l.refuse("", l.ptr("/acls"), "acls is null, which no engine's reading has been checked for; write [] to deny everything, or leave the section out")
+	}
+	if l.has("/grants") && l.p.Grants == nil {
+		l.refuse("", l.ptr("/grants"), "grants is null, which no engine's reading has been checked for; write [] to deny everything, or leave the section out")
+	}
+	l.markerSource()
 	if l.p.DisableIPv4 {
 		l.refuse(engine.IPv4Disabled, l.ptr("/disableIPv4"), "the tailnet has IPv4 disabled, and the lab's probes are IPv4")
 	}
@@ -94,6 +108,11 @@ func Lower(t model.Tailnet) (engine.Lowering, error) {
 		l.refuse("", "", "every rule in acls and grants is left out of headscale's copy, some because they need what headscale can't do; with none left, headscale would deny everything, which isn't the policy")
 	}
 
+	for _, d := range t.Devices {
+		if d.IPv4 != "" {
+			l.out.Notes = append(l.out.Notes, fmt.Sprintf("device %s's pinned address %s isn't honoured on headscale until #67; it gets whatever headscale assigns", d.Name, d.IPv4))
+		}
+	}
 	l.tagOwners()
 	l.autoApprovers()
 	l.sections()
@@ -183,6 +202,11 @@ func (l *lowerer) rule(section string, i int) ruleOutcome {
 			if rl.hostPort {
 				v = stripPort(v)
 			}
+			// headscale decides which lab device holds an address in the
+			// tailnet's range, so such an address could be any of them.
+			if _, ok := l.tailnetAddress(v); ok {
+				v = "*"
+			}
 			if rl.src {
 				src = append(src, v)
 			} else if rl.field != "via" {
@@ -247,24 +271,15 @@ func (l *lowerer) rule(section string, i int) ruleOutcome {
 	// Conditions and keys headscale lacks: removed, not the rule (0016).
 	switch section {
 	case "grants":
-		if len(l.p.Grants[i].SrcPosture) > 0 {
-			change(engine.Removed, engine.Posture, base+"/srcPosture", "headscale has no posture")
-			l.remove(base+"/srcPosture", "headscale has no posture; the tests this rule could touch are REFUSED")
-		}
+		l.srcPosture(base, len(l.p.Grants[i].SrcPosture), change)
 		if len(l.p.Grants[i].App) > 0 {
 			change(engine.Inexact, engine.AppGrants, base+"/app", "the lab doesn't exercise application capabilities")
 		}
 	case "acls":
-		if len(l.p.ACLs[i].SrcPosture) > 0 {
-			change(engine.Removed, engine.Posture, base+"/srcPosture", "headscale has no posture")
-			l.remove(base+"/srcPosture", "headscale has no posture; the tests this rule could touch are REFUSED")
-		}
+		l.srcPosture(base, len(l.p.ACLs[i].SrcPosture), change)
 	case "ssh":
 		r := l.p.SSH[i]
-		if len(r.SrcPosture) > 0 {
-			change(engine.Removed, engine.Posture, base+"/srcPosture", "headscale has no posture")
-			l.remove(base+"/srcPosture", "headscale has no posture")
-		}
+		l.srcPosture(base, len(r.SrcPosture), change)
 		if l.has(base + "/enforceRecorder") {
 			change(engine.Removed, engine.SSHRecording, base+"/enforceRecorder", "headscale has no session recording")
 			l.remove(base+"/enforceRecorder", "headscale has no session recording")
@@ -307,6 +322,45 @@ func (l *lowerer) rule(section string, i int) ruleOutcome {
 		}
 	}
 	return ruleKept
+}
+
+// srcPosture removes a rule's posture condition: the condition, not the
+// rule (0016). An empty list changes nothing, so its removal is exact.
+func (l *lowerer) srcPosture(base string, n int, change func(engine.ChangeKind, engine.Capability, string, string)) {
+	switch {
+	case n > 0:
+		change(engine.Removed, engine.Posture, base+"/srcPosture", "headscale has no posture")
+		l.remove(base+"/srcPosture", "headscale has no posture; the tests this rule could touch are REFUSED")
+	case l.has(base + "/srcPosture"):
+		l.out.Rewrites = append(l.out.Rewrites, engine.Rewrite{Pointer: l.ptr(base + "/srcPosture"), Was: "srcPosture: []", Now: "(removed)", Reason: "an empty list changes nothing, and headscale doesn't read the key"})
+		l.remove(base+"/srcPosture", "an empty list changes nothing")
+	}
+}
+
+// markerSource refuses a policy whose rules name the readiness marker's
+// source address: the wait couldn't tell such a rule from the marker.
+func (l *lowerer) markerSource() {
+	marker := netip.MustParsePrefix(engine.MarkerSource).Addr()
+	for _, r := range l.f.References() {
+		if r.Role != "src" && r.Role != "dst" {
+			continue
+		}
+		a := r.Value
+		if h, ok := l.p.Hosts[a]; ok {
+			a = h
+		}
+		var p netip.Prefix
+		if ad, err := netip.ParseAddr(a); err == nil {
+			p = netip.PrefixFrom(ad, ad.BitLen())
+		} else if q, err := netip.ParsePrefix(a); err == nil {
+			p = q
+		} else {
+			continue
+		}
+		if p.Contains(marker) {
+			l.refuse("", r.Pointer, "the rule names "+r.Value+", which holds "+marker.String()+", tailsuite's readiness marker's source; the lab couldn't tell the rule from the marker")
+		}
+	}
 }
 
 // tailnetAddress says whether a name is, or is a host for, an address or
@@ -470,6 +524,9 @@ func (l *lowerer) autoApprovers() {
 	}
 	if l.has("/autoApprovers/exitNode") {
 		lower("/autoApprovers/exitNode", l.p.AutoApprovers.ExitNode)
+		// A removed approver names no identities, so it refuses no test:
+		// true while routes are refused (M3). When routes are built, it
+		// must name the approvers' devices.
 	}
 	if l.has("/autoApprovers/services") {
 		l.out.Changes = append(l.out.Changes, engine.Change{Pointer: l.ptr("/autoApprovers/services"), Kind: engine.Removed, Capability: engine.Services, Reason: "headscale has no services"})

@@ -491,7 +491,10 @@ func (l *Lab) Apply(ctx context.Context, pol []byte) ([]byte, error) {
 		}
 		current[i] = f
 	}
-	port := engine.NewMarkerPort(current)
+	port, err := engine.NewMarkerPort(current)
+	if err != nil {
+		return nil, fmt.Errorf("headscale: %w", err)
+	}
 	withMarker, ops, err := engine.WithMarker(pol, port)
 	if err != nil {
 		return nil, fmt.Errorf("headscale: %w", err)

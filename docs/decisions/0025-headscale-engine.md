@@ -83,7 +83,10 @@ code:
   - it signs headscale's certificate, and its key is then dropped, so
     nothing can issue another;
   - nodes trust it through `SSL_CERT_FILE`, which replaces Go's system
-    roots, so they trust it and nothing else.
+    roots. tailscaled also falls back to its own baked-in Let's Encrypt
+    roots, for any host (`net/tlsdial`, v1.102.5), so a node trusts the
+    lab CA and those. What keeps a node's TLS inside the lab is the
+    internal network, not the trust store.
 - **DERP is headscale's embedded server only**, over the same TLS. No
   DERP map comes from Tailscale (`derp.urls: []`).
 - **Nothing leaves the lab:** no update checks, `logtail` off, no DNS
@@ -102,7 +105,9 @@ code:
   tailnet node, and its image has no shell.
 - **The policy is applied in database mode** through headscale's CLI,
   run through the sandbox's exec channel, with the policy on stdin. No
-  change restarts headscale, and nothing listens for an API.
+  change restarts headscale. headscale still serves its REST API on its
+  listener and gRPC on its own loopback, behind API keys, but the lab
+  never makes a key: the CLI needs none.
 - **A policy headscale rejects is REFUSED**, naming headscale's message,
   but only when headscale is otherwise healthy. A CLI that can't reach the
   server fails the same way, and that's an error (exit 3).
@@ -116,18 +121,20 @@ references, in the file's own spelling (0014, 0022):
 | In the user's policy | In headscale's copy | Recorded as |
 |---|---|---|
 | A key the typed copy doesn't understand, or a duplicate key | The run is REFUSED, naming the key: headscale rejects unknown fields | Refusal |
-| `defaultSrcPosture` | The run is REFUSED: it applies to every rule (0016) | Refusal |
+| `defaultSrcPosture` | The run is REFUSED: it applies to every rule (0016). An empty list is removed, exactly | Refusal, or Rewrite |
+| `acls` or `grants` written as `null` | The run is REFUSED: headscale reads it as absent (allow-all), Tailscale's reading isn't checked, and the marker would make the lab deny everything | Refusal |
+| A rule naming an address or prefix that holds the marker's source, `192.0.2.77` | The run is REFUSED: the wait couldn't tell the rule from the marker | Refusal |
 | `disableIPv4: true` | The run is REFUSED: the lab's probes are IPv4 | Refusal |
 | `tests`, `sshTests` | Removed: tailsuite runs them itself (0015) | Change, touching no test |
 | `ipsets`, and every rule that names an IP set | Removed | Change: the rule's tests REFUSED |
 | A rule naming `autogroup:shared` | Removed | Change |
-| `postures`; a rule's `srcPosture` | Removed: the condition, not the rule (0016) | Change: the rule's tests REFUSED |
+| `postures`; a rule's `srcPosture` | Removed: the condition, not the rule (0016). An empty `srcPosture` is removed, exactly | Change: the rule's tests REFUSED; or Rewrite |
 | SSH `recorder`, `enforceRecorder` | Removed | Change |
 | `nodeAttrs` | Removed, each entry recorded | Change: tests from or to its targets REFUSED |
 | `attrConfig`, `externalTailnets` | Removed | Change: tests on the devices they name REFUSED |
 | `autoApprovers.services` | Removed | Change |
 | A grant's `app` | Kept | Change, inexact |
-| An address inside the tailnet's range, short of the whole range | Kept | Change, inexact: headscale can't give a device production's address |
+| An address inside the tailnet's range, short of the whole range | Kept | Change, inexact: headscale can't give a device production's address. The change names `*` in its place: headscale decides which lab device holds the address, so it could be any |
 | `derpMap`, `oneCGNATRoute`, `disableIPv4: false` | Removed: they don't change who reaches what | Rewrite |
 | An ACL's legacy `users` and `ports` | Moved to `src` and `dst` | Rewrite |
 | Role autogroups as tag owners | The lab's admin, `lab-admin@tailsuite.invalid` | Rewrite |
@@ -189,7 +196,8 @@ needs a restart. So:
   no node holds or can be given it, on either engine, and no rule of the
   user's in the tailnet's range can cover it.
 - **The marker's port is random** in 41000–60999, and never one a node's
-  current filter already has a marker on. So a wait can't be satisfied by
+  current filter already has a marker on. With none left, `Apply` fails
+  (exit 3) rather than waiting. So a wait can't be satisfied by
   an earlier apply's filter, even one another tailsuite process made.
 - **The default is made explicit only for a policy with neither section**
   (0016, 0021). `"grants": []` and `"acls": []` get the marker alone.
@@ -234,8 +242,8 @@ with its positive control (0001).
   path to the control plane, like the agent's control (0019).
 - **A name-constrained CA whose key is gone** can't be used to vouch for
   anything else, even by someone holding a lab's files.
-- **`SSL_CERT_FILE`** makes the lab CA the nodes' only root, so a node
-  can't reach anything over TLS that the lab didn't issue.
+- **`SSL_CERT_FILE`** makes the lab CA the nodes' system root, so the
+  control plane's certificate needs no public CA.
 - **Refusing on any unknown key** follows from headscale's own
   behaviour: it would reject the policy anyway, and a refusal from
   `Lower` names the key before anything starts.
@@ -262,10 +270,14 @@ with its positive control (0001).
     on every node;
   - `{"grants": []}`: the filter empties and the port closes, from a
     known state where it answered;
-  - a node without the lab CA can't join, and tailscaled says
+  - a node without the lab CA can't join
+    (`TestNodesWithoutTheLabCACantJoin`), and tailscaled says
     `x509: certificate signed by unknown authority`;
-  - a policy headscale rejects is REFUSED, and the last good policy
-    stays in force;
+  - a policy headscale rejects at parsing (an unknown field) is REFUSED,
+    and the last good policy stays in force: what it denied is still
+    denied, beside its positive control, and every filter keeps the last
+    apply's marker. A policy rejected after it's installed, which
+    0.29.5's fix covers, isn't tested;
   - research 0005's third policy, lowered, is accepted by headscale, and
     its surviving grant carries traffic;
   - a refused lowering isn't started.

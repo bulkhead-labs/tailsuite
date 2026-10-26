@@ -101,6 +101,13 @@ func TestWithMarker(t *testing.T) {
 			t.Fatalf("%+v", p)
 		}
 	})
+	t.Run("a null section", func(t *testing.T) {
+		for _, src := range []string{`{"acls": null}`, `{"grants": null}`} {
+			if _, _, err := WithMarker([]byte(src), 41234); err == nil {
+				t.Errorf("%s: marked", src)
+			}
+		}
+	})
 	t.Run("the file's spelling", func(t *testing.T) {
 		out, ops, err := WithMarker([]byte("// kept\n{\"Grants\": [{\"src\": [\"*\"], \"dst\": [\"*\"], \"ip\": [\"*\"]}]}"), 41234)
 		if err != nil {
@@ -117,8 +124,14 @@ func TestNewMarkerPortAvoidsCurrentMarkers(t *testing.T) {
 	for p := markerPortMin; p < markerPortMax-1; p++ {
 		current = append(current, Filter{Rules: []FilterRule{{SrcIPs: []string{"192.0.2.77"}, DstPorts: []DstPort{{IP: "*", Ports: PortRange{uint16(p), uint16(p)}}}}}})
 	}
-	if got := NewMarkerPort(current); got != markerPortMax-1 {
-		t.Errorf("got %d, the only free port is %d", got, markerPortMax-1)
+	if got, err := NewMarkerPort(current); err != nil || got != markerPortMax-1 {
+		t.Errorf("got %d, %v; the only free port is %d", got, err, markerPortMax-1)
+	}
+	// A rule from the marker's address on every port leaves none: an
+	// error, not a loop.
+	all := []Filter{{Rules: []FilterRule{{SrcIPs: []string{"192.0.2.77"}, DstPorts: []DstPort{{IP: "*", Ports: PortRange{0, 65535}}}}}}}
+	if _, err := NewMarkerPort(all); err == nil {
+		t.Error("a port with every port taken")
 	}
 }
 

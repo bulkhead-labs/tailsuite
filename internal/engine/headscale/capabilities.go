@@ -25,7 +25,7 @@ var capabilities = engine.Capabilities{
 	{Capability: engine.Services, Support: engine.Refused},
 	{Capability: engine.ExternalTailnets, Support: engine.Refused},
 	{Capability: engine.AppGrants, Support: engine.Refused},
-	{Capability: engine.PinnedIPv4, Support: engine.Refused, Note: "headscale 0.29.5 can't set a node's address: no API does, and its database can't be edited without a restart (decision 0025, #67)"},
+	{Capability: engine.PinnedIPv4, Support: engine.Refused, Target: engine.Native, Milestone: "M2", Note: "headscale 0.29.5 can't set a node's address: no API does, and its database can't be edited without a restart (decision 0025, #67)"},
 	{Capability: engine.PinnedIPv6, Support: engine.Refused},
 	{Capability: engine.CompiledFilter, Support: engine.Native},
 	{Capability: engine.IPv4Disabled, Support: engine.Refused},

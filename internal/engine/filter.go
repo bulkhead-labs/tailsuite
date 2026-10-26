@@ -9,7 +9,9 @@ import (
 )
 
 // Filter is a node's compiled packet filter, as tailscaled holds it
-// (`tailscale debug netmap`'s PacketFilterRules).
+// (`tailscale debug netmap`'s PacketFilterRules). Rules' CapGrant entries
+// (application capabilities) aren't read: app grants are refused, so no
+// result relies on them. The conformance check (#42) must read them.
 type Filter struct {
 	Rules []FilterRule `json:"rules"`
 }

@@ -323,8 +323,11 @@ func (r *runner) half(ctx context.Context, pt suite.Planned, pp suite.PlannedPai
 	// A block the target's own filter says shouldn't happen isn't the
 	// policy's: it's the lab (a peer not yet set up, a lost packet). It
 	// can't be a proven deny.
-	if h.Saw == sawBlocked && slices.Contains(r.admitted(ctx, pp.To, uint16(pt.Port)), pp.From) { //nolint:gosec // G115: checked when the suite loaded
-		h.Saw, h.Reason = sawUnknown, "blocked, but "+pp.To+"'s compiled filter admits "+pp.From+" on that port, so the block isn't the policy's"
+	if h.Saw == sawBlocked {
+		f, err := r.filter(ctx, pp.To)
+		if why := labsFault(f, err, uint16(pt.Port), r.nodes[pp.From].IPv4, r.nodes[pp.To].IPv4); why != "" { //nolint:gosec // G115: checked when the suite loaded
+			h.Saw, h.Reason = sawUnknown, "blocked, but "+why+", so the block may not be the policy's"
+		}
 	}
 	if h.Saw == sawBlocked {
 		c := r.control(ctx, pp, pt.Port)
@@ -418,23 +421,62 @@ func (r *runner) control(ctx context.Context, pp suite.PlannedPair, port int) *C
 // admitted lists the lab nodes whose addresses the target's compiled
 // filter admits on port, by name.
 func (r *runner) admitted(ctx context.Context, to string, port uint16) []string {
-	r.mu.Lock()
-	f, ok := r.filters[to]
-	r.mu.Unlock()
-	if !ok {
-		var err error
-		if f, err = r.cfg.Lab.CompiledFilter(ctx, r.nodes[to]); err != nil {
-			return nil
-		}
-		r.mu.Lock()
-		r.filters[to] = f
-		r.mu.Unlock()
+	f, err := r.filter(ctx, to)
+	if err != nil {
+		return nil
 	}
 	addrs := map[string]netip.Addr{}
 	for name, n := range r.nodes {
 		addrs[name] = n.IPv4
 	}
 	return filterAdmits(f, port, addrs, r.nodes[to].IPv4)
+}
+
+// filter reads a node's compiled filter, once per run.
+func (r *runner) filter(ctx context.Context, name string) (engine.Filter, error) {
+	r.mu.Lock()
+	f, ok := r.filters[name]
+	r.mu.Unlock()
+	if ok {
+		return f, nil
+	}
+	f, err := r.cfg.Lab.CompiledFilter(ctx, r.nodes[name])
+	if err != nil {
+		return f, err
+	}
+	r.mu.Lock()
+	r.filters[name] = f
+	r.mu.Unlock()
+	return f, nil
+}
+
+// labsFault says why a blocked probe may be the lab's fault rather than
+// the policy's, or "" when the target's filter rules that out. It gives
+// the benefit of the doubt toward the lab: an unreadable filter, or a rule
+// that might admit the source (a source or destination it can't parse),
+// is enough. A deny is proven only when the filter shows nothing that
+// could have let the probe in.
+func labsFault(f engine.Filter, err error, port uint16, from, to netip.Addr) string {
+	if err != nil {
+		return "the target's compiled filter couldn't be read"
+	}
+	for _, fr := range f.Rules {
+		if len(fr.IPProto) > 0 && !slices.Contains(fr.IPProto, 6) {
+			continue
+		}
+		if !fr.SrcAdmits(from) {
+			continue
+		}
+		for _, d := range fr.DstPorts {
+			if d.Ports.First > port || port > d.Ports.Last {
+				continue
+			}
+			if d.IP == "*" || (engine.FilterRule{SrcIPs: []string{d.IP}}).SrcAdmits(to) {
+				return "the target's compiled filter may admit the source on that port"
+			}
+		}
+	}
+	return ""
 }
 
 // filterAdmits lists, by name, the nodes a filter certainly admits on a

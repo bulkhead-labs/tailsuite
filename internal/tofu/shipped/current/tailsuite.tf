@@ -29,15 +29,25 @@ resource "tailscale_acl" "policy" {
   acl = file("${path.module}/../policy.hujson")
 }
 
-# Devices are found by name, never by ID: the lab's devices and
-# production's have different IDs and the same names.
-data "tailscale_device" "tagged" {
-  for_each = { for name, d in var.devices : name => d if length(d.tags) > 0 }
-  name     = each.key
+# Devices are found by their short MagicDNS name, never by ID or by the
+# tailnet's domain: the lab's devices and production's have different
+# IDs and domains, and the same short names. A device's full name is
+# "<short name>.<tailnet domain>", so its short name and a dot are a
+# prefix no other device's name has.
+data "tailscale_devices" "tagged" {
+  for_each    = { for name, d in var.devices : name => d if length(d.tags) > 0 }
+  name_prefix = "${each.key}."
+
+  lifecycle {
+    postcondition {
+      condition     = length(self.devices) == 1
+      error_message = "Want exactly one device named ${each.key}; found ${length(self.devices)}."
+    }
+  }
 }
 
 resource "tailscale_device_tags" "tagged" {
-  for_each  = data.tailscale_device.tagged
-  device_id = each.value.node_id
+  for_each  = data.tailscale_devices.tagged
+  device_id = one(each.value.devices).node_id
   tags      = var.devices[each.key].tags
 }

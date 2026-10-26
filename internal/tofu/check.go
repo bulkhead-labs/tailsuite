@@ -24,12 +24,15 @@ var varsExts = []string{".tfvars.json", ".tfvars"}
 var allowedBlocks = []string{"terraform", "provider", "variable", "locals", "output", "import", "data", "ephemeral"}
 
 // Data sources and ephemeral resources that can run commands or send
-// requests, so they're refused even though they only read.
-var refusedSources = []string{"external", "http"}
+// requests, so they're refused even though they only read: hashicorp's
+// external, http and local_command (hashicorp/local 2.6.0 and later).
+var refusedSources = []string{"external", "http", "local_command"}
 
-// The resources tailsuite.tf manages: an import block may only target
-// these.
-var moduleResources = []string{"tailscale_acl.policy", "tailscale_device_tags.tagged"}
+// The one resource a file beside tailsuite.tf may import into: the
+// policy, which the provider doesn't take over without an import or
+// overwrite_existing_content. Importing a device's tags would make a
+// replace in production that the lab never does.
+var importable = []string{"tailscale_acl.policy"}
 
 // CheckProject checks that a project's tofu/ folder applies only
 // tailsuite's module, by the file rules of the OpenTofu tailsuite pins
@@ -41,11 +44,18 @@ func CheckProject(dir string) []string {
 	if err != nil {
 		return []string{fmt.Sprintf("tofu/: %v", err)}
 	}
+	// OpenTofu skips hidden configuration files, but loads hidden
+	// variables files (*.auto.tfvars by suffix alone), so only the first
+	// are skipped here.
 	names := map[string]bool{}
 	for _, e := range entries {
-		if !e.IsDir() && !ignored(e.Name()) {
-			names[e.Name()] = true
+		if e.IsDir() {
+			continue
 		}
+		if _, ext := split(e.Name()); ignored(e.Name()) && !slices.Contains(varsExts, ext) {
+			continue
+		}
+		names[e.Name()] = true
 	}
 	var problems []string
 	add := func(format string, a ...any) { problems = append(problems, fmt.Sprintf(format, a...)) }
@@ -75,9 +85,8 @@ func CheckProject(dir string) []string {
 				add("tofu/%s is an override file, which can change what tailsuite.tf applies", n)
 				continue
 			}
-			if ext == ".tf" && names[base+".tofu"] || ext == ".tf.json" && names[base+".tofu.json"] {
-				continue // OpenTofu loads the .tofu twin instead
-			}
+			// A .tf beside its .tofu twin is checked too: OpenTofu skips
+			// it, but Terraform, which reads no .tofu file, applies it.
 			problems = append(problems, checkConfig(dir, n)...)
 		case slices.Contains(varsExts, ext):
 			problems = append(problems, checkVars(dir, n)...)
@@ -167,6 +176,8 @@ func checkConfig(dir, name string) []string {
 			problems = append(problems, fmt.Sprintf("%s: an %q %s source can run commands or send requests", at, b.Labels[0], b.Type))
 		case b.Type == "import":
 			problems = append(problems, checkImport(at, b)...)
+		case b.Type == "terraform":
+			problems = append(problems, checkEncryption(at, b.Body)...)
 		}
 	}
 	return problems
@@ -190,10 +201,34 @@ func checkImport(at string, b *hcl.Block) []string {
 	if a, ok := tr[1].(hcl.TraverseAttr); ok {
 		addr += "." + a.Name
 	}
-	if !slices.Contains(moduleResources, addr) {
-		return []string{fmt.Sprintf("%s: imports into %s, which tailsuite.tf doesn't manage", at, addr)}
+	if !slices.Contains(importable, addr) {
+		return []string{fmt.Sprintf("%s: imports into %s; a file beside tailsuite.tf may import only into %s", at, addr, strings.Join(importable, ", "))}
 	}
 	return nil
+}
+
+var (
+	terraformSchema  = &hcl.BodySchema{Blocks: []hcl.BlockHeaderSchema{{Type: "encryption"}}}
+	encryptionSchema = &hcl.BodySchema{Blocks: []hcl.BlockHeaderSchema{
+		{Type: "key_provider", LabelNames: []string{"type", "name"}},
+		{Type: "method", LabelNames: []string{"type", "name"}},
+	}}
+)
+
+// checkEncryption refuses OpenTofu's external key provider and method in
+// a terraform block's state encryption: both run a command.
+func checkEncryption(at string, body hcl.Body) []string {
+	tf, _, _ := body.PartialContent(terraformSchema)
+	var problems []string
+	for _, enc := range tf.Blocks {
+		content, _, _ := enc.Body.PartialContent(encryptionSchema)
+		for _, b := range content.Blocks {
+			if b.Labels[0] == "external" {
+				problems = append(problems, fmt.Sprintf("%s: an external %s in state encryption runs a command", at, strings.ReplaceAll(b.Type, "_", " ")))
+			}
+		}
+	}
+	return problems
 }
 
 // checkVars checks a variables file: tailnet.auto.tfvars sets only what

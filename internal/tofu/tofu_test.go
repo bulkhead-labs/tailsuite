@@ -6,6 +6,9 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclparse"
 )
 
 func TestShipped(t *testing.T) {
@@ -85,12 +88,20 @@ import {
 		"an external data source":          {map[string]string{"x.tf": `data "external" "x" { program = ["sh"] }`}, `"external" data`},
 		"an http data source":              {map[string]string{"x.tf": `data "http" "x" { url = "https://example.com" }`}, `"http" data`},
 		"a moved block":                    {map[string]string{"x.tf": "moved {\n  from = a.b\n  to = c.d\n}\n"}, "a moved block"},
-		"an import elsewhere":              {map[string]string{"x.tf": "import {\n  to = tailscale_dns_nameservers.x\n  id = \"x\"\n}\n"}, "doesn't manage"},
+		"an import elsewhere":              {map[string]string{"x.tf": "import {\n  to = tailscale_dns_nameservers.x\n  id = \"x\"\n}\n"}, "may import only into"},
 		"values for something else":        {map[string]string{ValuesFile: "devices = {}\nregion = \"x\"\n"}, `sets "region"`},
 		"another file overriding values":   {map[string]string{"zz.auto.tfvars": "devices = {}\n"}, "lives only in"},
 		"a -var-file overriding values":    {map[string]string{"prod.tfvars.json": `{"devices": {}}`}, "lives only in"},
 		"another file's own variables":     {map[string]string{"prod.tfvars": "region = \"x\"\n"}, ""},
-		"a .tf beside its .tofu twin":      {map[string]string{"x.tf": `resource "a" "b" {}`, "x.tofu": "locals {}\n"}, ""},
+		"a .tf beside its .tofu twin":      {map[string]string{"x.tf": `resource "a" "b" {}`, "x.tofu": "locals {}\n"}, "a resource block"},
+		"a hidden values file":             {map[string]string{".prod.auto.tfvars": "devices = {}\n"}, "lives only in"},
+		"a hidden configuration file":      {map[string]string{".x.tf": `resource "a" "b" {}`}, ""},
+		"a local_command data source":      {map[string]string{"x.tf": `data "local_command" "x" { command = "sh" }`}, `"local_command" data`},
+		"a local_command ephemeral":        {map[string]string{"x.tf": `ephemeral "local_command" "x" { command = "sh" }`}, `"local_command" ephemeral`},
+		"an external key provider":         {map[string]string{"x.tf": "terraform {\n  encryption {\n    key_provider \"external\" \"k\" {\n      command = [\"sh\"]\n    }\n  }\n}\n"}, "external key provider"},
+		"an external method, in JSON":      {map[string]string{"x.tf.json": `{"terraform": {"encryption": {"method": {"external": {"m": {}}}}}}`}, "external method"},
+		"a passphrase key provider":        {map[string]string{"x.tf": "terraform {\n  encryption {\n    key_provider \"pbkdf2\" \"k\" {\n      passphrase = var.p\n    }\n  }\n}\n"}, ""},
+		"an import of a device's tags":     {map[string]string{"x.tf": "import {\n  to = tailscale_device_tags.tagged[\"server\"]\n  id = \"x\"\n}\n"}, "may import only into"},
 		"a file that doesn't parse":        {map[string]string{"x.tf": "resource {"}, "x.tf"},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -173,5 +184,32 @@ func TestEnvIsAnAllowList(t *testing.T) {
 	}
 	if !slices.Equal(env, want) {
 		t.Errorf("env = %q\nwant %q", env, want)
+	}
+}
+
+// Variables must be exactly the variables the shipped module declares.
+func TestVariablesAreTheModules(t *testing.T) {
+	f, diags := hclparse.NewParser().ParseHCL(Current().Module, ModuleFile)
+	if diags.HasErrors() {
+		t.Fatal(diags)
+	}
+	content, _, diags := f.Body.PartialContent(&hcl.BodySchema{Blocks: []hcl.BlockHeaderSchema{{Type: "variable", LabelNames: []string{"name"}}}})
+	if diags.HasErrors() {
+		t.Fatal(diags)
+	}
+	var declared []string
+	for _, b := range content.Blocks {
+		declared = append(declared, b.Labels[0])
+	}
+	slices.Sort(declared)
+	if !slices.Equal(declared, Variables) {
+		t.Errorf("tailsuite.tf declares %q; Variables says %q", declared, Variables)
+	}
+}
+
+func TestLabTFEscapes(t *testing.T) {
+	got := labTF(Lab{Tailnet: "a${b}%{c}\"d", BaseURL: "https://api.example"})
+	if !strings.Contains(got, `tailnet  = "a$${b}%%{c}\"d"`) {
+		t.Errorf("lab.tf:\n%s", got)
 	}
 }

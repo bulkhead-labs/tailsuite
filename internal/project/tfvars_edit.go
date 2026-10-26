@@ -12,8 +12,8 @@ import (
 
 // SetDevices writes the devices variable into a tfvars file with hclwrite,
 // keeping everything else in it, comments included, and returns the new
-// file. The devices map itself is rewritten whole, in name order, one
-// device per line: comments inside it aren't kept, and with no devices
+// file. The devices map itself is rewritten whole, in name order:
+// comments inside it aren't kept, and with no devices
 // the variable is removed, with the comment lines directly above it. The file must read
 // with ReadTFVars first, so an edit never hides a value tailsuite
 // couldn't read.
@@ -33,10 +33,12 @@ func SetDevices(src []byte, filename string, devices map[string]TFDevice) ([]byt
 	return hclwrite.Format(f.Bytes()), nil
 }
 
-// devicesTokens is the devices map as literal HCL, one device per line:
+// devicesTokens is the devices map as literal HCL:
 //
 //	{
-//	  server = { tags = ["tag:prod"] }
+//	  server = {
+//	    tags = ["tag:prod"]
+//	  }
 //	}
 func devicesTokens(devices map[string]TFDevice) hclwrite.Tokens {
 	obj := map[string]cty.Value{}

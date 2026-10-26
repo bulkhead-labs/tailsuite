@@ -8,8 +8,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
+
+	"github.com/hashicorp/hcl/v2/hclwrite"
+	"github.com/zclconf/go-cty/cty"
 )
 
 // Lab is where a run directory's module applies: a throwaway tailnet.
@@ -31,10 +33,15 @@ terraform {
 }
 
 provider "tailscale" {
-  tailnet  = ` + strconv.Quote(l.Tailnet) + `
-  base_url = ` + strconv.Quote(l.BaseURL) + `
+  tailnet  = ` + hclString(l.Tailnet) + `
+  base_url = ` + hclString(l.BaseURL) + `
 }
 `
+}
+
+// hclString is s as an HCL string literal, with HCL's own escapes.
+func hclString(s string) string {
+	return string(hclwrite.TokensForValue(cty.StringVal(s)).Bytes())
 }
 
 // Run is a lab run's directory under the project's .tailsuite/:
@@ -143,8 +150,8 @@ func (r *Run) Env(environ []string, c Credentials) []string {
 // environment. tofu names the OpenTofu binary.
 func (r *Run) Apply(ctx context.Context, tofu string, env []string) error {
 	for _, args := range [][]string{
-		{"init", "-input=false", "-lockfile=readonly"},
-		{"apply", "-input=false", "-auto-approve"},
+		{"init", "-input=false", "-no-color", "-lockfile=readonly"},
+		{"apply", "-input=false", "-no-color", "-auto-approve"},
 	} {
 		cmd := exec.CommandContext(ctx, tofu, args...) //nolint:gosec // G204: the pinned OpenTofu, fixed arguments
 		cmd.Dir = filepath.Join(r.Dir, "tofu")

@@ -26,10 +26,14 @@ the module" for #9.
   - sets the policy with `tailscale_acl` from `file("${path.module}/../policy.hujson")`;
   - declares one variable, `devices`: a map from device name to
     `{ tags = [...] }`;
-  - finds each tagged device by name with the `tailscale_device` data
-    source (`name`), and sets its tags with `tailscale_device_tags` on
-    the device's `node_id`. Nothing refers to a device by ID, so the same
-    values fit the lab and production.
+  - finds each tagged device by its short MagicDNS name, with the
+    `tailscale_devices` data source and `name_prefix = "<name>."`, and a
+    postcondition that exactly one device matched; then sets its tags
+    with `tailscale_device_tags` on that device's `node_id`. A device's
+    full name is `<short name>.<tailnet domain>`, so the prefix fits the
+    lab and production, whose domains and IDs differ. (`tailscale_device`'s
+    `name` needs the full name, and `hostname` is the machine's, which
+    can differ from its MagicDNS name.)
 - **Its lock file** pins the provider's hashes for linux and darwin on
   amd64 and arm64, and windows on amd64, made with `tofu providers lock`.
 - **Every release's module ships in the binary**, by its SHA-256, with its
@@ -48,19 +52,29 @@ has. Each problem is a reason a lab run is REFUSED:
   `tailsuite.tf.json`, `tailsuite.tofu.json`;
 - an override file (`override.*`, `*_override.*`), in any extension;
 - in any other configuration file (`.tf`, `.tofu`, and their `.json`
-  forms; a `.tf` with a `.tofu` twin is skipped, as OpenTofu skips it),
-  any block but `terraform`, `provider`, `variable`, `locals`, `output`,
-  `import`, `data` and `ephemeral`: so `resource`, `module`, `moved`,
-  `removed`, `check` and unknown blocks are refused;
-- an `external` or `http` data source or ephemeral resource;
-- an `import` block into anything but `tailscale_acl.policy` or
-  `tailscale_device_tags.tagged`;
+  forms), any block but `terraform`, `provider`, `variable`, `locals`,
+  `output`, `import`, `data` and `ephemeral`: so `resource`, `module`,
+  `moved`, `removed`, `check` and unknown blocks are refused. A `.tf`
+  with a `.tofu` twin is checked too: OpenTofu skips it, but Terraform
+  (0004) reads no `.tofu` file and applies it;
+- an `external`, `http` or `local_command` data source or ephemeral
+  resource, which run commands or send requests;
+- OpenTofu's `external` key provider or method in a `terraform` block's
+  state encryption, which run a command;
+- an `import` block into anything but `tailscale_acl.policy`. Importing
+  a device's tags would make production replace that resource, and clear
+  the old device's tags, which the lab never does;
 - `tailnet.auto.tfvars` setting a variable `tailsuite.tf` doesn't
   declare, or any other variables file setting one it does;
 - a file that doesn't parse.
 
-Hidden files and editor leftovers are skipped, as OpenTofu skips them;
-the lock file, `.terraform/`, state and a README are never read.
+Hidden configuration files and editor leftovers are skipped, as OpenTofu
+skips them. Hidden variables files are checked: OpenTofu loads
+`*.auto.tfvars` by suffix alone, hidden or not. The lock file,
+`.terraform/`, state and a README are never read.
+
+A unit test checks that `tofu.Variables` is exactly the variables the
+shipped `tailsuite.tf` declares.
 
 ### The run directory
 
@@ -78,7 +92,9 @@ the lock file, `.terraform/`, state and a README are never read.
   throwaway tailnet's OAuth client. No `TF_VAR_*`, `TF_CLI_ARGS*` or other
   credentials pass.
 - **`Run.Apply`** runs `tofu init -lockfile=readonly`, so the shipped lock
-  file is the only one that counts, then `tofu apply -auto-approve`.
+  file is the only one that counts, then `tofu apply -auto-approve`, both
+  with `-no-color`. `lab.tf`'s strings are written with HCL's own
+  escaping.
 
 ### Editing the values
 
@@ -100,10 +116,14 @@ the lock file, `.terraform/`, state and a README are never read.
 
 ## Evidence (checked 2026-10-26)
 
-- The provider's schema (0.29.2, `tofu providers schema -json`):
-  `tailscale_device` takes `name` or `hostname` and exports `node_id`;
+- The provider's schema and source (0.29.2): `tailscale_device`'s `name`
+  is the full name, matched exactly by the API; `tailscale_devices`'
+  `name_prefix` is a prefix match on that full name
+  (`data_source_devices.go`); each device exports `node_id`;
   `tailscale_device_tags` takes `device_id` and `tags`; `tailscale_acl`
   takes `acl`.
+- OpenTofu loads a hidden `.prod.auto.tfvars` (the reviewer's run, on
+  1.13.2).
 - `tofu init -lockfile=readonly` and `tofu validate` in a run directory
   `PrepareRun` built, with its scrubbed environment, under OpenTofu
   1.13.1 (`go test -tags tofu ./internal/tofu/`): pass.

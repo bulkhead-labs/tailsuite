@@ -3,7 +3,6 @@
 **Status: designed; M1 is being built.** Built so far:
 
 - the Go module and its CI ([0018](decisions/0018-go-toolchain-flake-ci.md));
-  `cmd/tailsuite` only prints its version;
 - the Docker sandbox, `internal/sandbox`
   ([0019](decisions/0019-docker-sandbox.md));
 - the node agent, `cmd/tailsuite-agent` and `internal/agent`
@@ -15,9 +14,10 @@
 - the engine interface and the headscale engine, `internal/engine` and
   `internal/engine/headscale` ([0025](decisions/0025-headscale-engine.md));
 - the test suite and the runner, `internal/suite` and `internal/runner`
-  ([0026](decisions/0026-test-runner.md)).
-
-Nothing runs these from the command line yet (#12).
+  ([0026](decisions/0026-test-runner.md));
+- the CLI, `cmd/tailsuite`: `init`, `up`, `test`, `down` and
+  `capabilities` ([0030](decisions/0030-the-cli.md)). `up` starts the lab
+  without the local UI until #11.
 
 The rest describes the intended design, and the open questions are linked
 where they apply. Update it in the same pull request as any change to it.
@@ -60,8 +60,8 @@ where they apply. Update it in the same pull request as any change to it.
 | **Engines** | `Capabilities()`, `Lower(model)`, `Start(plan)`; the lab: `CompiledFilter(node)`, `Teardown()` | **Built:** headscale 0.29.5 (`internal/engine/headscale`): its own internal network, TLS from the run's own CA, its embedded DERP server, the policy set through its CLI with no restart. Its copy of the policy leaves out what headscale can't take, and records each change; role autogroups are lowered to lab.yaml's roles; pinned addresses aren't honoured there yet (#67). Later: the Tailscale throwaway tailnet (#6), NetBird. Each declares every capability as native, lowered (by a rewrite that's exact for every test it touches) or refused. Lowering is pure, and every test an inexact rewrite would touch is REFUSED. `Start` returns once every node's filter holds the apply's readiness marker and every peer its filters call for | [0002](decisions/0002-two-engines.md), [0016](decisions/0016-engine-interface-capabilities.md), [0021](decisions/0021-empty-grants-and-the-marker-on-tailscale.md), [0025](decisions/0025-headscale-engine.md) |
 | **Sandbox** | `CreateNetwork`, `StartNode`, `Exec`, `Teardown`; `sandbox.Run` tears down however a run ends | **Built:** Docker, through the official client (Podman through the same API). Every resource is named and labelled with its run's ID, so teardown works after a crash. Lab networks are internal unless an engine needs the internet: no route out, though a node can still reach the host through the network's gateway (#54). Docker Engines whose internal networks leak DNS (CVE-2024-29018) are refused; Podman isn't checked. Tailnet nodes get a kernel TUN device. Userspace mode is refused before start, and `CheckKernelTUN` catches it on a running node; engines call it on every tailnet node (the headscale engine does; #6). Later: a VM driver (Lima) and real macOS or Windows nodes for verify runs | [0003](decisions/0003-docker-one-container-per-node.md), [0009](decisions/0009-os-mimicry.md), [0019](decisions/0019-docker-sandbox.md) |
 | **Node agent** | Each tailsuite process opens its own sessions through the sandbox's exec channel (newline-delimited JSON), never over a network, so never the tailnet. `set_listeners` declares a node's whole set of listeners | **Built:** `tailsuite-agent`, a small stdlib-only binary and each node's entrypoint, running the node's own command under it. It owns the node's listeners, so they outlive sessions, and `up` and `test` share them. TCP and HTTP listeners name their node; TCP and HTTP probes have four outcomes that are never merged: success, refused, timeout (what a filter drop looks like), error | [0019](decisions/0019-docker-sandbox.md), [0020](decisions/0020-node-agent.md) |
-| **Tests** | YAML files in `tests/`, plus the policy's own `tests` and `sshTests` | **Built** (`internal/suite`, `internal/runner`, [0026](decisions/0026-test-runner.md)), run from the command line once #12 lands. A test names devices or identities (every matching device), probes the real protocol, and expects allow, deny or, for SSH, check. The planner computes each test's needs, and turns a missing capability into REFUSED or UNKNOWN before anything runs. Every deny gets a positive control. Labels and profiles choose what runs where | [0015](decisions/0015-test-file-labels-profiles.md), [0016](decisions/0016-engine-interface-capabilities.md), [0026](decisions/0026-test-runner.md) |
-| **Outputs** | Reporters and writers | **Built:** text, JSON and JUnit (`internal/runner`). Later: the CLI's flags, a PR comment; the local UI, which reads the same JSON over Server-Sent Events; a policy file, a checklist, OpenTofu | [0015](decisions/0015-test-file-labels-profiles.md), [0017](decisions/0017-local-ui.md) |
+| **Tests** | YAML files in `tests/`, plus the policy's own `tests` and `sshTests` | **Built** (`internal/suite`, `internal/runner`, [0026](decisions/0026-test-runner.md)), run by `tailsuite test`. A test names devices or identities (every matching device), probes the real protocol, and expects allow, deny or, for SSH, check. The planner computes each test's needs, and turns a missing capability into REFUSED or UNKNOWN before anything runs. Every deny gets a positive control. Labels and profiles choose what runs where | [0015](decisions/0015-test-file-labels-profiles.md), [0016](decisions/0016-engine-interface-capabilities.md), [0026](decisions/0026-test-runner.md) |
+| **Outputs** | Reporters and writers | **Built:** text, JSON and JUnit (`internal/runner`), through `tailsuite test --json` and `--junit`. Later: a PR comment; the local UI, which reads the same JSON over Server-Sent Events; a policy file, a checklist, OpenTofu | [0015](decisions/0015-test-file-labels-profiles.md), [0017](decisions/0017-local-ui.md) |
 
 ## Results
 
@@ -99,21 +99,31 @@ my-tailnet/
   lab.yaml               # never deployed: the devices as the lab rebuilds them, what listens, profiles
   tests/*.yaml           # tailsuite's tests
   flake.nix              # only with --nix: pins tailsuite and OpenTofu
-  .tailsuite/            # gitignored: the model, the lab plan, results
+  .tailsuite/            # gitignored: the lab that's up (lab.json), the last results
 ```
 
 The project alone rebuilds the lab, with no access to production. On
 headscale it needs no credentials at all.
 
-## Commands (planned)
+## Commands
+
+Built ([0030](decisions/0030-the-cli.md)); `up`, `test` and `down` work on
+the project in the current folder, or `--dir`:
 
 | Command | Does |
 |---|---|
-| `tailsuite init --template <name> [--nix]` | Writes a project from a template embedded in the binary |
-| `tailsuite up` | Starts the lab and the local UI, and opens it in the browser (not in CI, or with `--no-browser`); localhost only, behind a one-time link ([0017](decisions/0017-local-ui.md)) |
-| `tailsuite test [--profile <name>] [--engine <name>] [--only <label>] [--skip <label>] [--run <regex>] [--strict]` | Runs the suite: the profile picks the engine, the tests and the strictness, and flags override it. Exit codes: 0 fine, 1 a FAIL, 2 nothing proven or unproven under strict, 3 couldn't run ([0015](decisions/0015-test-file-labels-profiles.md)) |
-| `tailsuite capabilities` | Prints what each engine does natively, after a rewrite, or refuses ([0016](decisions/0016-engine-interface-capabilities.md)) |
-| `tailsuite down` | Tears the lab down |
+| `tailsuite init --template <name> [--nix] [dir]` | Writes a project from a template embedded in the binary, never over an existing one. `--nix` adds a flake pinning this release and OpenTofu |
+| `tailsuite up [--profile <name>] [--engine <name>]` | Starts the lab, with the embedded node agent, and leaves it running. From #11, it also serves the local UI and opens it in the browser (not in CI, or with `--no-browser`); localhost only, behind a one-time link ([0017](decisions/0017-local-ui.md)) |
+| `tailsuite test [--profile <name>] [--engine <name>] [--only <label>] [--skip <label>] [--run <regex>] [--strict] [--json] [--junit <file>]` | Runs the suite on the lab `up` left, after applying the current policy, or on a lab of its own. The profile picks the engine, the tests and the strictness, and flags override it. Exit codes: 0 fine, 1 a FAIL, 2 nothing proven or unproven under strict, 3 couldn't run ([0015](decisions/0015-test-file-labels-profiles.md)) |
+| `tailsuite capabilities [--json]` | Prints what each engine does natively, after a rewrite, or refuses ([0016](decisions/0016-engine-interface-capabilities.md)) |
+| `tailsuite down [--run <id>]` | Tears the lab down, or any run by its ID |
+
+Planned:
+
+| Command | Does |
+|---|---|
+| `tailsuite export tests` | Copies the tests that fit Tailscale's format into the policy's `tests` and `sshTests`, after showing the diff ([0015](decisions/0015-test-file-labels-profiles.md)) |
+| `tailsuite upgrade tofu` | Replaces `tofu/tailsuite.tf` with this release's copy, leaving the values alone (#9, [0014](decisions/0014-tailnet-model-and-project-layout.md)) |
 | `tailsuite export tofu` | Writes `tofu/` (tailsuite's module and the values) from the current model, once; `init` and `import` use it, and the user owns the result |
 | `tailsuite import tailscale` | Reads a real tailnet read-only into a project, with OpenTofu import blocks |
 | `tailsuite deploy` | Lab tests → `tofu plan` against production → blast-radius diff → apply, behind the gates in [0007](decisions/0007-read-only-by-default.md) |

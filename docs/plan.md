@@ -172,7 +172,8 @@ ready starts the heavy tiers. Any branch can run them by hand
    - #52, the node agent inside the binary: done
      ([0027](decisions/0027-embedded-agent.md));
    - #8, the test runner: done ([0026](decisions/0026-test-runner.md));
-   - #12, the CLI;
+   - #12, the CLI: done ([0030](decisions/0030-the-cli.md)); `up` starts
+     the lab without the UI until #11;
    - #11, the UI;
    - #9, the OpenTofu module;
    - #10, the round trip.

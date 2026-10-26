@@ -149,7 +149,14 @@ ready starts the heavy tiers. Any branch can run them by hand
    - #17, the engine interface and capability matrix: settled in
      [0016](decisions/0016-engine-interface-capabilities.md);
    - #19, the UI stack: settled in [0017](decisions/0017-local-ui.md).
-2. **Run the #3 spike**: the test organization exists (2026-10-25).
+2. **Run the #3 spike**: done (2026-10-25). The Tailscale engine is a go
+   ([research 0006](research/0006-throwaway-tailnets-spike.md)), and
+   0016's two checks for it are settled in
+   [0021](decisions/0021-empty-grants-and-the-marker-on-tailscale.md).
+   Its findings for #6 are listed in research 0006. Leaked throwaway
+   tailnets are deleted by a scheduled cleanup job, with a second OAuth
+   client (`all` scope) held only in the `nightly` environment
+   (maintainer, 2026-10-26, on #6).
 3. **Build:**
    - #1, the Go module, the flake and CI for lint and unit tests: done
      ([0018](decisions/0018-go-toolchain-flake-ci.md));
@@ -213,7 +220,8 @@ Deliberately after M7. Some may become a paid edition:
   traffic, from Tailscale's network flow logs (needs the
   `logs:network:read` scope).
 - **Drift detection**: the live tailnet vs the repo.
-- **Hosted runs**, and more parallelism than 10 throwaway tailnets.
+- **Hosted runs**, and more parallelism than 9 throwaway tailnets at once
+  (10 per organization, the original included).
 - **A fleet view inside a company**: client versions, routes, exit-node use
   and posture, aggregated locally.
 - **Multi-tailnet views** for MSPs.

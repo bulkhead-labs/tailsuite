@@ -113,10 +113,10 @@ the project in the current folder, or `--dir`:
 | Command | Does |
 |---|---|
 | `tailsuite init --template <name> [--nix] [dir]` | Writes a project from a template embedded in the binary, never over an existing one. `--nix` adds a flake pinning this release and OpenTofu |
-| `tailsuite up [--profile <name>] [--engine <name>]` | Starts the lab, with the embedded node agent, and leaves it running. From #11, it also serves the local UI and opens it in the browser (not in CI, or with `--no-browser`); localhost only, behind a one-time link ([0017](decisions/0017-local-ui.md)) |
-| `tailsuite test [--profile <name>] [--engine <name>] [--only <label>] [--skip <label>] [--run <regex>] [--strict] [--json] [--junit <file>]` | Runs the suite on the lab `up` left, after applying the current policy, or on a lab of its own. The profile picks the engine, the tests and the strictness, and flags override it. Exit codes: 0 fine, 1 a FAIL, 2 nothing proven or unproven under strict, 3 couldn't run ([0015](decisions/0015-test-file-labels-profiles.md)) |
+| `tailsuite up [--profile <name>] [--engine <name>]` | Starts the lab, with the embedded node agent, and holds it until Ctrl-C, which tears it down. From #11, it also serves the local UI and opens it in the browser (not in CI, or with `--no-browser`); localhost only, behind a one-time link ([0017](decisions/0017-local-ui.md)) |
+| `tailsuite test [--profile <name>] [--engine <name>] [--only <label>] [--skip <label>] [--run <regex>] [--strict] [--json] [--junit <file>]` | Runs the suite on the lab `up` holds, after applying the current policy, or on a lab of its own. The profile picks the engine, the tests and the strictness, and flags override it. Exit codes: 0 fine, 1 a FAIL, 2 nothing proven or unproven under strict, 3 couldn't run ([0015](decisions/0015-test-file-labels-profiles.md)) |
 | `tailsuite capabilities [--json]` | Prints what each engine does natively, after a rewrite, or refuses ([0016](decisions/0016-engine-interface-capabilities.md)) |
-| `tailsuite down [--run <id>]` | Tears the lab down, or any run by its ID |
+| `tailsuite down [--run <id>]` | Tears down a lab whose `up` was killed, or any run by its ID |
 
 Planned:
 

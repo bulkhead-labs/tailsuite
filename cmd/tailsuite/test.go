@@ -127,7 +127,7 @@ func onUpsLab(ctx context.Context, dir string, st labState, plan engine.LabPlan,
 	}
 	switch {
 	case st.Dir != abs:
-		return nil, fmt.Errorf("the lab state in %s belongs to %s (run %s); tailsuite down --run %s tears that lab down", stateDir, st.Dir, st.Run, st.Run)
+		return nil, fmt.Errorf("%s holds the lab state of %s (run %s): if this folder is a copy, delete %s; if the project moved, tailsuite down --run %s and up again", stateDir, st.Dir, st.Run, statePath(dir), st.Run)
 	case st.Engine != cfg.Options.Engine:
 		return nil, fmt.Errorf("the lab that's up (run %s) runs %s, and this run asks for %s%s, or choose --engine %s", st.Run, st.Engine, cfg.Options.Engine, again, st.Engine)
 	case !samePlan(plan.Devices, st.Devices):
@@ -188,7 +188,9 @@ func onOwnLab(ctx context.Context, plan engine.LabPlan, low engine.Lowering, pla
 		return err
 	})
 	if err != nil && r != nil && ctx.Err() == nil {
-		_, _ = fmt.Fprintf(stderr, "tailsuite: warning: tearing down run %s: %v; tailsuite down --run %s removes what's left\n", sb.RunID(), err, sb.RunID())
+		warn := fmt.Sprintf("tearing down run %s: %v; tailsuite down --run %s removes what's left", sb.RunID(), err, sb.RunID())
+		_, _ = fmt.Fprintf(stderr, "tailsuite: warning: %s\n", warn)
+		r.Warnings = append(r.Warnings, warn)
 		return r, nil
 	}
 	if err != nil {

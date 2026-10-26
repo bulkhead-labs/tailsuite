@@ -33,16 +33,16 @@ const usage = `tailsuite proves what your tailnet allows, with real traffic.
 Usage:
 
   tailsuite init --template startup [--nix] [dir]   write a project folder
-  tailsuite up [--profile <name>] [--engine <name>]  start the lab and leave it running
+  tailsuite up [--profile <name>] [--engine <name>]  start the lab; Ctrl-C tears it down
   tailsuite test [--profile <name>] [--engine <name>] [--only <label>]
                  [--skip <label>] [--run <regex>] [--strict] [--json] [--junit <file>]
                                                     run the suite
-  tailsuite down [--run <id>]                        tear the lab down
+  tailsuite down [--run <id>]                        tear down a lab left by a crash
   tailsuite capabilities [--json]                    what each engine supports
   tailsuite version                                  print the version
 
 up, test and down work on the project in the current folder, or the one
---dir names. test uses the lab up left running, or starts one for the run.
+--dir names. test uses the lab up holds, or starts one for the run.
 
 Exit codes: 0 fine, 1 a test failed, 2 nothing proven (or unproven results
 under --strict), 3 tailsuite couldn't run.

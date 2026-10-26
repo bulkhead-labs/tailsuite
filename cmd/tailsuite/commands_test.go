@@ -313,7 +313,7 @@ func TestUpsLabRefusals(t *testing.T) {
 		st   labState
 		want string
 	}{
-		"another folder's": {labState{Run: good.Run, Dir: "/elsewhere", Engine: good.Engine, Devices: good.Devices}, "belongs to /elsewhere"},
+		"another folder's": {labState{Run: good.Run, Dir: "/elsewhere", Engine: good.Engine, Devices: good.Devices}, "holds the lab state of /elsewhere"},
 		"another engine":   {labState{Run: good.Run, Dir: abs, Engine: "tailscale", Devices: good.Devices}, "runs tailscale"},
 		"a changed device": {labState{Run: good.Run, Dir: abs, Engine: good.Engine, Devices: changed}, "changed a device"},
 	} {

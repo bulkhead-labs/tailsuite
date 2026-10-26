@@ -3,12 +3,15 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/bulkhead-labs/tailsuite/internal/agentbin"
 	"github.com/bulkhead-labs/tailsuite/internal/engine/headscale"
@@ -45,9 +48,7 @@ func TestInitUpTestDown(t *testing.T) {
 		t.Error("test's own lab left a lab state")
 	}
 
-	if code, _, errOut := runCmd(t, "up", "--dir", dir); code != 0 {
-		t.Fatalf("up: exit %d: %s", code, errOut)
-	}
+	stop := startUp(t, dir)
 	st, ok, err := readState(dir)
 	if !ok || err != nil {
 		t.Fatalf("up left no lab state: %v", err)
@@ -88,6 +89,19 @@ func TestInitUpTestDown(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// A lab started by another build: its agent and images may differ.
+	other := st
+	other.Build.Agent = strings.Repeat("0", 64)
+	if err := writeState(dir, other); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, errOut := runCmd(t, "test", "--dir", dir); code != exitCouldNotRun || !strings.Contains(errOut, "another tailsuite build") {
+		t.Errorf("test on another build's lab: exit %d, %q", code, errOut)
+	}
+	if err := writeState(dir, st); err != nil {
+		t.Fatal(err)
+	}
+
 	// A policy applied by another process during a run unproves it.
 	stillHolds(t, st)
 
@@ -113,14 +127,15 @@ func TestInitUpTestDown(t *testing.T) {
 		t.Errorf("no FAIL after the grant was removed: %+v", got.Summary)
 	}
 
-	if code, _, errOut := runCmd(t, "down", "--dir", dir); code != 0 {
-		t.Fatalf("down: exit %d: %s", code, errOut)
+	// Ctrl-C tears up's lab down.
+	if code := stop(); code != 0 {
+		t.Fatalf("up after Ctrl-C: exit %d", code)
 	}
 	if _, ok, _ := readState(dir); ok {
-		t.Error("down left the lab state")
+		t.Error("up left the lab state")
 	}
 	if alive, err := runAlive(context.Background(), st.Run); alive || err != nil {
-		t.Errorf("run %s after down: alive %v, %v", st.Run, alive, err)
+		t.Errorf("run %s after up stopped: alive %v, %v", st.Run, alive, err)
 	}
 	if code, out, _ := runCmd(t, "down", "--dir", dir); code != 0 || !strings.Contains(out, "No lab is up") {
 		t.Errorf("a second down: exit %d, %q", code, out)
@@ -179,4 +194,44 @@ func results(t *testing.T, out string) runner.Run {
 		t.Fatalf("results: %v\n%s", err, out)
 	}
 	return r
+}
+
+// syncBuf is a buffer up writes to while the test reads it.
+type syncBuf struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (s *syncBuf) Write(p []byte) (int, error) { s.mu.Lock(); defer s.mu.Unlock(); return s.b.Write(p) }
+func (s *syncBuf) String() string              { s.mu.Lock(); defer s.mu.Unlock(); return s.b.String() }
+
+// startUp runs up in the background until its lab is up, and returns what
+// stops it, as Ctrl-C does, with up's exit code.
+func startUp(t *testing.T, dir string) (stop func() int) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	var out, errOut syncBuf
+	done := make(chan int, 1)
+	go func() { done <- run(ctx, []string{"up", "--dir", dir}, &out, &errOut) }()
+	code, stopped := 0, false
+	stop = func() int {
+		if !stopped {
+			cancel()
+			code, stopped = <-done, true
+		}
+		return code
+	}
+	t.Cleanup(func() { stop() })
+	deadline := time.After(3 * time.Minute)
+	for !strings.Contains(out.String(), "The lab is up") {
+		select {
+		case c := <-done:
+			stopped, code = true, c
+			t.Fatalf("up: exit %d: %s", c, errOut.String())
+		case <-deadline:
+			t.Fatalf("up didn't start in 3 minutes: %s", errOut.String())
+		case <-time.After(200 * time.Millisecond):
+		}
+	}
+	return stop
 }

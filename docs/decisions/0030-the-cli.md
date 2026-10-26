@@ -1,13 +1,17 @@
 # 0030: The CLI, and how its commands share a lab
 
-Status: **accepted** (2026-10-26). Settles #12. Names the commands
+Status: **accepted** (2026-10-26). Settles #12. Amends
+[0019](0019-docker-sandbox.md) and [0020](0020-node-agent.md): the lab
+outlives `test`, not `up`, which holds it until Ctrl-C. Names the commands
 [0014](0014-tailnet-model-and-project-layout.md) and
 [0015](0015-test-file-labels-profiles.md) left to it.
 
 ## Context
 
-- **`up` and `test` are separate processes, and the lab outlives both**
-  ([0019](0019-docker-sandbox.md), [0020](0020-node-agent.md)). The user
+- **`up` and `test` are separate processes.** 0019 and 0020 had the lab
+  outlive both ([0019](0019-docker-sandbox.md),
+  [0020](0020-node-agent.md)); the maintainer chose instead that `up`
+  holds it, and Ctrl-C tears it down (2026-10-26, on this PR). The user
   journey runs `up` headless, then `test`; a user may keep `up` open for
   the UI and run `test` in another terminal.
 - **The engine and the runner live in one process.** `runner.Execute`
@@ -40,17 +44,23 @@ Status: **accepted** (2026-10-26). Settles #12. Names the commands
 - **`tailsuite up [--profile] [--engine]`** starts the lab on the
   profile's engine with the embedded node agent for the Docker host's
   architecture (`agentbin.For(sandbox.Arch())`,
-  [0027](0027-embedded-agent.md)), and returns, leaving it running.
+  [0027](0027-embedded-agent.md)), and **holds it in the foreground until
+  Ctrl-C (or SIGTERM), which tears it down** (the maintainer's choice,
+  2026-10-26). From #11 it serves the UI meanwhile.
   - A build without the agent is refused before Docker is touched, with
     `agentbin.ErrNotEmbedded`'s message.
   - If the lab fails to start and its teardown fails too, the state file
     stays, so `down` can remove what's left.
-  - A project whose lab is already up is refused.
+  - A project whose lab is already up is refused, and so is a state file
+    from another folder, with what to do.
+  - `test`, in another terminal, uses the lab while `up` holds it. CI
+    (#13) runs `up` in the background and stops it with a signal.
 - **`tailsuite test`** takes `--profile`, `--engine`, `--only`, `--skip`,
   `--run` and `--strict` (0015), and `--json` and `--junit <file>` for the
   outputs #8 built. It exits with 0015's codes.
 - **`tailsuite down [--run <id>]`** tears the project's lab down, or any
-  run by its ID. With no lab up, it lists the runs the Docker Engine still
+  run by its ID: for a lab whose `up` was killed outright (SIGKILL, a
+  crash), which couldn't tear down. With no lab up, it lists the runs the Docker Engine still
   has, so one left by a crash can be found.
 - **`tailsuite capabilities [--json]`** prints each built engine's rows of
   0016's matrix.
@@ -137,7 +147,16 @@ Status: **accepted** (2026-10-26). Settles #12. Names the commands
 ## Given up
 
 - **Two `test` runs on one lab at once** spoil each other: the one whose
-  policy was replaced reports UNKNOWN. Run them one at a time.
+  policy was replaced reports UNKNOWN, or exit 3 if the other's apply
+  lands while it waits for its own. Run them one at a time. `StillHolds`
+  knows a run's policy by its marker port, one of about 20,000; if two
+  overlapping runs draw the same port, the later one's change goes
+  unseen.
+- **On a build from source, the version is `devel`** or a pseudo-version
+  per commit, so two source builds with the same agent and images pass
+  the build check.
+- **The lab lives as long as `up`.** Closing its terminal ends it; a
+  lab for a long session needs `up` kept open.
 - **A lab is reopened only by the project folder that started it**, and
   only by the same build. After an upgrade, or a change to a device,
   `down` and `up` again.

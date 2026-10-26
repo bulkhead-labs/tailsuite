@@ -204,8 +204,11 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return fail(stderr, err)
 		}
-		if alive {
-			return fail(stderr, fmt.Errorf("this project's lab is already up (run %s); tailsuite down tears it down", st.Run))
+		switch {
+		case alive && st.Dir != abs:
+			return fail(stderr, fmt.Errorf("%s holds the lab state of %s (run %s): if this folder is a copy, delete %s", stateDir, st.Dir, st.Run, statePath(*dir)))
+		case alive:
+			return fail(stderr, fmt.Errorf("this project's lab is already up (run %s): Ctrl-C in the terminal running tailsuite up tears it down, or tailsuite down", st.Run))
 		}
 	}
 	e := headscale.New(headscale.Config{})
@@ -247,8 +250,30 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	for _, c := range low.Changes {
 		fmt.Fprintf(&b, "Changed for %s: %s (%s)\n", e.Name(), c.Pointer, c.Reason)
 	}
-	b.WriteString("\ntailsuite test runs the suite on it; tailsuite down tears it down. The local UI comes with #11.\n")
-	return wrote(io.WriteString(stdout, b.String()))
+	b.WriteString("\nThe lab stays up until Ctrl-C, which tears it down. tailsuite test, in another terminal, runs the suite on it. The local UI comes with #11.\n")
+	if code := wrote(io.WriteString(stdout, b.String())); code != exitOK {
+		return teardownUp(ctx, *dir, sb, stderr, code)
+	}
+	// The maintainer's choice (2026-10-26): up holds the lab in the
+	// foreground, and Ctrl-C (or SIGTERM) tears it down.
+	<-ctx.Done()
+	_, _ = fmt.Fprintf(stderr, "Tearing down run %s...\n", sb.RunID())
+	return teardownUp(ctx, *dir, sb, stderr, exitOK)
+}
+
+// teardownUp removes up's lab and its state, with a context of its own
+// so a cancelled one doesn't stop it (0019). A failed teardown keeps the
+// state, for down.
+func teardownUp(ctx context.Context, dir string, sb *docker.Sandbox, stderr io.Writer, code int) int {
+	tctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), sandbox.TeardownTimeout)
+	defer cancel()
+	if err := sb.Teardown(tctx); err != nil {
+		return fail(stderr, fmt.Errorf("tearing down run %s: %w; tailsuite down removes what's left", sb.RunID(), err))
+	}
+	if err := removeState(dir); err != nil {
+		return fail(stderr, err)
+	}
+	return code
 }
 
 func cmdDown(ctx context.Context, args []string, stdout, stderr io.Writer) int {
@@ -266,6 +291,9 @@ func cmdDown(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if target == "" {
 		if !ok {
 			return downNothing(ctx, stdout, stderr)
+		}
+		if abs, err := filepath.Abs(*dir); err != nil || abs != st.Dir {
+			return fail(stderr, fmt.Errorf("%s holds the lab state of %s (run %s): if this folder is a copy, delete %s; to tear that lab down anyway, tailsuite down --run %s", stateDir, st.Dir, st.Run, statePath(*dir), st.Run))
 		}
 		target = st.Run
 	}

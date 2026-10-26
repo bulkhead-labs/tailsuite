@@ -69,14 +69,12 @@ Anything found blocks the PR. Fix it and say so.
 
 ## 5. Independent review
 
-Start the `pr-reviewer` agent with the PR number. It is read-only and
-reviews against the same checklist without seeing your conclusions. Wait
-for it.
-
-- Fix every finding it marks **blocking**. For anything else, fix it or
-  answer it in the PR.
-- Re-run the reviewer if the fixes were substantial.
-- Link its comment in the template's Review box.
+Run the [`pr-review`](../pr-review/SKILL.md) skill. It starts the
+`pr-reviewer` agent on Opus at the highest effort, which is read-only and
+reviews against the same checklist without seeing your conclusions. It
+runs another round after substantial fixes, and links every round in the
+template's Review box. Don't mark the PR ready until a round finds
+nothing blocking.
 
 ## 6. Mark ready
 

@@ -91,6 +91,22 @@ nothing to say, say that in one line ("No plan changes.").
      format, a new REFUSED case).
 
    Say plainly which of these need the maintainer's agreement.
+
+   **Show each change, don't only name it.** For every change to what a
+   user writes, sees or gets (a file format, a command, an output, a
+   REFUSED case) and every change the maintainer must agree to, show
+   the two versions side by side:
+   - **Before and after,** as real examples: the file as it was and as it
+     is now, or the output of a run each way. Use the PR's own synthetic
+     test data where it has some.
+   - **The difference, in a sentence or two:** what the user can do now
+     that they couldn't, or the other way round, and what a run does
+     differently.
+   - **When it's a choice:** each option the same way (option A's file
+     and what a run does with it, then option B's), with the
+     recommendation marked.
+
+   A two-column layout (`.two`) holds the pair, and stacks on a phone.
 8. **Review trail.** Each reviewer round: verdict, the findings, and how
    each was fixed or answered, linked to the PR comment. Then the tests:
    what ran, where, with numbers.
@@ -131,6 +147,9 @@ nothing to say, say that in one line ("No plan changes.").
   [0010](../../../docs/decisions/0010-public-tracking-in-issues.md)'s
   route: a `type:design` issue, settled into a decision record.
   The page summarises the repo; it's never the only record.
+- **Subagents:** gathering facts for a big group may go to a subagent,
+  as the [`delegate`](../delegate/SKILL.md) skill says. The page itself
+  is written and checked here.
 - **Check before you publish.** Every number (lines, inputs, rounds), SHA
   and issue number on the page against the facts from step 1. A wrong
   claim on a review page costs more than a missing one.

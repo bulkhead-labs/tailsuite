@@ -48,9 +48,12 @@ reviewer agent are those checks.
 3. **Before marking it ready, run the `pr-ready` skill**
    (`.claude/skills/pr-ready`). It walks the
    [definition of done](plan.md#definition-of-done) and updates the docs,
-   then starts the **`pr-reviewer` agent**. The agent is a separate,
-   read-only reviewer: it checks the PR against the checklist and the docs
-   against the code, and posts its findings on the PR.
+   then runs the **`pr-review` skill**, which starts the **`pr-reviewer`
+   agent** round after round until it finds nothing blocking. The agent is
+   a separate, read-only reviewer: it checks the PR against the checklist
+   and the docs against the code, and posts its findings on the PR. Like
+   every subagent, it runs as the **`delegate` skill** says: on Opus, with
+   the highest effort for review and design.
 4. **Fix the findings, then mark it ready.** The integration and
    user-journey tiers run, and must pass.
    When the maintainer will review later, the **`review-artifact` skill**

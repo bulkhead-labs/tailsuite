@@ -36,12 +36,15 @@ are in [`docs/decisions/`](docs/decisions/README.md).
    checked.
 6. **Every PR:**
    - opens as a draft;
-   - runs the `pr-ready` skill before it's marked ready (that skill starts
-     the `pr-reviewer` agent);
+   - runs the `pr-ready` skill before it's marked ready (that skill runs
+     `pr-review`, which starts the `pr-reviewer` agent);
    - is squash-merged only after the maintainer's approving review, and
      when they ask.
 
    **After every merge, run the `post-merge` skill.**
+
+   **Every subagent follows the `delegate` skill:** Opus always, with
+   the effort set by the kind of work, highest for design and review.
 7. **Sign off every commit** (`git commit -s`, DCO).
 8. **CI follows [0013](docs/decisions/0013-ci-trust-model.md).**
    - Every PR needs the maintainer's approving review.

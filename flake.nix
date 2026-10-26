@@ -53,6 +53,19 @@
           # matches.
           vendorHash = "sha256-EWFY55SkDPh42FN3ZdhMUnFxe+nMJC2L3PW+YLWEkFY=";
           subPackages = [ "cmd/tailsuite" ];
+          # The node agent for both Linux architectures, embedded (#52). It
+          # uses only the standard library, so it builds offline here.
+          preBuild = ''
+            go generate ./internal/agentbin
+          '';
+          # Not while vendoring the modules: it needs the vendored tree.
+          overrideModAttrs = _: { preBuild = ""; };
+          # The agents' own checks (Linux ELF, right architecture) run too.
+          postCheck = ''
+            go test ./internal/agentbin
+          '';
+          # The package's tests fail unless both agents are embedded.
+          env.TAILSUITE_REQUIRE_AGENT = "1";
           env.CGO_ENABLED = "0";
           ldflags = [
             "-s"

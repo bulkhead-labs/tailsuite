@@ -10,7 +10,9 @@ import (
 	"io"
 	"os"
 	"runtime"
+	"strings"
 
+	"github.com/bulkhead-labs/tailsuite/internal/agentbin"
 	"github.com/bulkhead-labs/tailsuite/internal/version"
 )
 
@@ -42,7 +44,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 	case "", "help", "-h", "-help", "--help":
 		_, err = fmt.Fprint(stdout, usage)
 	case "version", "--version":
-		_, err = fmt.Fprintf(stdout, "tailsuite %s %s %s/%s\n", version.String(), runtime.Version(), runtime.GOOS, runtime.GOARCH)
+		agents := "not embedded (go generate ./... builds it)"
+		if a := agentbin.Embedded(); len(a) > 0 {
+			agents = "linux/" + strings.Join(a, ", linux/")
+		}
+		_, err = fmt.Fprintf(stdout, "tailsuite %s %s %s/%s\nnode agent: %s\n", version.String(), runtime.Version(), runtime.GOOS, runtime.GOARCH, agents)
 	default:
 		// If stderr fails too, the exit code is all that's left.
 		_, _ = fmt.Fprintf(stderr, "tailsuite: unknown command %q\n\n%s", cmd, usage)

@@ -7,8 +7,9 @@
 - the Docker sandbox, `internal/sandbox`
   ([0019](decisions/0019-docker-sandbox.md));
 - the node agent, `cmd/tailsuite-agent` and `internal/agent`
-  ([0020](decisions/0020-node-agent.md)); the tailsuite binary doesn't
-  carry it yet (#52);
+  ([0020](decisions/0020-node-agent.md)), which the tailsuite binary
+  carries for linux/amd64 and linux/arm64, `internal/agentbin`
+  ([0027](decisions/0027-embedded-agent.md));
 - the tailnet model and loading a project, `internal/model` and
   `internal/project` ([0022](decisions/0022-reading-a-project.md));
 - the engine interface and the headscale engine, `internal/engine` and

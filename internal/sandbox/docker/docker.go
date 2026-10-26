@@ -32,6 +32,7 @@ import (
 type Sandbox struct {
 	cli   *client.Client
 	runID string
+	arch  string
 
 	mu       sync.Mutex
 	networks map[string]sandbox.Network
@@ -47,13 +48,19 @@ func New(ctx context.Context) (*Sandbox, error) {
 	if err != nil {
 		return nil, err
 	}
-	cli, err := Connect(ctx)
+	cli, v, err := connect(ctx)
 	if err != nil {
 		return nil, err
+	}
+	// Lab nodes are Linux, and so is the node agent they run.
+	if v.Os != "linux" {
+		_ = cli.Close()
+		return nil, fmt.Errorf("docker: the Docker Engine runs %s containers; tailsuite's lab nodes are Linux", v.Os)
 	}
 	return &Sandbox{
 		cli:      cli,
 		runID:    runID,
+		arch:     v.Arch,
 		networks: map[string]sandbox.Network{},
 		nodes:    map[string]sandbox.Node{},
 	}, nil
@@ -63,13 +70,18 @@ func New(ctx context.Context) (*Sandbox, error) {
 // after checking that it answers, and that its internal networks keep DNS
 // inside the lab.
 func Connect(ctx context.Context) (*client.Client, error) {
+	cli, _, err := connect(ctx)
+	return cli, err
+}
+
+func connect(ctx context.Context) (*client.Client, client.ServerVersionResult, error) {
 	cli, err := client.New(client.FromEnv) // negotiates the API version by default
 	if err != nil {
-		return nil, fmt.Errorf("docker: %w", err)
+		return nil, client.ServerVersionResult{}, fmt.Errorf("docker: %w", err)
 	}
 	if _, err := cli.Ping(ctx, client.PingOptions{NegotiateAPIVersion: true}); err != nil {
 		_ = cli.Close()
-		return nil, fmt.Errorf("docker: can't reach the Docker Engine at %s (is it running? DOCKER_HOST chooses another): %w", cli.DaemonHost(), err)
+		return nil, client.ServerVersionResult{}, fmt.Errorf("docker: can't reach the Docker Engine at %s (is it running? DOCKER_HOST chooses another): %w", cli.DaemonHost(), err)
 	}
 	v, err := cli.ServerVersion(ctx, client.ServerVersionOptions{})
 	if err == nil {
@@ -77,9 +89,9 @@ func Connect(ctx context.Context) (*client.Client, error) {
 	}
 	if err != nil {
 		_ = cli.Close()
-		return nil, fmt.Errorf("docker: %w", err)
+		return nil, client.ServerVersionResult{}, fmt.Errorf("docker: %w", err)
 	}
-	return cli, nil
+	return cli, v, nil
 }
 
 // checkEngine refuses a Docker Engine whose internal networks forward DNS
@@ -123,6 +135,10 @@ func checkEngineVersion(version string) error {
 
 // Close closes the connection to the Docker Engine. It doesn't tear down.
 func (s *Sandbox) Close() error { return s.cli.Close() }
+
+// Arch is the Docker host's architecture, as Go names it (amd64, arm64):
+// the one its Linux nodes run, so the node agent must be built for it.
+func (s *Sandbox) Arch() string { return s.arch }
 
 // RunID implements sandbox.Sandbox.
 func (s *Sandbox) RunID() string { return s.runID }

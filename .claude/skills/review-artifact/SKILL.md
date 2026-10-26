@@ -22,7 +22,9 @@ Others can't open it, and the repo is public. Give the link in chat.
 
 For each PR, at its current head. Run `git fetch origin` first and use
 `origin/` refs throughout: a local branch, a stacked base especially, can
-be stale and give the wrong diff.
+be stale and give the wrong diff. A PR from a fork has no `origin/<head>`;
+fetch it as `git fetch origin pull/<n>/head:refs/remotes/origin/pr-<n>` and
+use `origin/pr-<n>`.
 
 - `gh pr view <n> --json number,title,body,isDraft,baseRefName,headRefName,headRefOid,additions,deletions,changedFiles`
 - The issues it closes (the graphql query in `pr-ready` step 1), and
@@ -124,9 +126,10 @@ nothing to say, say that in one line ("No plan changes.").
   session finds the page (the Artifact tool's `list`).
 - **What's settled goes in the repo.** The page and chat are private. An
   answer, or anything else the maintainer settles there, is written into
-  the repo before it's acted on: in a PR or issue comment, an issue's
-  "Done when" list, or a decision record
-  ([0010](../../../docs/decisions/0010-public-tracking-in-issues.md)).
+  the repo before it's acted on: in a PR or issue comment, or an issue's
+  "Done when" list. A design question takes
+  [0010](../../../docs/decisions/0010-public-tracking-in-issues.md)'s
+  route: a `type:design` issue, settled into a decision record.
   The page summarises the repo; it's never the only record.
 - **Check before you publish.** Every number (lines, inputs, rounds), SHA
   and issue number on the page against the facts from step 1. A wrong

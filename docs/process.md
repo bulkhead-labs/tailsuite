@@ -56,7 +56,8 @@ reviewer agent are those checks.
    When the maintainer will review later, the **`review-artifact` skill**
    builds a review page for one PR or a group: the scope against the
    issue, what it sets up, and what it changes in the plan. The page is
-   private to the maintainer, so it's never linked from the repo.
+   private to the maintainer, so it's never linked from the repo, and
+   anything settled on it is written into the repo before it's acted on.
 5. **The maintainer approves, then it's squash-merged.** The PR title becomes the commit title, and the
    branch's commit messages its body, so every `Signed-off-by` is kept. The
    branch is deleted.

@@ -8,7 +8,8 @@ Status: **accepted** (2026-10-26). Built in #63. Follows
 Agents working on tailsuite start subagents: the `pr-reviewer` on every
 PR, and others for searches, checks and pieces of building. Claude Code
 lets each one choose a model and an effort level. Left unset, a subagent
-runs on its caller's model, at the caller's session effort if one is set,
+runs on its caller's model (unless an override below says otherwise), at
+the caller's session effort if one is set,
 otherwise at the model's default. For Opus 5.5 that default is `medium`.
 The `CLAUDE_CODE_EFFORT_LEVEL` environment variable, when set, overrides
 both.
@@ -67,8 +68,17 @@ review, and hard building gets one step below (#63).
   - hard building at `xhigh`, about 2.5 times (1.66);
   - ordinary building at `high`, about 1.5 times (1);
   - searches stay at `medium`.
-- **An environment override.** If `CLAUDE_CODE_EFFORT_LEVEL` is set, it
-  wins over this table. It's unset on the maintainer's VM.
+- **Overrides outside the repo.** These win over this table:
+  - `CLAUDE_CODE_EFFORT_LEVEL` sets the effort;
+  - `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` drops the model a call or agent
+    file asks for;
+  - `CLAUDE_CODE_SUBAGENT_MODEL` replaces the caller's model when a
+    subagent sets none;
+  - a `maxEffortLevel` setting, or an organization's cap, clamps `max`
+    and anything above the cap.
+
+  None is set on the maintainer's VM (2026-10-26). An organization cap
+  can't be seen from there.
 - **Speed.** Higher effort takes longer. A review round took 2 to 15
   minutes on #60 and #62.
 - **Forks ignore it.** The Agent tool's `fork` type always inherits the

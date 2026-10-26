@@ -44,15 +44,18 @@ are in [`docs/decisions/`](docs/decisions/README.md).
      branch reaches `main`, so each one is signed off and written to be
      read;
    - stacked on another PR, has its base on `main` and its branch built
-     on the one below, so it merges with no push once that one has. It
-     never merges before the one below has.
+     on the one below, so it merges with no push once that one has.
+     Before it merges, `git log origin/main..origin/<branch>` must list
+     only its own commits: that proves the one below merged, and that it
+     brings nothing its review didn't see.
 
    **After every merge, run the `post-merge` skill.**
 
    **Every subagent follows the `delegate` skill:** Opus always, with
    the effort set by the kind of work, highest for design and review.
-7. **Sign off every commit** (`git commit -s`, DCO). A merge commit
-   GitHub makes adds no content, and is exempt.
+7. **Sign off every commit** (`git commit -s`, DCO), merges on a branch
+   included (`git merge --signoff`). Only the merge commit GitHub makes when a PR merges is
+   exempt: it adds no content.
 8. **CI follows [0013](docs/decisions/0013-ci-trust-model.md).**
    - Every PR needs the maintainer's approving review.
    - Secrets live only in environments, never at the repo level:

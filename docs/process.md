@@ -86,15 +86,19 @@ When one PR builds on another that hasn't merged yet:
 - **The PR body says "Builds on #n"**, and its own commits are
   `origin/<branch below>..origin/<branch>`. Until the one below merges,
   GitHub's diff shows both PRs' commits; reviewers read only that range.
-- **They merge bottom up, and the order is checked, not assumed.** GitHub
-  would merge an approved PR whose base is `main` while the one below is
-  open, and bring the lower PR's commits in under an approval that read
-  only the range above them. So before merging a stacked PR, the one
-  below must show `MERGED` (`gh pr view <below> --json state`). Once it
-  has, the next merges cleanly with no push, so its approval holds.
-- **A fix to a lower PR** means rebuilding every branch above it, and a
-  push to each, which dismisses their approvals. Fix lower PRs before the
-  maintainer reviews the stack, where possible.
+- **They merge bottom up, and what each brings is checked, not
+  assumed.** GitHub would merge an approved PR whose base is `main` while
+  the one below is open, and bring the lower PR's commits in under an
+  approval that read only its own. It would also bring old commits of a
+  lower branch that was rewritten after this one was built. So, after a
+  fetch, `git log --oneline origin/main..origin/<branch>` must list only
+  the PR's own commits before it merges. Then it merges cleanly with no
+  push, so its approval holds.
+- **Fix a lower PR with a new commit.** The PRs above keep the same
+  range, and merge with no push once it has. A rewrite of a lower branch
+  (a reword, an amend, a rebase) means rebuilding every branch above it,
+  and a push to each, which dismisses their approvals; rewrite only
+  before the maintainer reviews the stack.
 
 Humans can do every step by hand. The skills exist so agents and people
 follow the same checklist.
@@ -147,5 +151,5 @@ This repo is public.
 Every commit is signed off under the
 [Developer Certificate of Origin](https://developercertificate.org/)
 (`git commit -s`). See [CONTRIBUTING.md](../CONTRIBUTING.md). A merge
-commit GitHub makes for a PR adds no content of its own, and is exempt;
-a DCO check over `main` skips merges (`git log --no-merges`).
+commit on a branch is signed off like any other (`git merge --signoff`).
+Only the merge commit GitHub makes when a PR merges is exempt: it adds no content.

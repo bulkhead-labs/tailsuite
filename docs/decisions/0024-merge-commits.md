@@ -2,7 +2,10 @@
 
 Status: **accepted** (2026-10-26). Settles #64. Changes the merge step in
 [0008](0008-tests-and-pr-flow.md)'s flow, as `docs/process.md` describes
-it, and CLAUDE.md rule 6.
+it, and CLAUDE.md rules 6 and 7. Amends
+[0006](0006-apache-2-dco-open-core.md) (the merge commit GitHub makes when
+a PR merges isn't signed off) and [0018](0018-go-toolchain-flake-ci.md)
+(on `main`, CI runs once per push, on the merge commit).
 
 ## Context
 
@@ -41,8 +44,10 @@ it, and CLAUDE.md rule 6.
   `commit_title` and `commit_message`. The repo's defaults for web merges
   are the maintainer's to set (today GitHub's "Merge pull request #n
   from …").
-- **Merge commits are exempt from sign-off.** GitHub makes them, and they
-  add no content. A DCO check over `main` skips merges.
+- **Only the merge commit GitHub makes when a PR merges is exempt from sign-off.** It
+  adds no content. A merge on a branch is signed off like any other commit
+  (`git merge --signoff`), since one that resolves conflicts does add
+  content.
 - **Stacked PRs:**
   - every base is `main`; never another PR's branch;
   - each branch is built on the branch below it;
@@ -50,8 +55,13 @@ it, and CLAUDE.md rule 6.
     above that branch;
   - they merge bottom up, and each merges cleanly once the one below has,
     with no push, so its approval holds;
-  - nothing in GitHub enforces the order, so whoever merges checks that
-    the one below shows `MERGED` first.
+  - nothing in GitHub enforces the order, or stops a PR above bringing
+    old commits of a lower branch that was rewritten after it was built.
+    So before a stacked PR merges, `git log origin/main..origin/<branch>`
+    must list only its own commits;
+  - a lower PR is fixed with a new commit, which leaves the ranges above
+    it as they were. Rewriting a lower branch means rebuilding every
+    branch above it.
 - **To undo a PR, revert its merge commit:** `git revert -m 1 <merge>`.
 - **Commit identities are checked before review:** `pr-ready` lists every
   commit's author and committer address, and only `noreply` addresses or
@@ -62,8 +72,8 @@ it, and CLAUDE.md rule 6.
 
 - **An approval holds across a stack.** A merge commit keeps the lower
   PR's commits with their hashes, so the branch above still contains them
-  and merges with no rebase. Only a fix to a lower PR forces a push above
-  it.
+  and merges with no rebase. A fix to a lower PR, made as a new commit,
+  forces nothing above it; only a rewrite does.
 - **Nothing is lost.** Each commit keeps its own message and sign-off,
   instead of all of them folded into one body.
 - **One method, set in the repo**, so nobody picks per PR.
@@ -112,7 +122,7 @@ it, and CLAUDE.md rule 6.
 - **`git bisect` can land on a commit in the middle of a PR**, which may
   not build. `git bisect --first-parent` steps by PR.
 - **On `main`, only the merge commit gets a CI run.** The branch's own
-  commits ran on the PR. So [0018](0018-go-toolchain-flake-ci.md)'s
+  commits ran on the PR only where each was a push's head. So [0018](0018-go-toolchain-flake-ci.md)'s
   "every commit on `main` keeps its run" now means every push to `main`.
 - **Until the stack below merges, a stacked PR's GitHub diff** shows the
   lower PRs' commits too. Reviewers read the range above the branch below.

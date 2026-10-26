@@ -19,11 +19,10 @@ what each step found.
   classic Projects), use
   `gh api -X PATCH repos/bulkhead-labs/tailsuite/pulls/<n> -F body=@<file>`.
 - **Stacked on another PR?** Its base must be `main`, its branch built on
-  the branch below (`git merge-base --is-ancestor origin/<branch below>
-  HEAD`), and its body must say "Builds on #n"
-  ([process](../../../docs/process.md#stacked-pull-requests)). Its own
-  commits are `origin/<branch below>..HEAD`; check those in the steps
-  below.
+  the branch below, and its body must say "Builds on #n"
+  ([process](../../../docs/process.md#stacked-pull-requests)).
+  `git log --oneline origin/<branch below>..HEAD` must list only its own
+  commits; check those in the steps below.
 - Read the issue's "Done when" list. Every item is either done in this PR
   or moved to a new issue (linked in the PR).
 
@@ -83,7 +82,7 @@ Search the diff and the PR text:
 
   Reword before review, not after approval: a force-push dismisses it.
 
-Anything found blocks the PR. Fix it and say so.
+Anything else found blocks the PR. Fix it and say so.
 
 ## 5. Independent review
 

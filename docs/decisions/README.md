@@ -12,7 +12,7 @@ table in the same PR.
 | [0003](0003-docker-one-container-per-node.md) | Docker, one container per node, kernel TUN, TLS in the lab | Accepted 2026-10-23; refined by 0016; amended by 0019 |
 | [0004](0004-opentofu-owns-config.md) | OpenTofu owns the tailnet config; tailsuite owns the machines | Accepted 2026-10-24; amended by 0014 |
 | [0005](0005-go-single-binary-nix.md) | Go, one signed binary, Nix for development | Accepted 2026-10-24 |
-| [0006](0006-apache-2-dco-open-core.md) | Apache-2.0, DCO sign-off, open core later | Accepted 2026-10-24 |
+| [0006](0006-apache-2-dco-open-core.md) | Apache-2.0, DCO sign-off, open core later | Accepted 2026-10-24; amended by 0024 |
 | [0007](0007-read-only-by-default.md) | Read-only by default; earn each permission; local first | Accepted 2026-10-24 |
 | [0008](0008-tests-and-pr-flow.md) | Test tiers, draft PRs, the user-journey suite | Accepted 2026-10-24 |
 | [0009](0009-os-mimicry.md) | macOS and Windows mimicked; real only for verify runs | Accepted 2026-10-24 |
@@ -24,7 +24,7 @@ table in the same PR.
 | [0015](0015-test-file-labels-profiles.md) | The test file, labels and profiles | Accepted 2026-10-25 |
 | [0016](0016-engine-interface-capabilities.md) | The engine interface and the capability matrix | Accepted 2026-10-25; amended by 0021 |
 | [0017](0017-local-ui.md) | The local UI: the map first, localhost only, no build step | Accepted 2026-10-25 |
-| [0018](0018-go-toolchain-flake-ci.md) | The Go toolchain, the flake, and CI for lint and unit tests | Accepted 2026-10-25 |
+| [0018](0018-go-toolchain-flake-ci.md) | The Go toolchain, the flake, and CI for lint and unit tests | Accepted 2026-10-25; amended by 0024 |
 | [0019](0019-docker-sandbox.md) | The Docker sandbox, and agents controlled through it | Accepted 2026-10-25 |
 | [0020](0020-node-agent.md) | The node agent: it lives with the node, and sessions come and go | Accepted 2026-10-25 |
 | [0021](0021-empty-grants-and-the-marker-on-tailscale.md) | An empty `grants` section denies everything, and the marker holds on Tailscale | Accepted 2026-10-25 |

@@ -36,7 +36,8 @@ use `origin/pr-<n>`.
   place of `origin/<base>` until the one below merges; its totals then
   differ from `gh pr view`'s, which count the lower PR's commits too.
 - Changes to `docs/plan.md`, `docs/architecture.md`, `README.md` and
-  `docs/decisions/`: `git diff origin/<base>...origin/<head> -- docs README.md`.
+  `docs/decisions/`: `git diff origin/<base>...origin/<head> -- docs README.md`
+  (from `origin/<branch below>` for a stacked PR, as above).
 - Each `pr-reviewer` comment, its verdict, its findings, and what was done
   about each:
   `gh pr view <n> --json comments --jq '.comments[]|select(.body|startswith("## pr-reviewer"))|.url'`.

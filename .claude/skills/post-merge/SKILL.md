@@ -29,7 +29,10 @@ deleted that branch. Point it back before anything else:
 - **A stack above it** (`gh pr list --search '"Builds on #<n>" in:body'`):
   each should now merge cleanly, with its base still `main`
   (`gh pr view <m> --json baseRefName,mergeable`; `mergeable` reads
-  `UNKNOWN` for a while after a merge, so ask again).
+  `UNKNOWN` for a while after a merge, so ask again), and
+  `git log --oneline origin/main..origin/<its branch>` should list only
+  its own commits. If it lists more, the branch below was rewritten:
+  rebuild that PR's branch before anyone merges it.
 - The issues it closed must be closed. If one was only partly done, reopen
   it, or file the rest as a new issue on the same milestone.
 

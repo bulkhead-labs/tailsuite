@@ -1,6 +1,8 @@
 # 0006: Apache-2.0, DCO sign-off, open core later
 
-Status: **accepted** (2026-10-24).
+Status: **accepted** (2026-10-24). Amended by
+[0024](0024-merge-commits.md): the merge commit GitHub makes when a PR
+merges isn't signed off.
 
 ## Decision
 

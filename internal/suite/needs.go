@@ -59,6 +59,9 @@ func (pl *Planner) Needs(t Test, p Pair) Needs {
 			add(engine.SSHLocalpart, "its login is tied to the source's login")
 		}
 	}
+	if pl.t.Policy != nil && len(pl.t.Policy.Policy.DefaultSrcPosture) > 0 {
+		add(engine.Posture, "the policy's defaultSrcPosture applies to every rule")
+	}
 	if len(t.When) > 0 {
 		add(engine.Posture, "it pins a device condition (when)")
 	}

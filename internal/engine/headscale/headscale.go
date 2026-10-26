@@ -218,6 +218,7 @@ type Lab struct {
 	mu      sync.Mutex
 	applied []byte
 	marker  []engine.PatchOp
+	port    uint16 // the last Apply's marker port
 }
 
 var _ engine.Lab = (*Lab)(nil)
@@ -555,12 +556,35 @@ func (l *Lab) Apply(ctx context.Context, pol []byte) ([]byte, error) {
 		return nil, err
 	}
 	l.mu.Lock()
-	l.applied, l.marker = withMarker, ops
+	l.applied, l.marker, l.port = withMarker, ops, port
 	l.mu.Unlock()
 	if err := l.WaitReady(ctx, port); err != nil {
 		return nil, err
 	}
 	return withMarker, nil
+}
+
+// StillHolds checks that every node still holds the policy this lab's
+// last Apply set, by its readiness marker. Another process applying a
+// policy to the same lab changes the marker: results read while it did
+// weren't read under this run's policy.
+func (l *Lab) StillHolds(ctx context.Context) error {
+	l.mu.Lock()
+	port := l.port
+	l.mu.Unlock()
+	if port == 0 {
+		return errors.New("headscale: nothing was applied through this lab")
+	}
+	for _, n := range l.nodes {
+		f, err := l.CompiledFilter(ctx, n)
+		if err != nil {
+			return err
+		}
+		if !f.HasMarker(port) {
+			return fmt.Errorf("node %s no longer holds this run's policy: another process applied one to the lab", n.Name)
+		}
+	}
+	return nil
 }
 
 // WaitReady waits, bounded, for every node to show the apply whose marker

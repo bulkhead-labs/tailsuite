@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,18 +21,45 @@ import (
 	"github.com/bulkhead-labs/tailsuite/internal/sandbox"
 	"github.com/bulkhead-labs/tailsuite/internal/sandbox/docker"
 	"github.com/bulkhead-labs/tailsuite/internal/suite"
+	"github.com/bulkhead-labs/tailsuite/internal/version"
 )
 
 // stateDir is the project's own gitignored folder (decision 0014).
 const stateDir = ".tailsuite"
 
 // labState is what `up` leaves for `test` and `down`: which run is this
-// project's lab. The lab itself is found by the run's labels.
+// project's lab, and what it was built from, so `test` can refuse a lab
+// that no longer matches the project or the build. The lab itself is
+// found by the run's labels.
 type labState struct {
-	Version int      `json:"version"`
-	Run     string   `json:"run"`
-	Engine  string   `json:"engine"`
-	Devices []string `json:"devices"`
+	Version int    `json:"version"`
+	Run     string `json:"run"`
+	// Dir is the project's absolute path: a copied project isn't this lab's.
+	Dir    string `json:"dir"`
+	Engine string `json:"engine"`
+	Build  build  `json:"build"`
+	// Devices are the plan the lab was started with. A node's user and
+	// tags are fixed when it joins, so a changed plan needs a new lab.
+	Devices []engine.PlanDevice `json:"devices"`
+}
+
+// build is what made a lab: this tailsuite, the images, and the agent.
+type build struct {
+	Tailsuite string   `json:"tailsuite"`
+	Images    []string `json:"images"`
+	Agent     string   `json:"agent"` // SHA-256 of the node agent's binary
+}
+
+func buildOf(agent []byte) build {
+	sum := sha256.Sum256(agent)
+	return build{Tailsuite: version.String(), Images: []string{headscale.HeadscaleImage, headscale.TailscaleImage}, Agent: hex.EncodeToString(sum[:])}
+}
+
+// samePlan compares two plans device by device: name, user, tags, IPv4.
+func samePlan(a, b []engine.PlanDevice) bool {
+	return slices.EqualFunc(a, b, func(x, y engine.PlanDevice) bool {
+		return x.Name == y.Name && x.User == y.User && x.IPv4 == y.IPv4 && slices.Equal(x.Tags, y.Tags)
+	})
 }
 
 const labStateVersion = 1
@@ -105,9 +134,9 @@ func checkEngine(name string) error {
 }
 
 // planNames are the devices the lab rebuilds, in the plan's order.
-func planNames(plan engine.LabPlan) []string {
-	names := make([]string, len(plan.Devices))
-	for i, d := range plan.Devices {
+func planNames(devices []engine.PlanDevice) []string {
+	names := make([]string, len(devices))
+	for i, d := range devices {
 		names[i] = d.Name
 	}
 	return names
@@ -160,6 +189,14 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return fail(stderr, err)
 	}
+	// Refused before Docker is touched (0027).
+	if len(agentbin.Embedded()) == 0 {
+		return fail(stderr, agentbin.ErrNotEmbedded)
+	}
+	abs, err := filepath.Abs(*dir)
+	if err != nil {
+		return fail(stderr, err)
+	}
 	if st, ok, err := readState(*dir); err != nil {
 		return fail(stderr, err)
 	} else if ok {
@@ -187,14 +224,19 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	plan := engine.PlanEveryDevice(p.Tailnet)
 	// Written first, so a crash while starting still leaves the run ID
 	// for down.
-	if err := writeState(*dir, labState{Run: sb.RunID(), Engine: o.Engine, Devices: planNames(plan)}); err != nil {
+	if err := writeState(*dir, labState{Run: sb.RunID(), Dir: abs, Engine: o.Engine, Build: buildOf(agent), Devices: plan.Devices}); err != nil {
 		return fail(stderr, err)
 	}
 	_, _ = fmt.Fprintf(stderr, "Starting the lab on %s (run %s)...\n", e.Version(), sb.RunID())
 	lab, err := headscale.New(headscale.Config{Sandbox: sb, Agent: agent}).Start(ctx, plan, low)
 	if err != nil {
-		// Start has torn down what it made.
-		_ = removeState(*dir)
+		// Start tears down what it made. If that failed too, the state
+		// keeps the run ID for down.
+		if alive, aerr := runAlive(context.WithoutCancel(ctx), sb.RunID()); aerr == nil && !alive {
+			_ = removeState(*dir)
+		} else {
+			_, _ = fmt.Fprintf(stderr, "tailsuite: run %s is still partly up: tailsuite down removes it\n", sb.RunID())
+		}
 		return fail(stderr, fmt.Errorf("the lab didn't start: %w", err))
 	}
 	var b strings.Builder

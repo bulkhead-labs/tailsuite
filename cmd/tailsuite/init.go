@@ -34,7 +34,11 @@ func cmdInit(args []string, stdout, stderr io.Writer) int {
 	if err := templates.Write(dir, files); err != nil {
 		return fail(stderr, err)
 	}
-	return wrote(fmt.Fprintf(stdout, "Wrote the %s template to %s. Next: tailsuite up, then tailsuite test.\n", *tmpl, dir))
+	next := "tailsuite up, then tailsuite test"
+	if dir != "." {
+		next = "cd " + dir + ", then " + next
+	}
+	return wrote(fmt.Fprintf(stdout, "Wrote the %s template to %s. Next: %s.\n", *tmpl, dir, next))
 }
 
 // release is a version a flake can pin by tag.

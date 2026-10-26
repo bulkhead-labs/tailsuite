@@ -213,3 +213,32 @@ func TestLabsFault(t *testing.T) {
 		}
 	}
 }
+
+func TestUnprove(t *testing.T) {
+	run := &Run{Tests: []TestResult{
+		{Name: "a", Result: Pass, Pairs: []PairResult{{Result: Pass}}},
+		{Name: "b", Result: Fail, Pairs: []PairResult{{Result: Fail}, {Result: Pass}}},
+		{Name: "c", Result: Refused, Reason: "posture"},
+		{Name: "d", Skipped: "skip slow"},
+	}, Summary: Summary{Pass: 1, Fail: 1, Refused: 1, Skipped: 1}, Exit: 1}
+	run.Unprove("the policy changed")
+	if want := (Summary{Unknown: 2, Refused: 1, Skipped: 1}); run.Summary != want {
+		t.Errorf("summary = %+v, want %+v", run.Summary, want)
+	}
+	if run.Exit != 2 {
+		t.Errorf("exit = %d, want 2: nothing proven", run.Exit)
+	}
+	for _, tr := range run.Tests[:2] {
+		if tr.Result != Unknown || tr.Reason != "the policy changed" {
+			t.Errorf("%s: %s %q", tr.Name, tr.Result, tr.Reason)
+		}
+		for _, p := range tr.Pairs {
+			if p.Result != Unknown {
+				t.Errorf("%s: a pair still %s", tr.Name, p.Result)
+			}
+		}
+	}
+	if run.Tests[2].Reason != "posture" {
+		t.Error("a REFUSED result lost its reason")
+	}
+}

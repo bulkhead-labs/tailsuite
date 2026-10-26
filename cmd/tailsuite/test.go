@@ -8,8 +8,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
+	"reflect"
 
+	"github.com/bulkhead-labs/tailsuite/internal/agentbin"
 	"github.com/bulkhead-labs/tailsuite/internal/engine"
 	"github.com/bulkhead-labs/tailsuite/internal/engine/headscale"
 	"github.com/bulkhead-labs/tailsuite/internal/project"
@@ -102,31 +103,74 @@ func runOnLab(ctx context.Context, dir string, p *project.Project, o suite.Optio
 			}
 		}
 	}
+	var r *runner.Run
 	if up {
-		if st.Engine != o.Engine {
-			return nil, fmt.Errorf("the lab that's up (run %s) runs %s, and this run asks for %s; tailsuite down first, or choose --engine %s", st.Run, st.Engine, o.Engine, st.Engine)
-		}
-		if names := planNames(plan); !slices.Equal(names, st.Devices) {
-			return nil, fmt.Errorf("lab.yaml's devices changed since the lab came up (run %s); tailsuite down, then up again", st.Run)
-		}
-		sb, err := docker.Attach(ctx, st.Run)
-		if err != nil {
-			return nil, err
-		}
-		defer func() { _ = sb.Close() }()
-		lab, err := headscale.New(headscale.Config{Sandbox: sb}).Attach(ctx, sb.Nodes(), st.Devices)
-		if err != nil {
-			return nil, err
-		}
-		// The policy may have changed since up: apply it, and wait for
-		// every node to hold it, before any probe (0016).
-		if _, err := lab.Apply(ctx, low.Policy); err != nil {
-			return nil, fmt.Errorf("applying the policy to the lab: %w", err)
-		}
-		cfg.Sandbox, cfg.Lab = sb, lab
-		return runner.Execute(ctx, cfg, planned)
+		r, err = onUpsLab(ctx, dir, st, plan, low, planned, cfg)
+	} else {
+		r, err = onOwnLab(ctx, plan, low, planned, cfg, stderr)
 	}
+	if err == nil && ctx.Err() != nil {
+		// Interrupted: probes cut short read as failures to connect.
+		return nil, fmt.Errorf("interrupted: %w", ctx.Err())
+	}
+	return r, err
+}
 
+// onUpsLab runs on the lab `up` started, after checking it's still what
+// this project and this build would start, and applying the current
+// policy. A result is only true of the lab it was read on.
+func onUpsLab(ctx context.Context, dir string, st labState, plan engine.LabPlan, low engine.Lowering, planned []suite.Planned, cfg runner.Config) (*runner.Run, error) {
+	again := "; tailsuite down, then tailsuite up, starts a lab that matches"
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case st.Dir != abs:
+		return nil, fmt.Errorf("the lab state in %s belongs to %s (run %s); tailsuite down --run %s tears that lab down", stateDir, st.Dir, st.Run, st.Run)
+	case st.Engine != cfg.Options.Engine:
+		return nil, fmt.Errorf("the lab that's up (run %s) runs %s, and this run asks for %s%s, or choose --engine %s", st.Run, st.Engine, cfg.Options.Engine, again, st.Engine)
+	case !samePlan(plan.Devices, st.Devices):
+		return nil, fmt.Errorf("lab.yaml or tailnet.auto.tfvars changed a device since the lab came up (run %s): a node keeps the user and tags it joined with%s", st.Run, again)
+	}
+	sb, err := docker.Attach(ctx, st.Run)
+	if err != nil {
+		return nil, fmt.Errorf("%w%s", err, again)
+	}
+	defer func() { _ = sb.Close() }()
+	agent, err := agentbin.For(sb.Arch())
+	if err != nil {
+		return nil, err
+	}
+	if b := buildOf(agent); !reflect.DeepEqual(b, st.Build) {
+		return nil, fmt.Errorf("the lab that's up (run %s) was started by another tailsuite build (%s, agent %.12s), and this is %s, agent %.12s%s", st.Run, st.Build.Tailsuite, st.Build.Agent, b.Tailsuite, b.Agent, again)
+	}
+	lab, err := headscale.New(headscale.Config{Sandbox: sb}).Attach(ctx, sb.Nodes(), planNames(st.Devices))
+	if err != nil {
+		return nil, fmt.Errorf("%w%s", err, again)
+	}
+	// The policy may have changed since up: apply it, and wait for every
+	// node to hold it, before any probe (0016).
+	if _, err := lab.Apply(ctx, low.Policy); err != nil {
+		return nil, fmt.Errorf("applying the policy to the lab: %w", err)
+	}
+	cfg.Sandbox, cfg.Lab = sb, lab
+	r, err := runner.Execute(ctx, cfg, planned)
+	if err != nil {
+		return nil, err
+	}
+	// Another process may have applied its own policy while this one
+	// probed: then no result here was read under this run's policy.
+	if err := lab.StillHolds(ctx); err != nil {
+		r.Unprove("not read under this run's policy: " + err.Error())
+	}
+	return r, nil
+}
+
+// onOwnLab starts a lab for this run alone, and always tears it down. A
+// teardown that fails after the run doesn't change what was proven; it's
+// reported, with what removes the rest.
+func onOwnLab(ctx context.Context, plan engine.LabPlan, low engine.Lowering, planned []suite.Planned, cfg runner.Config, stderr io.Writer) (*runner.Run, error) {
 	sb, agent, err := newSandbox(ctx)
 	if err != nil {
 		return nil, err
@@ -143,6 +187,10 @@ func runOnLab(ctx context.Context, dir string, p *project.Project, o suite.Optio
 		r, err = runner.Execute(ctx, cfg, planned)
 		return err
 	})
+	if err != nil && r != nil && ctx.Err() == nil {
+		_, _ = fmt.Fprintf(stderr, "tailsuite: warning: tearing down run %s: %v; tailsuite down --run %s removes what's left\n", sb.RunID(), err, sb.RunID())
+		return r, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -152,24 +200,26 @@ func runOnLab(ctx context.Context, dir string, p *project.Project, o suite.Optio
 // report writes the run, and returns its exit code. A result that can't
 // be written is exit 3: nobody saw it.
 func report(r *runner.Run, dir string, asJSON bool, junit string, stdout, stderr io.Writer) int {
+	// JUnit first: if it can't be written the exit is 3, and the results
+	// printed below say so.
+	var junitErr error
+	if junit != "" {
+		var b bytes.Buffer
+		junitErr = runner.WriteJUnit(&b, r)
+		if junitErr == nil {
+			junitErr = os.WriteFile(junit, b.Bytes(), 0o644) //nolint:gosec // G306: a report for CI to read
+		}
+		if junitErr != nil {
+			junitErr = fmt.Errorf("--junit: %w", junitErr)
+			r.Exit = exitCouldNotRun
+			r.Warnings = append(r.Warnings, junitErr.Error())
+		}
+	}
 	write := runner.WriteText
 	if asJSON {
 		write = runner.WriteJSON
 	}
-	var errs []error
-	if err := write(stdout, r); err != nil {
-		errs = append(errs, err)
-	}
-	if junit != "" {
-		var b bytes.Buffer
-		err := runner.WriteJUnit(&b, r)
-		if err == nil {
-			err = os.WriteFile(junit, b.Bytes(), 0o644) //nolint:gosec // G306: a report for CI to read
-		}
-		if err != nil {
-			errs = append(errs, fmt.Errorf("--junit: %w", err))
-		}
-	}
+	writeErr := write(stdout, r)
 	// The last results, for the UI (#11). Losing them loses no result.
 	var b bytes.Buffer
 	if err := runner.WriteJSON(&b, r); err == nil {
@@ -181,7 +231,7 @@ func report(r *runner.Run, dir string, asJSON bool, junit string, stdout, stderr
 			_, _ = fmt.Fprintf(stderr, "tailsuite: warning: couldn't save the results in %s: %v\n", stateDir, err)
 		}
 	}
-	if err := errors.Join(errs...); err != nil {
+	if err := errors.Join(junitErr, writeErr); err != nil {
 		return fail(stderr, err)
 	}
 	return r.Exit

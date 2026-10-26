@@ -11,7 +11,9 @@ import (
 	"testing"
 
 	"github.com/bulkhead-labs/tailsuite/internal/agentbin"
+	"github.com/bulkhead-labs/tailsuite/internal/engine/headscale"
 	"github.com/bulkhead-labs/tailsuite/internal/runner"
+	"github.com/bulkhead-labs/tailsuite/internal/sandbox/docker"
 )
 
 // The CLI on a real headscale lab, from init to down, with the node agent
@@ -59,12 +61,35 @@ func TestInitUpTestDown(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("test on the lab: exit %d\n%s", code, errOut)
 	}
+	if strings.Contains(errOut, "starting one") {
+		t.Fatalf("test started its own lab with up's running: %s", errOut)
+	}
 	if got := results(t, out); got.Summary != own.Summary {
 		t.Errorf("on the lab that's up: %+v; on its own lab: %+v", got.Summary, own.Summary)
 	}
 	if code, _, _ := runCmd(t, "test", "--dir", dir, "--strict"); code != 2 {
 		t.Errorf("test --strict with unproven results: exit %d, want 2", code)
 	}
+
+	// A device whose tags change needs a new lab: its node keeps the tags
+	// it joined with.
+	tfvars := filepath.Join(dir, "tofu", "tailnet.auto.tfvars")
+	tv, err := os.ReadFile(tfvars)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(tfvars, []byte(strings.Replace(string(tv), `["tag:prod"]`, `["tag:prod", "tag:db"]`, 1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if code, out, errOut := runCmd(t, "test", "--dir", dir); code != exitCouldNotRun || !strings.Contains(errOut, "changed a device") || out != "" {
+		t.Errorf("test after a device's tags changed: exit %d, %q, %q", code, errOut, out)
+	}
+	if err := os.WriteFile(tfvars, tv, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// A policy applied by another process during a run unproves it.
+	stillHolds(t, st)
 
 	// A policy changed after up reaches the lab before any probe: with
 	// engineers' grant gone, their test fails.
@@ -99,6 +124,51 @@ func TestInitUpTestDown(t *testing.T) {
 	}
 	if code, out, _ := runCmd(t, "down", "--dir", dir); code != 0 || !strings.Contains(out, "No lab is up") {
 		t.Errorf("a second down: exit %d, %q", code, out)
+	}
+
+	// A state left by a lab that's gone: test says so, and starts its own.
+	if err := writeState(dir, st); err != nil {
+		t.Fatal(err)
+	}
+	code, _, errOut = runCmd(t, "test", "--dir", dir, "--run", "the web tier reaches the database")
+	if code != 0 || !strings.Contains(errOut, "is gone") || !strings.Contains(errOut, "starting one") {
+		t.Errorf("test with a gone lab's state: exit %d, %q", code, errOut)
+	}
+	if _, ok, _ := readState(dir); ok {
+		t.Error("the gone lab's state is still there")
+	}
+}
+
+// stillHolds attaches to the lab twice, as two test processes would, and
+// checks the first sees the second's apply.
+func stillHolds(t *testing.T, st labState) {
+	t.Helper()
+	ctx := context.Background()
+	open := func() *headscale.Lab {
+		sb, err := docker.Attach(ctx, st.Run)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = sb.Close() })
+		lab, err := headscale.New(headscale.Config{Sandbox: sb}).Attach(ctx, sb.Nodes(), planNames(st.Devices))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return lab
+	}
+	first, second := open(), open()
+	pol := []byte(`{"grants": [{"src": ["*"], "dst": ["*"], "ip": ["*"]}]}`)
+	if _, err := first.Apply(ctx, pol); err != nil {
+		t.Fatal(err)
+	}
+	if err := first.StillHolds(ctx); err != nil {
+		t.Fatalf("right after its own apply: %v", err)
+	}
+	if _, err := second.Apply(ctx, pol); err != nil {
+		t.Fatal(err)
+	}
+	if err := first.StillHolds(ctx); err == nil {
+		t.Error("StillHolds didn't see another process's apply")
 	}
 }
 

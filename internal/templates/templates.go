@@ -50,12 +50,18 @@ func Files(name string) (map[string][]byte, error) {
 // ErrExists means a file Write would write is already there.
 var ErrExists = errors.New("already exists")
 
+// gitignore is merged rather than written: a new repo often has one.
+const gitignore = ".gitignore"
+
 // Write writes files into dir, creating it. It writes nothing if any of
 // them exists already: a project is the user's, and init never overwrites
-// it.
+// it. An existing .gitignore gets the template's lines it lacks.
 func Write(dir string, files map[string][]byte) error {
 	var there []string
 	for p := range files {
+		if p == gitignore {
+			continue
+		}
 		if _, err := os.Lstat(filepath.Join(dir, p)); err == nil {
 			there = append(there, p)
 		} else if !errors.Is(err, fs.ErrNotExist) {
@@ -65,6 +71,13 @@ func Write(dir string, files map[string][]byte) error {
 	if len(there) > 0 {
 		slices.Sort(there)
 		return fmt.Errorf("%s: %s %w; init writes nothing over a project", dir, strings.Join(there, ", "), ErrExists)
+	}
+	if b, ok := files[gitignore]; ok {
+		merged, err := mergeLines(filepath.Join(dir, gitignore), b)
+		if err != nil {
+			return err
+		}
+		files[gitignore] = merged
 	}
 	paths := make([]string, 0, len(files))
 	for p := range files {
@@ -81,4 +94,28 @@ func Write(dir string, files map[string][]byte) error {
 		}
 	}
 	return nil
+}
+
+// mergeLines is an existing file with each non-comment line of add that it
+// lacks appended, or add itself when there's no file.
+func mergeLines(path string, add []byte) ([]byte, error) {
+	have, err := os.ReadFile(path) //nolint:gosec // G304: the user's own project
+	if errors.Is(err, fs.ErrNotExist) {
+		return add, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	out := string(have)
+	lines := strings.Split(out, "\n")
+	for _, l := range strings.Split(string(add), "\n") {
+		if l == "" || strings.HasPrefix(l, "#") || slices.Contains(lines, l) {
+			continue
+		}
+		if out != "" && !strings.HasSuffix(out, "\n") {
+			out += "\n"
+		}
+		out += l + "\n"
+	}
+	return []byte(out), nil
 }

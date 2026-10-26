@@ -6,10 +6,13 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/bulkhead-labs/tailsuite/internal/agentbin"
+	"github.com/bulkhead-labs/tailsuite/internal/engine"
 	"github.com/bulkhead-labs/tailsuite/internal/engine/headscale"
 	"github.com/bulkhead-labs/tailsuite/internal/runner"
 	"github.com/bulkhead-labs/tailsuite/internal/suite"
@@ -172,7 +175,7 @@ func TestLabState(t *testing.T) {
 	if _, ok, err := readState(dir); ok || err != nil {
 		t.Fatalf("no state: %v %v", ok, err)
 	}
-	want := labState{Run: "0123abcd", Engine: "headscale", Devices: []string{"laptop", "db"}}
+	want := labState{Run: "0123abcd", Dir: dir, Engine: "headscale", Build: buildOf([]byte("agent")), Devices: []engine.PlanDevice{{Name: "laptop", User: "alice@example.com"}, {Name: "db", Tags: []string{"tag:db"}}}}
 	if err := writeState(dir, want); err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +184,7 @@ func TestLabState(t *testing.T) {
 		t.Errorf("state file mode = %v, %v; want 0600", fi.Mode().Perm(), err)
 	}
 	got, ok, err := readState(dir)
-	if !ok || err != nil || got.Run != want.Run || got.Engine != want.Engine || len(got.Devices) != 2 {
+	if !ok || err != nil || !reflect.DeepEqual(got, labState{Version: labStateVersion, Run: want.Run, Dir: want.Dir, Engine: want.Engine, Build: want.Build, Devices: want.Devices}) {
 		t.Errorf("readState = %+v %v %v", got, ok, err)
 	}
 	for _, bad := range []string{"{", `{"version": 9, "run": "0123abcd"}`, `{"version": 1, "run": "../x"}`} {
@@ -221,9 +224,10 @@ func TestReportExitCodes(t *testing.T) {
 		t.Errorf("report with an unwritable --junit = %d, want %d", got, exitCouldNotRun)
 	}
 	var back runner.Run
-	if err := json.Unmarshal(out.Bytes(), &back); err != nil || back.Summary.Pass != 1 {
-		t.Errorf("--json printed %q: %v", out.String(), err)
+	if err := json.Unmarshal(out.Bytes(), &back); err != nil || back.Summary.Pass != 1 || back.Exit != exitCouldNotRun {
+		t.Errorf("--json printed %q (%v): its exit must match the process's", out.String(), err)
 	}
+	r.Exit, r.Warnings = 0, nil
 	junit := filepath.Join(dir, "junit.xml")
 	if got := report(r, dir, false, junit, &out, &errOut); got != 0 {
 		t.Errorf("report with --junit = %d", got)
@@ -255,6 +259,67 @@ func TestEngines(t *testing.T) {
 	for _, e := range []string{"tailscale", "", "netbird"} {
 		if err := checkEngine(e); err == nil {
 			t.Errorf("checkEngine(%q) accepted it", e)
+		}
+	}
+}
+
+func TestSamePlan(t *testing.T) {
+	a := []engine.PlanDevice{{Name: "laptop", User: "alice@example.com"}, {Name: "server", Tags: []string{"tag:prod"}}}
+	if !samePlan(a, []engine.PlanDevice{{Name: "laptop", User: "alice@example.com"}, {Name: "server", Tags: []string{"tag:prod"}}}) {
+		t.Error("the same plan differs")
+	}
+	for name, b := range map[string][]engine.PlanDevice{
+		"a tag changed":    {{Name: "laptop", User: "alice@example.com"}, {Name: "server", Tags: []string{"tag:admin"}}},
+		"a tag added":      {{Name: "laptop", User: "alice@example.com"}, {Name: "server", Tags: []string{"tag:prod", "tag:admin"}}},
+		"tagged to a user": {{Name: "laptop", User: "alice@example.com"}, {Name: "server", User: "bob@example.com"}},
+		"a user changed":   {{Name: "laptop", User: "bob@example.com"}, {Name: "server", Tags: []string{"tag:prod"}}},
+		"a device less":    {{Name: "laptop", User: "alice@example.com"}},
+		"a pin added":      {{Name: "laptop", User: "alice@example.com", IPv4: "100.64.0.9"}, {Name: "server", Tags: []string{"tag:prod"}}},
+	} {
+		if samePlan(a, b) {
+			t.Errorf("%s: samePlan says the lab still matches", name)
+		}
+	}
+}
+
+func TestInitKeepsAnExistingGitignore(t *testing.T) {
+	dir := t.TempDir()
+	gi := filepath.Join(dir, ".gitignore")
+	if err := os.WriteFile(gi, []byte("node_modules/"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, errOut := runCmd(t, "init", dir); code != 0 {
+		t.Fatalf("init into a repo with a .gitignore: exit %d: %s", code, errOut)
+	}
+	if b, _ := os.ReadFile(gi); string(b) != "node_modules/\n/.tailsuite/\n" {
+		t.Errorf(".gitignore = %q", b)
+	}
+}
+
+// onUpsLab refuses a lab that isn't this project's, or doesn't match it,
+// before it touches Docker.
+func TestUpsLabRefusals(t *testing.T) {
+	dir := initProject(t)
+	p, o, err := load(dir, suite.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := engine.PlanEveryDevice(p.Tailnet)
+	abs, _ := filepath.Abs(dir)
+	good := labState{Run: "0123abcd", Dir: abs, Engine: "headscale", Devices: plan.Devices}
+	changed := slices.Clone(plan.Devices)
+	changed[0].Tags = append(slices.Clone(changed[0].Tags), "tag:extra")
+	for name, tc := range map[string]struct {
+		st   labState
+		want string
+	}{
+		"another folder's": {labState{Run: good.Run, Dir: "/elsewhere", Engine: good.Engine, Devices: good.Devices}, "belongs to /elsewhere"},
+		"another engine":   {labState{Run: good.Run, Dir: abs, Engine: "tailscale", Devices: good.Devices}, "runs tailscale"},
+		"a changed device": {labState{Run: good.Run, Dir: abs, Engine: good.Engine, Devices: changed}, "changed a device"},
+	} {
+		_, err := onUpsLab(context.Background(), dir, tc.st, plan, engine.Lowering{}, nil, runner.Config{Options: o})
+		if err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: %v, want %q", name, err, tc.want)
 		}
 	}
 }

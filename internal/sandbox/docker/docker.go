@@ -66,6 +66,77 @@ func New(ctx context.Context) (*Sandbox, error) {
 	}, nil
 }
 
+// Attach returns a sandbox for a run that's already up, such as the lab
+// `tailsuite up` left running, with its nodes and networks as the Docker
+// Engine reports them. Every node must be running. Teardown tears that run
+// down.
+func Attach(ctx context.Context, runID string) (*Sandbox, error) {
+	if err := sandbox.CheckRunID(runID); err != nil {
+		return nil, err
+	}
+	cli, v, err := connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	s := &Sandbox{cli: cli, runID: runID, arch: v.Arch, networks: map[string]sandbox.Network{}, nodes: map[string]sandbox.Node{}}
+	if err := s.attach(ctx); err != nil {
+		_ = cli.Close()
+		return nil, err
+	}
+	return s, nil
+}
+
+func (s *Sandbox) attach(ctx context.Context) error {
+	filter := client.Filters{}.Add("label", sandbox.LabelRun+"="+s.runID)
+	networks, err := s.cli.NetworkList(ctx, client.NetworkListOptions{Filters: filter})
+	if err != nil {
+		return fmt.Errorf("docker: listing run %s's networks: %w", s.runID, err)
+	}
+	for _, n := range networks.Items {
+		name := n.Labels[sandbox.LabelName]
+		s.networks[name] = sandbox.Network{Name: name, ID: n.ID}
+	}
+	containers, err := s.cli.ContainerList(ctx, client.ContainerListOptions{All: true, Filters: filter})
+	if err != nil {
+		return fmt.Errorf("docker: listing run %s's nodes: %w", s.runID, err)
+	}
+	if len(containers.Items) == 0 {
+		return fmt.Errorf("docker: run %s has no nodes", s.runID)
+	}
+	for _, c := range containers.Items {
+		name := c.Labels[sandbox.LabelName]
+		if c.State != container.StateRunning {
+			return fmt.Errorf("docker: run %s's node %s is %s, not running", s.runID, name, c.State)
+		}
+		inspect, err := s.cli.ContainerInspect(ctx, c.ID, client.ContainerInspectOptions{})
+		if err != nil {
+			return fmt.Errorf("docker: inspecting node %s: %w", name, err)
+		}
+		node := sandbox.Node{Name: name, ID: c.ID, Role: sandbox.Role(c.Labels[sandbox.LabelRole]), Addrs: map[string]netip.Addr{}}
+		if settings := inspect.Container.NetworkSettings; settings != nil {
+			for nname := range s.networks {
+				if ep := settings.Networks[sandbox.ResourceName(s.runID, nname)]; ep != nil {
+					node.Addrs[nname] = ep.IPAddress
+				}
+			}
+		}
+		s.nodes[name] = node
+	}
+	return nil
+}
+
+// Nodes lists the run's nodes this sandbox knows, by name.
+func (s *Sandbox) Nodes() []sandbox.Node {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]sandbox.Node, 0, len(s.nodes))
+	for _, n := range s.nodes {
+		out = append(out, n)
+	}
+	slices.SortFunc(out, func(a, b sandbox.Node) int { return strings.Compare(a.Name, b.Name) })
+	return out
+}
+
 // Connect returns a client for the Docker Engine named by the environment,
 // after checking that it answers, and that its internal networks keep DNS
 // inside the lab.

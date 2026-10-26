@@ -1,0 +1,18 @@
+# Synthetic.
+version: 1
+devices:
+  laptop: { user: alice@example.com, os: macos }
+  bobs-laptop: { user: bob@example.com, os: linux }
+  server:
+    os: linux
+    listen: [{ http: 80 }, { tcp: 9000 }]
+  db:
+    os: linux
+    listen: [{ tcp: 5432 }]
+users:
+  alice@example.com: { roles: [admin] }
+  bob@example.com: { roles: [member] }
+profiles:
+  default: { engine: headscale }
+  pr: { engine: headscale, skip: [slow] }
+  nightly: { engine: tailscale, unproven: fail }

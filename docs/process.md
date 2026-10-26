@@ -53,7 +53,9 @@ reviewer agent are those checks.
    a separate, read-only reviewer: it checks the PR against the checklist
    and the docs against the code, and posts its findings on the PR. Like
    every subagent, it runs as the **`delegate` skill** says: on Opus, with
-   the highest effort for review and design.
+   the highest effort for design, and for review the effort of the PR's
+   tier: `high`, or `xhigh` for critical paths
+   ([0028](decisions/0028-review-tiers.md)).
 4. **Fix the findings, then mark it ready.** The integration and
    user-journey tiers run, and must pass.
    When the maintainer will review later, the **`review-artifact` skill**

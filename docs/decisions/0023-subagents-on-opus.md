@@ -1,6 +1,8 @@
 # 0023: Subagents run on Opus, with the effort set by the work
 
-Status: **accepted** (2026-10-26). Built in #63. Follows
+Status: **accepted** (2026-10-26). Built in #63. Amended by
+[0028](0028-review-tiers.md): reviews run at `high`, or `xhigh` for
+critical paths, never `max`. Follows
 [0008](0008-tests-and-pr-flow.md).
 
 ## Context

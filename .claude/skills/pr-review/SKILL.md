@@ -9,14 +9,41 @@ The `pr-reviewer` agent ([`.claude/agents/pr-reviewer.md`](../../agents/pr-revie
 reviews a PR without seeing your conclusions, and posts one comment per
 round. This skill runs it, and closes the loop on what it finds.
 
+## 0. Size the review to the PR
+
+Reviews cost. Choose the tier before the first round, by what a miss
+would cost, not by the PR's length, and say it in the reviewer's prompt
+and the PR body ([0028](../../../docs/decisions/0028-review-tiers.md)).
+
+| Tier | For | Effort | Rounds, at most | Budget per round |
+|---|---|---|---|---|
+| **Light** | Docs, process and skill wording; a pinned bump with no code; a status page change | `high` | 1 | about 60k tokens |
+| **Standard** | A feature, a refactor, tests, an engine or command with a settled design | `high` | 2 | about 150k tokens |
+| **Critical** | What a false result or a leak would come from: workflows and the release path (0013); credentials and secrets; writes to a real tailnet (0007); the policy lowering and readiness, and the runner's reading of results (0001) | `xhigh` | 3 | about 250k tokens |
+
+- **Never `max`.**
+- **The budget goes in the prompt.** The reviewer stops at it, posts what
+  it found, and lists what it didn't get to.
+- **Only a blocking finding earns another round**, within the tier's
+  limit. A should-fix is fixed and checked here, by the author, not by
+  another round.
+- **A later round reviews only the fix commits** (`git show <sha>`), not
+  the whole PR again.
+- **Don't widen the PR in review.** A finding that needs new scope
+  becomes an issue, linked in the PR.
+- **At the limit, stop**: list in the PR what's left, and why it's safe
+  to leave, or file it.
+
 ## 1. Start a round
 
 - Start it as the [`delegate`](../delegate/SKILL.md) skill says, for
-  **review**: `model: "opus"`, effort `max`.
+  **review**: `model: "opus"`, and the tier's effort and budget.
+  Background the agent; don't wait on it.
 - **A fresh agent every round.** Never resume the last round's reviewer:
   it would review its own earlier conclusions.
 - **Its prompt carries:**
   - the PR number and its head SHA;
+  - its tier and token budget;
   - for a stacked PR, the branch below it, so it reviews only
     `origin/<branch below>..<head>`;
   - the worktree, read-only (for a fork, the ref instead; below);
@@ -58,14 +85,9 @@ round. This skill runs it, and closes the loop on what it finds.
 
 ## 3. Decide whether to run another round
 
-Run another round when:
-
-- a round found anything blocking;
-- the fixes changed behaviour, a rule or a decision, rather than wording;
-- or the fixes touched more than the lines the findings named.
-
-Stop when a round says ready and the fixes since then were small and
-local. Say which it was in the PR.
+Run another round only when a round found something blocking, and the
+tier allows another. Scope it to the fix commits. Otherwise stop, and say
+in the PR which it was.
 
 ## 4. Record it
 

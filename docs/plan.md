@@ -160,11 +160,13 @@ ready starts the heavy tiers. Any branch can run them by hand
 3. **Build:**
    - #1, the Go module, the flake and CI for lint and unit tests: done
      ([0018](decisions/0018-go-toolchain-flake-ci.md));
-   - #4, the Docker sandbox;
+   - #4, the Docker sandbox: done
+     ([0019](decisions/0019-docker-sandbox.md));
    - #58, the tailnet model and loading a project: done
      ([0022](decisions/0022-reading-a-project.md));
    - #5, headscale;
-   - #7, the node agent;
+   - #7, the node agent: done
+     ([0020](decisions/0020-node-agent.md));
    - #8, the test runner;
    - #12, the CLI;
    - #11, the UI;

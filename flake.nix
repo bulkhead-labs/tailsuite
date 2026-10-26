@@ -51,7 +51,7 @@
           # The hash of the Go dependencies. Every change to go.sum changes
           # it: set it to the hash `nix build` reports. CI fails until it
           # matches.
-          vendorHash = "sha256-VAUssOa6tQA5EYNBoC++xVBnl4wqYscnnghUmKkNsIs=";
+          vendorHash = "sha256-EWFY55SkDPh42FN3ZdhMUnFxe+nMJC2L3PW+YLWEkFY=";
           subPackages = [ "cmd/tailsuite" ];
           env.CGO_ENABLED = "0";
           ldflags = [

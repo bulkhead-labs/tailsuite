@@ -58,7 +58,7 @@ func spawnHolder(ctx context.Context, dir, abs, profile, engineName string, stdo
 	}
 	removeOldLogs(dir)
 	logFile := logPath(dir, token)
-	log, err := os.OpenFile(logFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	log, err := os.OpenFile(logFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600) //nolint:gosec // G304: the project's own .tailsuite/, a name we chose
 	if err != nil {
 		return fail(stderr, err)
 	}
@@ -85,7 +85,7 @@ func spawnHolder(ctx context.Context, dir, abs, profile, engineName string, stdo
 	for {
 		select {
 		case err := <-exited:
-			out, _ := os.ReadFile(logFile)
+			out, _ := os.ReadFile(logFile) //nolint:gosec // G304: our holder's log
 			_, _ = stderr.Write(out)
 			return fail(stderr, fmt.Errorf("the background process stopped before the lab was up (%w); its log is %s", err, logFile))
 		case <-ctx.Done():
@@ -102,7 +102,7 @@ func spawnHolder(ctx context.Context, dir, abs, profile, engineName string, stdo
 			return fail(stderr, errors.New("interrupted; the background process stopped, and no lab of it is left"))
 		case <-tick.C:
 			if st, ok, err := readState(dir); err == nil && ok && st.Token == token && st.Holder == pid && st.Ready {
-				out, _ := os.ReadFile(logFile)
+				out, _ := os.ReadFile(logFile) //nolint:gosec // G304: our holder's log
 				_, _ = stdout.Write(out)
 				return wrote(fmt.Fprintf(stdout, "Held by pid %d; its log is %s.\n", pid, logFile))
 			}

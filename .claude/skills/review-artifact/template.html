@@ -103,7 +103,7 @@ ol.guide { margin: 0; padding-left: 1.4em; display: grid; gap: 8px; }
 </header>
 
 <nav class="toc" aria-label="Sections">
-  <a href="#verdict">Verdict</a><a href="#scope">Scope</a><a href="#changes">What changed</a>
+  <a href="#milestone">Milestone</a><a href="#verdict">Verdict</a><a href="#scope">Scope</a><a href="#changes">What changed</a>
   <a href="#choices">Choices</a><a href="#setup">Sets up</a><a href="#plan">Plan changes</a>
   <a href="#trail">Review trail</a><a href="#risks">Risks</a><a href="#guide">Reading guide</a>
   <!-- Add <a href="#waiting">Also waiting</a> and <a href="#questions">Questions</a> when those sections exist. -->
@@ -117,6 +117,22 @@ ol.guide { margin: 0; padding-left: 1.4em; display: grid; gap: 8px; }
     WHAT CHANGED IN REVIEW, FOLLOW-UPS FILED.
   </div>
 </section> -->
+
+<section class="block" id="milestone">
+  <span class="eyebrow">Milestone · MN NAME · DONE done, REVIEW in review, LEFT not started, of TOTAL</span>
+  <h2>Where MN stands</h2>
+  <p class="prose">THE MILESTONE'S GOAL, IN ONE LINE.</p>
+  <!-- Every issue in the plan's order. Chips: done "done", in review "in review", next "next", blocked "blocked: ON WHAT". -->
+  <div class="tablewrap"><table>
+    <thead><tr><th>Issue</th><th>What</th><th>State</th></tr></thead>
+    <tbody>
+      <tr><td>#N</td><td>WHAT IT DELIVERS</td><td><span class="chip done">done</span></td></tr>
+      <tr><td>#N</td><td>WHAT IT DELIVERS</td><td><span class="chip info">in review · #PR</span></td></tr>
+      <tr><td>#N</td><td>WHAT IT DELIVERS</td><td><span class="chip partly">blocked: ON WHAT</span></td></tr>
+    </tbody>
+  </table></div>
+  <p class="prose">WHAT THESE PRS MOVE, AND WHAT'S NEXT ON THE CRITICAL PATH.</p>
+</section>
 
 <section class="block" id="verdict">
   <!-- callout ok when ready; callout warn when not. -->

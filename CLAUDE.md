@@ -38,8 +38,13 @@ are in [`docs/decisions/`](docs/decisions/README.md).
    - opens as a draft;
    - runs the `pr-ready` skill before it's marked ready (that skill runs
      `pr-review`, which starts the `pr-reviewer` agent);
-   - is squash-merged only after the maintainer's approving review, and
-     when they ask.
+   - is merged with a merge commit, only after the maintainer's approving
+     review, and when they ask
+     ([0024](docs/decisions/0024-merge-commits.md)). Every commit on the
+     branch reaches `main`, so each one is signed off and written to be
+     read;
+   - stacked on another PR, has its base on `main` and its branch built
+     on the one below, so it merges with no push once that one has.
 
    **After every merge, run the `post-merge` skill.**
 

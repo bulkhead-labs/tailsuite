@@ -13,7 +13,8 @@ useful thing right now is a view on the
    template's checklist.
 3. Mark it ready when the checklist is done. The heavier test tiers will
    run then, once they exist (#13).
-4. Maintainers squash-merge.
+4. Maintainers merge with a merge commit, so every commit on your branch
+   reaches `main`. Write each one to be read, and sign it off.
 
 ## Sign your commits off (DCO)
 

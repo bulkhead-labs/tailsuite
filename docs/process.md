@@ -61,13 +61,35 @@ reviewer agent are those checks.
    issue, what it sets up, and what it changes in the plan. The page is
    private to the maintainer, so it's never linked from the repo, and
    anything settled on it is written into the repo before it's acted on.
-5. **The maintainer approves, then it's squash-merged.** The PR title becomes the commit title, and the
-   branch's commit messages its body, so every `Signed-off-by` is kept. The
-   branch is deleted.
+5. **The maintainer approves, then it's merged with a merge commit**
+   ([0024](decisions/0024-merge-commits.md)). The branch's commits reach
+   `main` as they are, each with its `Signed-off-by`, so each one is
+   written to be read. The merge commit's title is the PR's title and
+   number, and its body the PR's description. The
+   branch is deleted. To undo a PR, revert its merge commit
+   (`git revert -m 1 <merge>`).
 6. **After the merge, run the `post-merge` skill**
    (`.claude/skills/post-merge`). It checks that the status page deployed,
    that the milestone and issue state matches `plan.md`, and that nothing
    in the docs went stale. Any fix goes in a docs-only PR.
+
+### Stacked pull requests
+
+When one PR builds on another that hasn't merged yet:
+
+- **Every PR's base is `main`.** Never base a PR on another PR's branch.
+  GitHub retargets such a PR when the one below merges, and a base change
+  dismisses the maintainer's approval.
+- **Each branch is built on the branch below it**, so its commits sit on
+  top of that branch's.
+- **The PR body says "Builds on #n"**, and its own commits are
+  `origin/<branch below>..origin/<branch>`. Until the one below merges,
+  GitHub's diff shows both PRs' commits; reviewers read only that range.
+- **They merge bottom up.** Once the one below has merged, the next merges
+  cleanly with no push, so its approval holds.
+- **A fix to a lower PR** means rebuilding every branch above it, and a
+  push to each, which dismisses their approvals. Fix lower PRs before the
+  maintainer reviews the stack, where possible.
 
 Humans can do every step by hand. The skills exist so agents and people
 follow the same checklist.

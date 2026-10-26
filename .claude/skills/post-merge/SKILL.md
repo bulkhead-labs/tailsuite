@@ -22,6 +22,12 @@ deleted that branch. Point it back before anything else:
 - `git fetch origin main && git log --oneline -5 origin/main`
 - `gh pr view <n> --json title,body,mergedAt`, and the issues it closed:
   `gh api graphql -f query='query{repository(owner:"bulkhead-labs",name:"tailsuite"){pullRequest(number:<n>){closingIssuesReferences(first:20){nodes{number title state}}}}}'`
+- **The merge commit's author** must be the account's `noreply` address:
+  `git log -1 --format='%an <%ae>' <merge SHA>`. Anything else is a leak;
+  stop and tell the maintainer.
+- **A stack above it**: each PR built on this one should now merge
+  cleanly, with its base still `main`
+  (`gh pr view <m> --json baseRefName,mergeable`).
 - The issues it closed must be closed. If one was only partly done, reopen
   it, or file the rest as a new issue on the same milestone.
 

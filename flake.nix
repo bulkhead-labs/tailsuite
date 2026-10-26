@@ -48,9 +48,10 @@
                 ./internal
               ];
             };
-          # No dependencies yet. Once go.sum exists, set this to the hash
-          # `nix build` reports; CI fails until it matches.
-          vendorHash = null;
+          # The hash of the Go dependencies. Every change to go.sum changes
+          # it: set it to the hash `nix build` reports. CI fails until it
+          # matches.
+          vendorHash = "sha256-VAUssOa6tQA5EYNBoC++xVBnl4wqYscnnghUmKkNsIs=";
           subPackages = [ "cmd/tailsuite" ];
           env.CGO_ENABLED = "0";
           ldflags = [

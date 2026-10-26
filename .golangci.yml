@@ -13,6 +13,12 @@ linters:
     - nolintlint
     - unconvert
     - usestdlibvars
+  exclusions:
+    rules:
+      # Tests read their own test data and temporary files.
+      - path: _test\.go
+        linters: [gosec]
+        text: "G304|G703"
   settings:
     nolintlint:
       require-explanation: true

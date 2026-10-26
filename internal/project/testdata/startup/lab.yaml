@@ -1,0 +1,14 @@
+# Synthetic.
+version: 1
+devices:
+  laptop: { user: alice@example.com, os: macos }
+  server:
+    os: linux
+    listen: [{ http: 80 }]
+  db:
+    os: linux
+    ip: 100.64.0.10
+    listen: [{ tcp: 5432 }]
+profiles:
+  default: { engine: headscale }
+  nightly: { engine: tailscale, unproven: fail }

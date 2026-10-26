@@ -1,0 +1,11 @@
+// Synthetic. A small startup's first segmented policy.
+{
+	"groups": {"group:eng": ["alice@example.com"]},
+	"tagOwners": {"tag:prod": ["group:eng"], "tag:db": ["group:eng"]},
+	"grants": [
+		// Engineers reach the web tier over HTTP.
+		{"src": ["group:eng"], "dst": ["tag:prod"], "ip": ["tcp:80"]},
+		// The web tier reaches the database.
+		{"src": ["tag:prod"], "dst": ["tag:db"], "ip": ["tcp:5432"]},
+	],
+}

@@ -3,6 +3,7 @@ package runner
 import (
 	"bytes"
 	"encoding/xml"
+	"errors"
 	"net/netip"
 	"slices"
 	"strings"
@@ -149,7 +150,7 @@ func TestWriteText(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := b.String()
-	for _, want := range []string{"Not proven in this lab", "UNKNOWN", "REFUSED", "1 passed, 1 failed, 1 unknown, 1 refused, 1 skipped", "FAIL\n"} {
+	for _, want := range []string{"Not proven in this lab", "UNKNOWN", "REFUSED", "1 passed, 1 failed, 1 unknown, 1 refused, 1 skipped", "FAIL\n", "skipped slow one (skip slow)"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in\n%s", want, out)
 		}
@@ -182,5 +183,32 @@ func TestFilterAdmits(t *testing.T) {
 	f.Rules = append(f.Rules, engine.FilterRule{SrcIPs: []string{"something-new"}, DstPorts: []engine.DstPort{{IP: "*", Ports: engine.PortRange{First: 0, Last: 65535}}}})
 	if got := filterAdmits(f, 80, nodes, db); len(got) != 0 {
 		t.Errorf("unreadable: %v", got)
+	}
+}
+
+func TestLabsFault(t *testing.T) {
+	laptop, db := netip.MustParseAddr("100.64.0.1"), netip.MustParseAddr("100.64.0.3")
+	rule := func(src, dstIP string, proto ...int) engine.Filter {
+		return engine.Filter{Rules: []engine.FilterRule{{SrcIPs: []string{src}, DstPorts: []engine.DstPort{{IP: dstIP, Ports: engine.PortRange{First: 5000, Last: 6000}}}, IPProto: proto}}}
+	}
+	for name, c := range map[string]struct {
+		f     engine.Filter
+		err   error
+		fault bool
+	}{
+		"no rule for the source":     {rule("100.64.0.2", db.String()), nil, false},
+		"the source is admitted":     {rule(laptop.String(), db.String()), nil, true},
+		"a range admits it":          {rule("100.64.0.0-100.64.0.9", "*"), nil, true},
+		"an unreadable source":       {rule("something-new", "*"), nil, true},
+		"an unreadable destination":  {rule(laptop.String(), "something-new"), nil, true},
+		"another destination":        {rule(laptop.String(), "192.0.2.9"), nil, false},
+		"UDP only":                   {rule(laptop.String(), "*", 17), nil, false},
+		"a CIDR destination with db": {rule(laptop.String(), "100.64.0.0/24"), nil, true},
+		"an unreadable filter":       {engine.Filter{}, errors.New("exec failed"), true},
+		"an empty filter":            {engine.Filter{}, nil, false},
+	} {
+		if got := labsFault(c.f, c.err, 5432, laptop, db) != ""; got != c.fault {
+			t.Errorf("%s: fault %v, want %v", name, got, c.fault)
+		}
 	}
 }

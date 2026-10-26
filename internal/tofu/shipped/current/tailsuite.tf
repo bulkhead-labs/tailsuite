@@ -33,21 +33,22 @@ resource "tailscale_acl" "policy" {
 # tailnet's domain: the lab's devices and production's have different
 # IDs and domains, and the same short names. A device's full name is
 # "<short name>.<tailnet domain>", so its short name and a dot are a
-# prefix no other device's name has.
+# prefix no other device's name has. Devices shared in from other
+# tailnets are listed too, and never count: they aren't this tailnet's.
 data "tailscale_devices" "tagged" {
   for_each    = { for name, d in var.devices : name => d if length(d.tags) > 0 }
   name_prefix = "${each.key}."
 
   lifecycle {
     postcondition {
-      condition     = length(self.devices) == 1
-      error_message = "Want exactly one device named ${each.key}; found ${length(self.devices)}."
+      condition     = length([for d in self.devices : d if !d.is_external]) == 1
+      error_message = "Want exactly one device named ${each.key} in this tailnet; found ${length([for d in self.devices : d if !d.is_external])}."
     }
   }
 }
 
 resource "tailscale_device_tags" "tagged" {
   for_each  = data.tailscale_devices.tagged
-  device_id = one(each.value.devices).node_id
+  device_id = one([for d in each.value.devices : d if !d.is_external]).node_id
   tags      = var.devices[each.key].tags
 }

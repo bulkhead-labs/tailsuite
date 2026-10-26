@@ -2,7 +2,8 @@
 
 Status: **accepted** (2026-10-26). Builds
 [0014](0014-tailnet-model-and-project-layout.md)'s "How tailsuite reads
-the module" for #9.
+the module" for #9, and amends its allow-list: an `import` block may
+target only the policy, and more sources are refused.
 
 ## Context
 
@@ -28,7 +29,9 @@ the module" for #9.
     `{ tags = [...] }`;
   - finds each tagged device by its short MagicDNS name, with the
     `tailscale_devices` data source and `name_prefix = "<name>."`, and a
-    postcondition that exactly one device matched; then sets its tags
+    postcondition that exactly one of this tailnet's devices matched
+    (devices shared in from other tailnets, which the API lists too, are
+    left out); then sets its tags
     with `tailscale_device_tags` on that device's `node_id`. A device's
     full name is `<short name>.<tailnet domain>`, so the prefix fits the
     lab and production, whose domains and IDs differ. (`tailscale_device`'s
@@ -134,5 +137,7 @@ shipped `tailsuite.tf` declares.
   the map removes the comment lines directly above it.
 - **`check` blocks are refused**, though one holding only assertions
   applies nothing: telling them apart is more than the M1 lab needs.
+- **Imports into device tags are refused**, which M5's import (#36) will
+  need for a zero-change plan; M5 revisits the rule.
 - **The run directory is applied only once the Tailscale engine lands**
   (#6). Until then it's validated, not applied.

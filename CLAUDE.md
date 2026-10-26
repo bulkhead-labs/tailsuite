@@ -52,7 +52,9 @@ are in [`docs/decisions/`](docs/decisions/README.md).
    **After every merge, run the `post-merge` skill.**
 
    **Every subagent follows the `delegate` skill:** Opus always, with
-   the effort set by the kind of work, highest for design and review.
+   the effort set by the kind of work, highest for design. Reviews are
+   sized to the PR: `high`, or `xhigh` for critical paths, never `max`
+   ([0028](docs/decisions/0028-review-tiers.md)).
 7. **Sign off every commit** (`git commit -s`, DCO), merges on a branch
    included (`git merge --signoff`). Only the merge commit GitHub makes
    when a PR merges is exempt: it adds no content.

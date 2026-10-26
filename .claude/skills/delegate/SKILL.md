@@ -1,6 +1,6 @@
 ---
 name: delegate
-description: Hand work in tailsuite to a subagent, choosing its model and effort by the kind of work. Every subagent runs on Opus; design and review get the highest effort, hard building one step below (decision 0023). Use whenever you start a subagent or an agent from .claude/agents/ (the pr-reviewer included), or when asked to "delegate", "fan out", "use a subagent" or "run agents in parallel".
+description: Hand work in tailsuite to a subagent, choosing its model and effort by the kind of work. Every subagent runs on Opus; design gets the highest effort, hard building one step below, and reviews high or, for critical paths, xhigh (decisions 0023, 0028). Use whenever you start a subagent or an agent from .claude/agents/ (the pr-reviewer included), or when asked to "delegate", "fan out", "use a subagent" or "run agents in parallel".
 ---
 
 # delegate
@@ -19,7 +19,7 @@ an agent file sets its own.
 | Work | Effort | Examples |
 |---|---|---|
 | **Design and decisions** | `max` | A design question, a decision record, a spike's conclusions, the engine interface, anything a later milestone builds on |
-| **Review** | `max` | The `pr-reviewer` agent, a security check, a second opinion on a finding |
+| **Review** | `high`; `xhigh` only for the critical tier | The `pr-reviewer` agent, a security check, a second opinion on a finding. The [`pr-review`](../pr-review/SKILL.md) skill sets the tier and the budget; never `max` ([0028](../../../docs/decisions/0028-review-tiers.md)) |
 | **Hard building and debugging** | `xhigh` | Parsers, concurrency, sandbox and network code, a test that fails only sometimes, anything a fuzzer or the race detector found |
 | **Ordinary building** | `high` | A feature with a clear design, tests for code that exists, a docs change with code behind it |
 | **Finding things** | `medium` | Where is X defined, which files use Y, what changed between two refs |

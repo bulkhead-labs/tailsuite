@@ -93,5 +93,8 @@ Report:
 - the reviewer's findings and what happened to each;
 - the CI run link (and, once #13 exists, the heavy tiers' runs).
 
+When the maintainer will review later, or asks for it, build a review
+page with the `review-artifact` skill, and give its link in the report.
+
 Merging needs the maintainer's approving review (decision 0013), and their
 say-so. Don't merge unless asked.

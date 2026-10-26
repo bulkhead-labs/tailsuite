@@ -70,7 +70,13 @@ Read each against the code on `main`:
 
 Never change behaviour in this PR.
 
-## 6. Report
+## 6. The review page
+
+If the PR had a review page (the `review-artifact` skill), update it to
+the outcome, as that skill's "Keep it current" says: an outcome box at the
+top, and its links repointed from the branch to `main`.
+
+## 7. Report
 
 A short list:
 
@@ -78,4 +84,5 @@ A short list:
 - issue and milestone state;
 - what was checked;
 - the drift found and fixed, with the docs PR link;
+- the review page, if there was one, and that it shows the outcome;
 - the status page's state.

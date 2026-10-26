@@ -1,0 +1,139 @@
+<title>NAME Review</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* tailsuite review page. Layout: one reading column; tables scroll in their
+   own box; cards stack on phones. Colors are tokens, for light and dark. */
+:root {
+  --bg: #f2f4f6; --surface: #ffffff; --sunk: #e7ebef;
+  --fg: #16202a; --muted: #55626e; --line: #d2d9e0;
+  --accent: #1c5a84; --accent-soft: #dce8f1;
+  --warn: #84560a; --warn-soft: #f4e9d3;
+  --ok: #2b6a3c; --ok-soft: #dbeee0;
+  --bad: #9a2b2b; --bad-soft: #f5dede;
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f151b; --surface: #161f28; --sunk: #0b1015; --fg: #e2e8ee; --muted: #9ba9b6;
+    --line: #2a3743; --accent: #7ab4dc; --accent-soft: #1a3245; --warn: #e3b55f; --warn-soft: #382c16;
+    --ok: #7dcf93; --ok-soft: #163222; --bad: #ec8c8c; --bad-soft: #3a1c1c; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f151b; --surface: #161f28; --sunk: #0b1015; --fg: #e2e8ee; --muted: #9ba9b6;
+  --line: #2a3743; --accent: #7ab4dc; --accent-soft: #1a3245; --warn: #e3b55f; --warn-soft: #382c16;
+  --ok: #7dcf93; --ok-soft: #163222; --bad: #ec8c8c; --bad-soft: #3a1c1c; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+.wrap { max-width: 1000px; margin: 0 auto; }
+.prose { max-width: 70ch; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 600; line-height: 1.2; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(30px, 5vw, 42px); letter-spacing: -0.01em; }
+h2 { font-size: 26px; }
+h3 { font-size: 18px; }
+p { margin: 0; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+code { background: var(--sunk); padding: 0.08em 0.32em; border-radius: 3px; overflow-wrap: anywhere; }
+pre { margin: 0; background: var(--sunk); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; overflow-x: auto; line-height: 1.5; font-size: 13px; }
+pre code { background: none; padding: 0; font-size: inherit; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+header.top { padding-block: 40px 24px; display: grid; gap: 14px; border-bottom: 1px solid var(--line); }
+.lede { font-size: 18px; }
+nav.toc { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 18px; }
+nav.toc a { font-family: var(--font-mono); font-size: 13px; text-decoration: none; color: var(--fg); border: 1px solid var(--line); background: var(--surface); padding: 5px 10px; border-radius: 999px; }
+nav.toc a:hover { border-color: var(--accent); }
+
+section.block { padding-block: 34px 8px; display: grid; gap: 16px; }
+section.block + section.block { border-top: 1px solid var(--line); }
+.stack { display: grid; gap: 12px; }
+ul.tight { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 14px; }
+.two > * { min-width: 0; }
+
+.callout { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 6px; padding: 14px 16px; display: grid; gap: 8px; }
+.callout.ok { border-left-color: var(--ok); }
+.callout.warn { border-left-color: var(--warn); }
+.given { background: var(--warn-soft); border-radius: 6px; padding: 10px 14px; }
+.given b { color: var(--warn); font-weight: 600; }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+tr:last-child td { border-bottom: 0; }
+th { font-family: var(--font-mono); font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); background: var(--sunk); }
+td.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+td.nowrap { white-space: nowrap; }
+
+.chip { display: inline-block; font-family: var(--font-mono); font-size: 11.5px; line-height: 1; padding: 4px 7px; border-radius: 4px; letter-spacing: 0.03em; white-space: nowrap; vertical-align: 2px; }
+.chip.done { background: var(--ok-soft); color: var(--ok); }
+.chip.partly, .chip.agree { background: var(--warn-soft); color: var(--warn); }
+.chip.moved, .chip.info { background: var(--accent-soft); color: var(--accent); }
+.chip.no { background: var(--bad-soft); color: var(--bad); }
+
+.cards { display: grid; gap: 10px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; display: grid; gap: 6px; min-width: 0; }
+.card .src { font-size: 13.5px; color: var(--muted); }
+ol.guide { margin: 0; padding-left: 1.4em; display: grid; gap: 8px; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-width: 520px) { body { font-size: 15.5px; } h2 { font-size: 23px; } }
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <span class="eyebrow">tailsuite · review · PR #N · checked YYYY-MM-DD at SHA</span>
+  <h1>WHAT WAS BUILT</h1>
+  <p class="lede prose">WHAT IT DELIVERS, AND THE VERDICT, IN TWO OR THREE SENTENCES.</p>
+</header>
+
+<nav class="toc" aria-label="Sections">
+  <a href="#verdict">Verdict</a><a href="#scope">Scope</a><a href="#changes">What changed</a>
+  <a href="#choices">Choices</a><a href="#setup">Sets up</a><a href="#plan">Plan changes</a>
+  <a href="#trail">Review trail</a><a href="#risks">Risks</a><a href="#guide">Reading guide</a>
+</nav>
+
+<section class="block" id="verdict">
+  <div class="callout ok">
+    <span class="eyebrow">Verdict</span>
+    <h3>READY / NOT READY</h3>
+    <!-- Review rounds, CI, merge order, anything waiting on the maintainer. One row per PR for a group. -->
+  </div>
+</section>
+
+<section class="block" id="scope">
+  <span class="eyebrow">Scope · #ISSUE "Done when"</span>
+  <h2>Against what was asked</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Done when</th><th>Delivered by</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>ITEM</td><td>FILE OR TEST</td><td><span class="chip done">done</span></td></tr>
+    </tbody>
+  </table></div>
+  <!-- Then: beyond the scope, and why. -->
+</section>
+
+<section class="block" id="changes"><span class="eyebrow">What changed</span><h2>By area</h2></section>
+<section class="block" id="choices"><span class="eyebrow">Choices made · decision NNNN</span><h2>Choices with trade-offs</h2></section>
+<section class="block" id="setup"><span class="eyebrow">What it sets up</span><h2>What comes next can use</h2></section>
+<section class="block" id="plan"><span class="eyebrow">Plan changes</span><h2>What this changes in the plan</h2></section>
+<section class="block" id="trail"><span class="eyebrow">Review trail</span><h2>Reviews and tests</h2></section>
+<section class="block" id="risks"><span class="eyebrow">Risks</span><h2>What could still be wrong</h2></section>
+<section class="block" id="guide"><span class="eyebrow">Reading guide</span><h2>If you read the diff</h2><ol class="guide"></ol></section>
+
+</div>

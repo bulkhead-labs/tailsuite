@@ -1,6 +1,6 @@
 # The UI's Playwright smoke test (#11). smoke_test.go runs it in the
 # pinned Playwright image, against a server it started, as:
-#   python3 smoke.py <link> <results file inside the container>
+#   python3 smoke.py <link> <a second link> <results file> [screenshots folder]
 # Synthetic data only.
 import json
 import sys
@@ -9,8 +9,8 @@ from urllib.parse import urlparse
 
 from playwright.sync_api import expect, sync_playwright
 
-link, results = sys.argv[1], sys.argv[2]
-shots = sys.argv[3] if len(sys.argv) > 3 else ""  # a folder for screenshots, to look at by hand
+link, link2, results = sys.argv[1], sys.argv[2], sys.argv[3]
+shots = sys.argv[4] if len(sys.argv) > 4 else ""  # a folder for screenshots, to look at by hand
 origin = urlparse(link)
 failures = []
 
@@ -62,6 +62,12 @@ with sync_playwright() as p:
         # A reload keeps the session, without trading again.
         page.reload()
         expect(page.locator(".tests li")).to_have_count(2, timeout=10000)
+        # A fresh link pasted into the open tab is traded, and leaves the
+        # address bar.
+        page.goto(link2)
+        page.wait_for_function("location.hash === ''", timeout=10000)
+        expect(page.locator(".tests li")).to_have_count(2, timeout=10000)
+        check(not page.locator("[role=alert]").is_visible(), "an error after pasting a fresh link")
         # Phone width, dark: no sideways scroll.
         page.set_viewport_size({"width": 390, "height": 800})
         page.emulate_media(color_scheme="dark")

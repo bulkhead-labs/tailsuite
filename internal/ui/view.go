@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -38,7 +39,7 @@ type Path struct {
 
 // NewView draws the map from a project.
 func NewView(p *project.Project) View {
-	v := View{Project: p.Dir}
+	v := View{Project: filepath.Base(p.Dir)}
 	for _, d := range p.Tailnet.Devices {
 		v.Devices = append(v.Devices, Device{Name: d.Name, User: d.User, Tags: d.Tags, OS: d.OS})
 	}
@@ -50,7 +51,9 @@ func NewView(p *project.Project) View {
 	resolve := func(rule, id string) (suite.Match, bool) {
 		m, err := r.Resolve(id)
 		if err != nil || len(m.Devices) == 0 {
-			v.Notes = append(v.Notes, fmt.Sprintf("%s: %s isn't drawn: it names no lab device", rule, id))
+			if note := fmt.Sprintf("%s: %s isn't drawn: it names no lab device", rule, id); !slices.Contains(v.Notes, note) {
+				v.Notes = append(v.Notes, note)
+			}
 			return suite.Match{}, false
 		}
 		return m, true

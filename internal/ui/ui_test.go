@@ -250,3 +250,27 @@ func TestEventsStreamTheViewThenNewResults(t *testing.T) {
 		t.Errorf("after the session ended: %s", ev)
 	}
 }
+
+func TestNoDirectoryListings(t *testing.T) {
+	s, _, _ := start(t)
+	for _, p := range []string{"/vendor/", "/fonts/"} {
+		if got := do(t, s, "GET", p, nil).StatusCode; got != http.StatusNotFound {
+			t.Errorf("GET %s = %d, want 404", p, got)
+		}
+	}
+}
+
+func TestCloseEndsOpenStreams(t *testing.T) {
+	s, _, _ := start(t)
+	link, _, _ := s.NewLink()
+	_, sess := trade(t, s, secretOf(t, link))
+	res := do(t, s, "GET", "/api/events", map[string]string{"Sec-Fetch-Site": "same-origin", headerSession: sess})
+	readEvent(t, res.Body)
+	began := time.Now()
+	if err := s.Close(); err != nil {
+		t.Errorf("Close: %v", err)
+	}
+	if d := time.Since(began); d > time.Second {
+		t.Errorf("Close took %v with a stream open", d)
+	}
+}

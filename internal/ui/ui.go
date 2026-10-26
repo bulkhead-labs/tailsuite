@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -58,6 +59,8 @@ type Server struct {
 	files http.Handler
 	// started is when the UI started; results older than it aren't shown.
 	started time.Time
+	// stop ends open streams, so Close doesn't wait on them.
+	stop context.CancelFunc
 }
 
 // Start serves the UI on 127.0.0.1 and ::1, on one random free port. ::1
@@ -80,7 +83,9 @@ func Start(opts Options) (*Server, error) {
 		s.hosts[hp] = true
 		s.orig["http://"+hp] = true
 	}
-	s.srv = &http.Server{Handler: s, ReadHeaderTimeout: 10 * time.Second}
+	base, stop := context.WithCancel(context.Background())
+	s.stop = stop
+	s.srv = &http.Server{Handler: s, ReadHeaderTimeout: 10 * time.Second, BaseContext: func(net.Listener) context.Context { return base }}
 	for _, ln := range s.lns {
 		s.wg.Go(func() { _ = s.srv.Serve(ln) })
 	}
@@ -123,6 +128,7 @@ func noIPv6(err error) bool {
 
 // Close stops serving. Open streams end.
 func (s *Server) Close() error {
+	s.stop()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	err := s.srv.Shutdown(ctx)
@@ -171,6 +177,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		// No directory listings.
+		if r.URL.Path != "/" && strings.HasSuffix(r.URL.Path, "/") {
+			http.NotFound(w, r)
 			return
 		}
 		// The shell, scripts and styles hold no tailnet data (0017).

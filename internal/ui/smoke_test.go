@@ -38,6 +38,10 @@ func TestSmoke(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	link2, traded2, err := s.NewLink()
+	if err != nil {
+		t.Fatal(err)
+	}
 	script, err := filepath.Abs("testdata/smoke.py")
 	if err != nil {
 		t.Fatal(err)
@@ -61,12 +65,17 @@ func TestSmoke(t *testing.T) {
 		args = append(args, "-v", os.Getenv("TAILSUITE_SMOKE_SHOTS")+":/shots")
 	}
 	args = append(args, playwrightImage, "sh", "-c",
-		`pip install -q --break-system-packages --require-hashes --no-deps -r /smoke/requirements.txt && exec python3 /smoke/smoke.py "$0" /out/results.json "$1"`,
-		link, shots)
+		`pip install -q --break-system-packages --require-hashes --no-deps -r /smoke/requirements.txt && exec python3 /smoke/smoke.py "$0" "$1" /out/results.json "$2"`,
+		link, link2, shots)
 	cmd := exec.Command("docker", args...) //nolint:gosec,noctx // G204: fixed arguments and this test's own paths
 	out, err := cmd.CombinedOutput()
 	t.Logf("%s", out)
 	if err != nil {
 		t.Fatal(err)
+	}
+	select {
+	case <-traded2:
+	default:
+		t.Error("the pasted link's traded channel didn't close")
 	}
 }

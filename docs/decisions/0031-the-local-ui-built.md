@@ -27,8 +27,9 @@ Status: **accepted** (2026-10-26). Builds [0017](0017-local-ui.md) for
 - **Results replace the map path by path.** Every pair a test probed is
   drawn from its result: allowed and proven, blocked and proven (a deny
   that held, with its positive control, 0001), FAIL, or not proven
-  (UNKNOWN or REFUSED). A policy path with a tested pair is no longer
-  drawn as unverified.
+  (UNKNOWN or REFUSED). A policy path keeps, still unverified, the ports
+  no test probed between its two devices; a test on one port proves
+  nothing about the others.
 - **Results arrive a run at a time.** The server watches the results
   file and sends each new run whole. It never sends a test's result
   before the run has finished, because the runner turns results UNKNOWN
@@ -39,7 +40,9 @@ Status: **accepted** (2026-10-26). Builds [0017](0017-local-ui.md) for
   fragment, traded once for a 32-byte session secret sent as a header;
   secrets are kept as their SHA-256; an unused link expires after five
   minutes; a used link traded again within that time ends the session it
-  made, and is refused after. Every response carries the CSP, `nosniff`,
+  made, and is refused after. A link in the address bar is traded even
+  over a stored session, and when it's pasted into an open tab (a
+  fragment change, which doesn't reload the page). Every response carries the CSP, `nosniff`,
   `no-referrer` and same-origin opener and resource policies.
 - **Cytoscape injects a `<style>` element**, which the CSP refuses,
   unless the page has an element with its id. The page's stylesheet link

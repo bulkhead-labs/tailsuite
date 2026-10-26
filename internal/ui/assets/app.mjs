@@ -15,13 +15,17 @@ function store(s) {
   try { if (s) sessionStorage.setItem(KEY, s); else sessionStorage.removeItem(KEY); } catch { /* the session lasts this load only */ }
 }
 
-// session returns a live session secret: the stored one, or one traded
-// for the link's secret, which then leaves the address bar.
+// session returns a live session secret. A link in the address bar wins,
+// even over a stored session, since a fresh link is pasted to replace a
+// dead one: its secret leaves the address bar and is traded. Otherwise
+// the stored session.
 async function session() {
-  const have = stored();
-  if (have) return have;
   const secret = location.hash.slice(1);
-  if (!secret) throw new Error("Open the link tailsuite up printed. Press Enter in its terminal for a fresh one.");
+  if (!secret) {
+    const have = stored();
+    if (have) return have;
+    throw new Error("Open the link tailsuite up printed. Press Enter in its terminal for a fresh one.");
+  }
   history.replaceState(null, "", location.pathname);
   const res = await fetch("/api/session", { method: "POST", headers: { "X-Tailsuite-Link": secret } });
   const body = await res.json().catch(() => ({}));
@@ -32,8 +36,8 @@ async function session() {
 
 // stream reads Server-Sent Events from fetch, which can send the session
 // header that EventSource can't.
-async function stream(sess, on) {
-  const res = await fetch("/api/events", { headers: { "X-Tailsuite-Session": sess } });
+async function stream(sess, on, signal) {
+  const res = await fetch("/api/events", { headers: { "X-Tailsuite-Session": sess }, signal });
   if (res.status === 401) {
     store("");
     const body = await res.json().catch(() => ({}));
@@ -72,17 +76,32 @@ function edgeClass(result, expect) {
   return "unproven";
 }
 
+// untested is a policy path's ports that no test probed: a test on one
+// port proves nothing about the others, which stay unverified.
+function untested(ports, probed) {
+  return ports.filter((p) => {
+    const n = p.replace(/^tcp:/, "");
+    return !/^\d+$/.test(n) || !probed.has(Number(n));
+  });
+}
+
 function elements(view, run) {
   const els = [];
+  const names = new Set();
   for (const d of view.devices || []) {
+    names.add(d.name);
     els.push({ data: { id: "n:" + d.name, label: d.name, sub: (d.tags && d.tags.join(" ")) || d.user || "" } });
   }
-  const tested = new Set();
+  const known = (p) => names.has(p.from) && names.has(p.to);
+  const tested = new Map(); // "from>to" → ports probed
   if (run) {
     for (const t of run.tests || []) {
       if (t.skipped) continue;
       (t.pairs || []).forEach((p, i) => {
-        tested.add(p.from + ">" + p.to);
+        if (!known(p)) return;
+        const key = p.from + ">" + p.to;
+        if (!tested.has(key)) tested.set(key, new Set());
+        tested.get(key).add(t.port);
         els.push({
           data: { id: "t:" + t.name + ":" + i, source: "n:" + p.from, target: "n:" + p.to,
             label: (t.port || p.probe) + (t.expect === "deny" ? " ✕" : "") },
@@ -92,9 +111,11 @@ function elements(view, run) {
     }
   }
   for (const p of view.paths || []) {
-    if (tested.has(p.from + ">" + p.to)) continue;
+    if (!known(p)) continue;
+    const ports = untested(p.ports || [], tested.get(p.from + ">" + p.to) || new Set());
+    if (ports.length === 0) continue;
     els.push({ data: { id: "p:" + p.from + ">" + p.to, source: "n:" + p.from, target: "n:" + p.to,
-      label: p.ports.join(", ") }, classes: "unverified" });
+      label: ports.join(", ") }, classes: "unverified" });
   }
   return els;
 }
@@ -122,7 +143,7 @@ function cyStyle() {
   ];
 }
 
-function Map({ view, run }) {
+function LabMap({ view, run }) {
   const box = useRef(null), cy = useRef(null);
   useEffect(() => {
     cy.current = cytoscape({ container: box.current, style: cyStyle(), autoungrabify: false,
@@ -148,12 +169,13 @@ function Tests({ run }) {
   if (!run) {
     return html`<p class="summary">Waiting for results. Run <code>tailsuite test</code>; they appear here as each run finishes.</p>`;
   }
-  const s = run.summary;
+  const s = run.summary || { pass: 0, fail: 0, unknown: 0, refused: 0, skipped: 0 };
+  const tests = run.tests || [];
   return html`
     <p class="summary"><b>${run.version}</b>, profile ${run.profile}${run.strict ? ", strict" : ""}<br/>
       ${s.pass} passed, ${s.fail} failed, ${s.unknown} unknown, ${s.refused} refused, ${s.skipped} skipped</p>
     <ul class="tests">
-      ${run.tests.map((t) => html`<li>
+      ${tests.map((t) => html`<li>
         <span class=${"result " + (t.skipped ? "skipped" : t.result)}>${t.skipped ? "skipped" : t.result}</span>
         <span>${t.name}</span>
         ${(t.reason || t.skipped) && html`<span class="why">${t.reason || t.skipped}</span>`}
@@ -166,15 +188,28 @@ function App() {
   const [run, setRun] = useState(null);
   const [error, setError] = useState("");
   useEffect(() => {
-    (async () => {
+    let abort = null;
+    const connect = async () => {
+      if (abort) abort.abort();
+      const mine = new AbortController();
+      abort = mine;
+      setError("");
       try {
         const s = await session();
         await stream(s, (event, data) => {
           if (event === "view") setView(data);
           if (event === "results") setRun(data);
-        });
-      } catch (e) { setError(e.message); }
-    })();
+        }, mine.signal);
+      } catch (e) {
+        if (!mine.signal.aborted) setError(e.message);
+      }
+    };
+    // A fresh link pasted into this tab changes only the fragment, which
+    // doesn't reload the page.
+    const onHash = () => { if (location.hash.length > 1) connect(); };
+    addEventListener("hashchange", onHash);
+    connect();
+    return () => { removeEventListener("hashchange", onHash); if (abort) abort.abort(); };
   }, []);
   const state = error ? "Disconnected" : !view ? "Connecting…" : run
     ? html`<b>results</b> from the last <code>tailsuite test</code>` : html`<b>unverified</b>: drawn from the policy, before any traffic`;
@@ -183,7 +218,7 @@ function App() {
     ${error && html`<p class="notice" role="alert">${error}</p>`}
     ${view && html`<main>
       <section class="panel" aria-labelledby="map-h"><h2 id="map-h">The lab</h2>
-        <${Map} view=${view} run=${run} />
+        <${LabMap} view=${view} run=${run} />
         <div class="legend">
           <span class="key unverified"><i></i>unverified, from the policy</span>
           <span class="key pass"><i></i>allowed, proven</span>

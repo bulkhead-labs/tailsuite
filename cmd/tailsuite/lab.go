@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -47,11 +48,20 @@ type labState struct {
 	// detached. Ready is set once the lab is up.
 	Holder int  `json:"holder,omitempty"`
 	Ready  bool `json:"ready,omitempty"`
+	// Token is the random token a detaching up gave its holder, so it
+	// can't mistake an old state for its own (process IDs are reused).
+	Token string `json:"token,omitempty"`
 }
 
 // projectID is a project's label value: a hash of its folder's path, so
 // the label names no path.
 func projectID(abs string) string {
+	if real, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = real
+	}
+	if runtime.GOOS == "windows" {
+		abs = strings.ToLower(abs)
+	}
 	sum := sha256.Sum256([]byte(abs))
 	return hex.EncodeToString(sum[:8])
 }
@@ -204,7 +214,7 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	eng := fs.String("engine", "", "the engine, over the profile's")
 	detach := fs.Bool("detach", false, "hold the lab in a background process; tailsuite down tears it down (default: lab.yaml's up.detach)")
 	clean := fs.Bool("clean", false, "first tear down this project's earlier labs (default: lab.yaml's up.clean)")
-	holder := fs.Bool(holderFlag, false, "internal: the background process --detach starts")
+	token := fs.String(holderFlag, "", "internal: the background process --detach starts, with its token")
 	if ok, code := parse(fs, args, 0); !ok {
 		return code
 	}
@@ -213,6 +223,7 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return fail(stderr, err)
 	}
 	*detach, *clean = upDefaults(fs, *detach, *clean, p.Lab.Up)
+	holder := *token != ""
 	// Refused before Docker is touched (0027).
 	if len(agentbin.Embedded()) == 0 {
 		return fail(stderr, agentbin.ErrNotEmbedded)
@@ -221,7 +232,16 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return fail(stderr, err)
 	}
-	if *clean && !*holder {
+	e := headscale.New(headscale.Config{})
+	low, err := e.Lower(p.Tailnet)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	if err := low.Err(); err != nil {
+		return fail(stderr, err)
+	}
+	// After the policy's checks, so a bad policy leaves the lab that's up.
+	if *clean && !holder {
 		if err := cleanProject(ctx, *dir, abs, stderr); err != nil {
 			return fail(stderr, err)
 		}
@@ -240,15 +260,7 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			return fail(stderr, fmt.Errorf("this project's lab is already up (run %s): tailsuite down tears it down, or up --clean replaces it", st.Run))
 		}
 	}
-	e := headscale.New(headscale.Config{})
-	low, err := e.Lower(p.Tailnet)
-	if err != nil {
-		return fail(stderr, err)
-	}
-	if err := low.Err(); err != nil {
-		return fail(stderr, err)
-	}
-	if *detach && !*holder {
+	if *detach && !holder {
 		return spawnHolder(ctx, *dir, abs, *prof, *eng, stdout, stderr)
 	}
 	sb, agent, err := newSandbox(ctx, projectID(abs))
@@ -257,7 +269,7 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	}
 	defer func() { _ = sb.Close() }()
 	plan := engine.PlanEveryDevice(p.Tailnet)
-	st := labState{Run: sb.RunID(), Dir: abs, Engine: o.Engine, Build: buildOf(agent), Devices: plan.Devices, Holder: os.Getpid()}
+	st := labState{Run: sb.RunID(), Dir: abs, Engine: o.Engine, Build: buildOf(agent), Devices: plan.Devices, Holder: os.Getpid(), Token: *token}
 	// Written first, so a crash while starting still leaves the run ID
 	// for down.
 	if err := writeState(*dir, st); err != nil {
@@ -283,7 +295,7 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	for _, c := range low.Changes {
 		fmt.Fprintf(&b, "Changed for %s: %s (%s)\n", e.Name(), c.Pointer, c.Reason)
 	}
-	if *holder {
+	if holder {
 		b.WriteString("\nThe lab is held in the background; tailsuite down tears it down. tailsuite test runs the suite on it. The local UI comes with #11.\n")
 	} else {
 		b.WriteString("\nThe lab stays up until Ctrl-C, which tears it down. tailsuite test, in another terminal, runs the suite on it. The local UI comes with #11.\n")
@@ -408,14 +420,16 @@ func downAll(ctx context.Context, dir string, stdout, stderr io.Writer) int {
 	tctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), sandbox.TeardownTimeout)
 	defer cancel()
 	var errs []error
+	down := map[string]bool{}
 	for _, r := range runs {
 		if err := docker.TeardownRun(tctx, cli, r); err != nil {
 			errs = append(errs, fmt.Errorf("run %s: %w", r, err))
 			continue
 		}
+		down[r] = true
 		_, _ = fmt.Fprintf(stdout, "Run %s is torn down.\n", r)
 	}
-	if st, ok, err := readState(dir); err == nil && ok {
+	if st, ok, err := readState(dir); err == nil && ok && (down[st.Run] || !slices.Contains(runs, st.Run)) {
 		_ = removeState(dir, st.Run)
 	}
 	if err := errors.Join(errs...); err != nil {

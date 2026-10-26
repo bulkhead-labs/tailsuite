@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,12 +39,21 @@ func spawnHolder(ctx context.Context, dir, abs, profile, engineName string, stdo
 	if err := os.MkdirAll(filepath.Join(dir, stateDir), 0o700); err != nil {
 		return fail(stderr, err)
 	}
-	log, err := os.OpenFile(logPath(dir), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	// A new file, not the old one truncated: an earlier holder may still
+	// have the old one open, and would write into this one.
+	if err := os.Remove(logPath(dir)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fail(stderr, err)
+	}
+	log, err := os.OpenFile(logPath(dir), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
 		return fail(stderr, err)
 	}
 	defer func() { _ = log.Close() }()
-	args := []string{"up", "--dir", abs, "--" + holderFlag}
+	token, err := sandbox.NewRunID() // 8 random hex digits
+	if err != nil {
+		return fail(stderr, err)
+	}
+	args := []string{"up", "--dir", abs, "--" + holderFlag + "=" + token}
 	if profile != "" {
 		args = append(args, "--profile", profile)
 	}
@@ -68,12 +79,19 @@ func spawnHolder(ctx context.Context, dir, abs, profile, engineName string, stdo
 			_, _ = stderr.Write(out)
 			return fail(stderr, fmt.Errorf("the background process stopped before the lab was up (%w); its log is %s", err, logPath(dir)))
 		case <-ctx.Done():
-			// Interrupted while starting: the holder tears down what it made.
+			// Interrupted while starting: the holder tears down what it
+			// made (on Unix; on Windows it's killed). Check, rather than
+			// assume.
 			_ = interrupt(cmd.Process)
 			<-exited
-			return fail(stderr, fmt.Errorf("interrupted; the background process tore the lab down"))
+			if st, ok, err := readState(dir); err == nil && ok && st.Token == token {
+				if alive, aerr := runAlive(context.WithoutCancel(ctx), st.Run); aerr != nil || alive {
+					return fail(stderr, fmt.Errorf("interrupted; run %s may still be partly up: tailsuite down removes it", st.Run))
+				}
+			}
+			return fail(stderr, errors.New("interrupted; the background process stopped, and no lab of it is left"))
 		case <-tick.C:
-			if st, ok, err := readState(dir); err == nil && ok && st.Holder == pid && st.Ready {
+			if st, ok, err := readState(dir); err == nil && ok && st.Token == token && st.Holder == pid && st.Ready {
 				out, _ := os.ReadFile(logPath(dir))
 				_, _ = stdout.Write(out)
 				return wrote(fmt.Fprintf(stdout, "Held by pid %d; its log is %s.\n", pid, logPath(dir)))

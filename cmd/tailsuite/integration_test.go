@@ -297,6 +297,18 @@ func TestDetachAndClean(t *testing.T) {
 		t.Errorf("test on the detached lab: exit %d, %q", code, errOut)
 	}
 
+	// --clean over a detached lab replaces it, and the new up's output
+	// is its own: the old holder, exiting, writes into its old log only.
+	code, out, errOut = runCmd(t, "up", "--dir", dir, "--detach", "--clean")
+	if code != 0 || strings.Contains(out, st.Run) || strings.ContainsRune(out, 0) {
+		t.Fatalf("a second up --detach --clean: exit %d\n%q\n%s", code, out, errOut)
+	}
+	waitExit(t, st.Holder)
+	if alive, _ := runAlive(ctx, st.Run); alive {
+		t.Error("--clean left the earlier detached lab")
+	}
+	st, _, _ = readState(dir)
+
 	// down ends it, and the holder notices and exits.
 	if code, _, errOut := runCmd(t, "down", "--dir", dir); code != 0 {
 		t.Fatalf("down: exit %d: %s", code, errOut)

@@ -169,6 +169,8 @@ ready starts the heavy tiers. Any branch can run them by hand
      #68, from 2026-11-07;
    - #7, the node agent: done
      ([0020](decisions/0020-node-agent.md));
+   - #52, the node agent inside the binary: done
+     ([0027](decisions/0027-embedded-agent.md));
    - #8, the test runner: done ([0026](decisions/0026-test-runner.md));
    - #12, the CLI;
    - #11, the UI;

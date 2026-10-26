@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -26,7 +25,21 @@ var holdPoll = 5 * time.Second
 // readyPoll is how often a detaching up checks the holder's progress.
 const readyPoll = 250 * time.Millisecond
 
-func logPath(dir string) string { return filepath.Join(dir, stateDir, "up.log") }
+// logPath is a holder's log: one file per holder, by its token, so a new
+// holder never shares a file with an old one that hasn't exited yet (on
+// Windows, a file another process has open can't even be removed).
+func logPath(dir, token string) string {
+	return filepath.Join(dir, stateDir, "up-"+token+".log")
+}
+
+// removeOldLogs removes earlier holders' logs, best-effort: one still
+// open (on Windows) stays until a later up.
+func removeOldLogs(dir string) {
+	old, _ := filepath.Glob(filepath.Join(dir, stateDir, "up-*.log"))
+	for _, f := range old {
+		_ = os.Remove(f)
+	}
+}
 
 // spawnHolder starts tailsuite up again, as a background process in a
 // session of its own, and returns once it holds a ready lab, with what it
@@ -39,20 +52,17 @@ func spawnHolder(ctx context.Context, dir, abs, profile, engineName string, stdo
 	if err := os.MkdirAll(filepath.Join(dir, stateDir), 0o700); err != nil {
 		return fail(stderr, err)
 	}
-	// A new file, not the old one truncated: an earlier holder may still
-	// have the old one open, and would write into this one.
-	if err := os.Remove(logPath(dir)); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return fail(stderr, err)
-	}
-	log, err := os.OpenFile(logPath(dir), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-	if err != nil {
-		return fail(stderr, err)
-	}
-	defer func() { _ = log.Close() }()
 	token, err := sandbox.NewRunID() // 8 random hex digits
 	if err != nil {
 		return fail(stderr, err)
 	}
+	removeOldLogs(dir)
+	logFile := logPath(dir, token)
+	log, err := os.OpenFile(logFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	defer func() { _ = log.Close() }()
 	args := []string{"up", "--dir", abs, "--" + holderFlag + "=" + token}
 	if profile != "" {
 		args = append(args, "--profile", profile)
@@ -75,9 +85,9 @@ func spawnHolder(ctx context.Context, dir, abs, profile, engineName string, stdo
 	for {
 		select {
 		case err := <-exited:
-			out, _ := os.ReadFile(logPath(dir))
+			out, _ := os.ReadFile(logFile)
 			_, _ = stderr.Write(out)
-			return fail(stderr, fmt.Errorf("the background process stopped before the lab was up (%w); its log is %s", err, logPath(dir)))
+			return fail(stderr, fmt.Errorf("the background process stopped before the lab was up (%w); its log is %s", err, logFile))
 		case <-ctx.Done():
 			// Interrupted while starting: the holder tears down what it
 			// made (on Unix; on Windows it's killed). Check, rather than
@@ -92,9 +102,9 @@ func spawnHolder(ctx context.Context, dir, abs, profile, engineName string, stdo
 			return fail(stderr, errors.New("interrupted; the background process stopped, and no lab of it is left"))
 		case <-tick.C:
 			if st, ok, err := readState(dir); err == nil && ok && st.Token == token && st.Holder == pid && st.Ready {
-				out, _ := os.ReadFile(logPath(dir))
+				out, _ := os.ReadFile(logFile)
 				_, _ = stdout.Write(out)
-				return wrote(fmt.Fprintf(stdout, "Held by pid %d; its log is %s.\n", pid, logPath(dir)))
+				return wrote(fmt.Fprintf(stdout, "Held by pid %d; its log is %s.\n", pid, logFile))
 			}
 		}
 	}

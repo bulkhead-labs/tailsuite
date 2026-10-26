@@ -246,7 +246,7 @@ func TestDetachAndClean(t *testing.T) {
 	t.Setenv(asMain, "1") // the background process is this binary
 	ctx := context.Background()
 	dir := initProject(t)
-	abs, _ := filepath.Abs(dir)
+	abs, _ := projectDir(dir)
 	t.Cleanup(func() {
 		if st, ok, _ := readState(dir); ok {
 			runCmd(t, "down", "--run", st.Run)
@@ -317,7 +317,7 @@ func TestDetachAndClean(t *testing.T) {
 	if alive, _ := runAlive(ctx, st.Run); alive {
 		t.Error("the detached lab is still up after down")
 	}
-	if log, _ := os.ReadFile(logPath(dir)); !strings.Contains(string(log), "torn down from elsewhere") {
+	if log, _ := os.ReadFile(logPath(dir, st.Token)); !strings.Contains(string(log), "torn down from elsewhere") {
 		t.Errorf("the holder's log:\n%s", log)
 	}
 

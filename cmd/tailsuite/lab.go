@@ -53,6 +53,20 @@ type labState struct {
 	Token string `json:"token,omitempty"`
 }
 
+// projectDir is a project folder's absolute path with symlinks resolved:
+// the one name for it in the lab state and its label, however it was
+// reached.
+func projectDir(dir string) (string, error) {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return "", err
+	}
+	if real, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = real
+	}
+	return abs, nil
+}
+
 // projectID is a project's label value: a hash of its folder's path, so
 // the label names no path.
 func projectID(abs string) string {
@@ -228,7 +242,7 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if len(agentbin.Embedded()) == 0 {
 		return fail(stderr, agentbin.ErrNotEmbedded)
 	}
-	abs, err := filepath.Abs(*dir)
+	abs, err := projectDir(*dir)
 	if err != nil {
 		return fail(stderr, err)
 	}
@@ -365,7 +379,7 @@ func cmdDown(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		if !ok {
 			return downNothing(ctx, stdout, stderr)
 		}
-		if abs, err := filepath.Abs(*dir); err != nil || abs != st.Dir {
+		if abs, err := projectDir(*dir); err != nil || abs != st.Dir {
 			return fail(stderr, fmt.Errorf("%s holds the lab state of %s (run %s): if this folder is a copy, delete %s; to tear that lab down anyway, tailsuite down --run %s", stateDir, st.Dir, st.Run, statePath(*dir), st.Run))
 		}
 		target = st.Run

@@ -321,7 +321,7 @@ func TestUpsLabRefusals(t *testing.T) {
 		t.Fatal(err)
 	}
 	plan := engine.PlanEveryDevice(p.Tailnet)
-	abs, _ := filepath.Abs(dir)
+	abs, _ := projectDir(dir)
 	good := labState{Run: "0123abcd", Dir: abs, Engine: "headscale", Devices: plan.Devices}
 	changed := slices.Clone(plan.Devices)
 	changed[0].Tags = append(slices.Clone(changed[0].Tags), "tag:extra")
@@ -361,6 +361,25 @@ func TestUpDefaults(t *testing.T) {
 		if gd, gc := upDefaults(fs, *d, *c, tc.lab); gd != tc.detach || gc != tc.clean {
 			t.Errorf("%q with lab.yaml %+v: detach %v clean %v, want %v %v", tc.args, tc.lab, gd, gc, tc.detach, tc.clean)
 		}
+	}
+}
+
+func TestProjectDirResolvesSymlinks(t *testing.T) {
+	real := t.TempDir()
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(real, link); err != nil {
+		t.Fatal(err)
+	}
+	a, err := projectDir(real)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := projectDir(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a != b || projectID(a) != projectID(b) {
+		t.Errorf("projectDir(%s) = %s, projectDir(%s) = %s: one folder, two names", real, a, link, b)
 	}
 }
 

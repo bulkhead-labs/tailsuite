@@ -107,7 +107,7 @@ func runOnLab(ctx context.Context, dir string, p *project.Project, o suite.Optio
 	if up {
 		r, err = onUpsLab(ctx, dir, st, plan, low, planned, cfg)
 	} else {
-		abs, aerr := filepath.Abs(dir)
+		abs, aerr := projectDir(dir)
 		if aerr != nil {
 			return nil, aerr
 		}
@@ -125,7 +125,7 @@ func runOnLab(ctx context.Context, dir string, p *project.Project, o suite.Optio
 // policy. A result is only true of the lab it was read on.
 func onUpsLab(ctx context.Context, dir string, st labState, plan engine.LabPlan, low engine.Lowering, planned []suite.Planned, cfg runner.Config) (*runner.Run, error) {
 	again := "; tailsuite down, then tailsuite up, starts a lab that matches"
-	abs, err := filepath.Abs(dir)
+	abs, err := projectDir(dir)
 	if err != nil {
 		return nil, err
 	}

@@ -21,9 +21,11 @@ Status: **accepted** (2026-10-26). Settles #81. Amends
 - **`up --detach`** starts tailsuite again as a background process, in a
   session of its own (a new process group without a console on Windows),
   with `up --detached-holder=<token>`, a random token. That process does
-  what a foreground `up` does, writing to a new `.tailsuite/up.log`
-  (0600; the old file is removed first, since an earlier holder may still
-  have it open). `up` waits until the lab state carries that token and
+  what a foreground `up` does, writing to a log of its own,
+  `.tailsuite/up-<token>.log` (0600). One file per holder, because an
+  earlier holder may still have its own open for a few seconds, and on
+  Windows a file that's open can't be removed; earlier logs are removed
+  when they can be. `up` waits until the lab state carries that token and
   says the lab is ready, prints the log, and returns: a token, not the
   process ID, which may be reused. If the process stops first, `up`
   prints its log and exits 3. Ctrl-C while waiting stops it; `up` then
@@ -40,7 +42,8 @@ Status: **accepted** (2026-10-26). Settles #81. Amends
   Other projects' labs are never touched. A holder whose lab goes exits.
   It runs after the policy's checks, so a bad policy leaves the lab
   that's up. The label hashes the folder's path with symlinks resolved
-  (and, on Windows, in lower case).
+  (and, on Windows, in lower case), and the lab state records the same
+  resolved path, so a folder reached through a symlink is one project.
 - **`down --all`** tears down every tailsuite run on the Docker Engine,
   any project's. This folder's state goes only if its run did.
 - **`lab.yaml`'s `up:` section** holds `detach` and `clean` defaults; a
@@ -64,8 +67,9 @@ Status: **accepted** (2026-10-26). Settles #81. Amends
   `up --detach --clean` removes this project's leftover and not another
   project's, returns with the holder running and the lab ready; `test`
   uses that lab; `down` ends it and the holder exits; `up` with
-  `up: { detach: true }` in `lab.yaml` detaches. 65 seconds with the rest
-  of the suite.
+  `up: { detach: true }` in `lab.yaml` detaches; a second
+  `up --detach --clean` over a detached lab replaces it, and prints only
+  its own output. 33 seconds on its own.
 
 ## Given up
 

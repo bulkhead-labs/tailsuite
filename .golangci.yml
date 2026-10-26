@@ -1,6 +1,11 @@
 # golangci-lint v2. The version comes from the flake (decision 0018).
 version: "2"
 
+run:
+  # Lint the Docker integration tests too.
+  build-tags:
+    - integration
+
 linters:
   # errcheck, govet, ineffassign, staticcheck, unused.
   default: standard

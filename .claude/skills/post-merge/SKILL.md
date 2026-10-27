@@ -86,8 +86,8 @@ Never change behaviour in this PR.
 
 ## 6. The review page
 
-If the PR had a review page (the `review-artifact` skill), update it to
-the outcome, as that skill's "Keep it current" says: an outcome box at the
+If the PR's group had a review page (the `review-artifact` skill), update
+it to the outcome once the group's last PR has merged, as that skill's "Keep it current" says: an outcome box at the
 top, and its links repointed from the branch to the merge commit.
 
 ## 7. Report
@@ -98,7 +98,8 @@ A short list:
 - issue and milestone state;
 - what was checked;
 - the drift found and fixed, with the docs PR link;
-- the review page, if there was one, and that it shows the outcome;
+- the group's review page, if there was one: that it shows the outcome,
+  or that the group still has PRs open;
 - the status page's state.
 
 Then the session is done: one session per issue

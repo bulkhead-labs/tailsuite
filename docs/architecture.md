@@ -134,7 +134,7 @@ Planned:
 | Command | Does |
 |---|---|
 | `tailsuite export tests` | Copies the tests that fit Tailscale's format into the policy's `tests` and `sshTests`, after showing the diff ([0015](decisions/0015-test-file-labels-profiles.md)) |
-| `tailsuite export tofu` | Writes `tofu/` (tailsuite's module and the values) from the current model, once; `import` uses it, and so will `init` once the module exists (#9). The user owns the result |
+| `tailsuite export tofu` | Writes `tofu/` (tailsuite's module and the values) from the current model, once; `import` uses it. `init` and `upgrade tofu` write only the module ([0032](decisions/0032-the-opentofu-module.md)). The user owns the result |
 | `tailsuite import tailscale` | Reads a real tailnet read-only into a project, with OpenTofu import blocks |
 | `tailsuite deploy` | Lab tests → `tofu plan` against production → blast-radius diff → apply, behind the gates in [0007](decisions/0007-read-only-by-default.md) |
 

@@ -3,7 +3,9 @@
 Status: **accepted** (2026-10-26). Builds
 [0014](0014-tailnet-model-and-project-layout.md)'s "How tailsuite reads
 the module" for #9, and amends its allow-list: an `import` block may
-target only the policy, and more sources are refused.
+target only the policy, and more sources are refused. Amends
+[0030](0030-the-cli.md): `init` writes `tofu/tailsuite.tf`, and
+`upgrade tofu` is built.
 
 ## Context
 

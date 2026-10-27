@@ -61,7 +61,7 @@ func CheckProject(dir string) []string {
 	add := func(format string, a ...any) { problems = append(problems, fmt.Sprintf(format, a...)) }
 
 	if !names[ModuleFile] {
-		add("tofu/%s is missing: tailsuite init or tailsuite export tofu writes it", ModuleFile)
+		add("tofu/%s is missing: tailsuite upgrade tofu writes it", ModuleFile)
 	} else if b, err := os.ReadFile(filepath.Join(dir, ModuleFile)); err != nil { //nolint:gosec // G304: the user's own project
 		add("tofu/%s: %v", ModuleFile, err)
 	} else if _, ok := Shipped(b); !ok {

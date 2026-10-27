@@ -429,6 +429,13 @@ func TestUpgradeTofu(t *testing.T) {
 	if code, _, _ := runCmd(t, "upgrade"); code != exitCouldNotRun {
 		t.Errorf("upgrade with nothing named: exit %d", code)
 	}
+	empty := t.TempDir()
+	if code, _, errOut := runCmd(t, "upgrade", "tofu", "--dir", empty); code != exitCouldNotRun || !strings.Contains(errOut, "isn't a tailsuite project") {
+		t.Errorf("upgrade outside a project: exit %d, %q", code, errOut)
+	}
+	if _, err := os.Stat(filepath.Join(empty, "tofu")); err == nil {
+		t.Error("upgrade outside a project wrote tofu/")
+	}
 }
 
 // A project whose tofu/ applies more than tailsuite's module is refused,

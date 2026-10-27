@@ -36,7 +36,7 @@ table in the same PR.
 | [0027](0027-embedded-agent.md) | The tailsuite binary carries the node agent | Accepted 2026-10-26 |
 | [0028](0028-review-tiers.md) | Reviews are sized to the PR | Accepted 2026-10-26 |
 | [0029](0029-stacked-prs-need-reapproval.md) | A stacked pull request needs a fresh approval once the one below merges | Accepted 2026-10-26 |
-| [0030](0030-the-cli.md) | The CLI, and how its commands share a lab | Accepted 2026-10-26; amended by 0033 |
+| [0030](0030-the-cli.md) | The CLI, and how its commands share a lab | Accepted 2026-10-26; amended by 0033 and 0032 |
 | [0031](0031-the-local-ui-built.md) | The local UI, as built | Accepted 2026-10-26 |
 | [0032](0032-the-opentofu-module.md) | The OpenTofu module, the allow-list, and the run directory | Accepted 2026-10-26 |
 | [0033](0033-up-start-and-stop-options.md) | How `up` starts and stops: detach, clean, and lab.yaml's defaults | Accepted 2026-10-26 |

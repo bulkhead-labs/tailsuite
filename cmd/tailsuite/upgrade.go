@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/bulkhead-labs/tailsuite/internal/project"
 	"github.com/bulkhead-labs/tailsuite/internal/tofu"
 )
 
@@ -37,6 +38,10 @@ func cmdUpgrade(args []string, stdout, stderr io.Writer) int {
 	force := set.Bool("force", false, "replace a tailsuite.tf no release shipped, such as an edited one")
 	if ok, code := parse(set, args[1:], 0); !ok {
 		return code
+	}
+	// A mistyped --dir would otherwise leave a stray tofu/ behind.
+	if _, err := os.Stat(filepath.Join(*dir, project.LabFile)); err != nil {
+		return fail(stderr, fmt.Errorf("%s isn't a tailsuite project (no %s): tailsuite init makes one", *dir, project.LabFile))
 	}
 	path := filepath.Join(*dir, "tofu", tofu.ModuleFile)
 	cur := tofu.Current()

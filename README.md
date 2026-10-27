@@ -5,8 +5,9 @@ local lab, on real Tailscale clients, sends real traffic between them, and
 shows what can actually reach what. Then it helps you lock it down, proves
 the lockdown works on every pull request, and deploys it through OpenTofu.
 
-> **Status: building the first milestone.** Nothing to install yet. The
-> commands below are the plan, not the product. Follow along on the
+> **Status: building the first milestone.** Nothing to install yet.
+> Built from source, `init`, `up`, `test` and `down` work on headscale;
+> the UI, `import` and `deploy` are still the plan. Follow along on the
 > [status page](https://bulkhead-labs.github.io/tailsuite/), the
 > [plan](docs/plan.md) and the
 > [milestones](https://github.com/bulkhead-labs/tailsuite/milestones).
@@ -23,8 +24,8 @@ between what a policy says and what a network does.
 
 ```
 tailsuite init --template startup   # a project folder you own; --nix for a pinned dev shell
-tailsuite up                        # the lab plus a local UI in your browser
-tailsuite test --profile pr         # real SSH, HTTP(S), TCP and more; allow and deny, both proven
+tailsuite up                        # the lab plus a local UI in your browser, until Ctrl-C
+tailsuite test --profile pr         # (in another terminal) real SSH, HTTP(S), TCP and more; allow and deny, both proven
 tailsuite import tailscale          # read-only: your tailnet as a project, with OpenTofu
 tailsuite deploy                    # lab tests → tofu plan → blast-radius diff → apply
 ```

@@ -23,16 +23,20 @@ table in the same PR.
 | [0014](0014-tailnet-model-and-project-layout.md) | The tailnet model, and which project file owns each fact | Accepted 2026-10-24; `lab.yaml` sketch refined by 0015 and 0016; allow-list amended by 0032 |
 | [0015](0015-test-file-labels-profiles.md) | The test file, labels and profiles | Accepted 2026-10-25 |
 | [0016](0016-engine-interface-capabilities.md) | The engine interface and the capability matrix | Accepted 2026-10-25; amended by 0021 and 0025 |
-| [0017](0017-local-ui.md) | The local UI: the map first, localhost only, no build step | Accepted 2026-10-25 |
+| [0017](0017-local-ui.md) | The local UI: the map first, localhost only, no build step | Accepted 2026-10-25; built in 0031 |
 | [0018](0018-go-toolchain-flake-ci.md) | The Go toolchain, the flake, and CI for lint and unit tests | Accepted 2026-10-25; amended by 0024 |
-| [0019](0019-docker-sandbox.md) | The Docker sandbox, and agents controlled through it | Accepted 2026-10-25 |
-| [0020](0020-node-agent.md) | The node agent: it lives with the node, and sessions come and go | Accepted 2026-10-25 |
+| [0019](0019-docker-sandbox.md) | The Docker sandbox, and agents controlled through it | Accepted 2026-10-25; amended by 0030 |
+| [0020](0020-node-agent.md) | The node agent: it lives with the node, and sessions come and go | Accepted 2026-10-25; amended by 0030 |
 | [0021](0021-empty-grants-and-the-marker-on-tailscale.md) | An empty `grants` section denies everything, and the marker holds on Tailscale | Accepted 2026-10-25 |
 | [0022](0022-reading-a-project.md) | Reading a project: the policy's edge cases, and strict project files | Accepted 2026-10-25 |
 | [0023](0023-subagents-on-opus.md) | Subagents run on Opus, with the effort set by the work | Accepted 2026-10-26; amended by 0028 |
-| [0024](0024-merge-commits.md) | Pull requests merge with merge commits, not squash | Accepted 2026-10-26 |
+| [0024](0024-merge-commits.md) | Pull requests merge with merge commits, not squash | Accepted 2026-10-26; amended by 0029 |
 | [0025](0025-headscale-engine.md) | The headscale engine: its lab, its copy of the policy, and readiness | Accepted 2026-10-26 |
 | [0026](0026-test-runner.md) | The test runner: reading traffic into results | Accepted 2026-10-26 |
 | [0027](0027-embedded-agent.md) | The tailsuite binary carries the node agent | Accepted 2026-10-26 |
 | [0028](0028-review-tiers.md) | Reviews are sized to the PR | Accepted 2026-10-26 |
+| [0029](0029-stacked-prs-need-reapproval.md) | A stacked pull request needs a fresh approval once the one below merges | Accepted 2026-10-26 |
+| [0030](0030-the-cli.md) | The CLI, and how its commands share a lab | Accepted 2026-10-26; amended by 0033 |
+| [0031](0031-the-local-ui-built.md) | The local UI, as built | Accepted 2026-10-26 |
 | [0032](0032-the-opentofu-module.md) | The OpenTofu module, the allow-list, and the run directory | Accepted 2026-10-26 |
+| [0033](0033-up-start-and-stop-options.md) | How `up` starts and stops: detach, clean, and lab.yaml's defaults | Accepted 2026-10-26 |

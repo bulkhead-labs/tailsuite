@@ -33,7 +33,9 @@ deleted that branch. Point it back before anything else:
   `UNKNOWN` for a while after a merge, so ask again), and
   `git log --oneline origin/main..origin/<its branch>` should list only
   its own commits. If it lists more, the branch below was rewritten:
-  rebuild that PR's branch before anyone merges it.
+  rebuild that PR's branch before anyone merges it. Its approval is now
+  stale ([0029](../../../docs/decisions/0029-stacked-prs-need-reapproval.md)):
+  say in the report that it needs the maintainer's approval again.
 - The issues it closed must be closed. If one was only partly done, reopen
   it, or file the rest as a new issue on the same milestone.
 

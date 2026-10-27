@@ -63,10 +63,18 @@ Status: **accepted** (2026-10-26). Builds [0017](0017-local-ui.md) for
   server. It checks the trade, the map, a run's results arriving, a
   reload, phone width in dark mode, and that the page makes no external
   request and logs no error. #13 puts it in CI.
-- **`up`'s side** (0017: the browser on a 0600 redirect file, the link
-  printed when it isn't traded, a fresh link on request) uses
-  `ui.WriteRedirect`, `ui.OpenBrowser` and `Server.NewLink`'s traded
-  channel, wired into `up` once #12's CLI has merged.
+- **`up` serves the UI while it holds the lab** ([0030](0030-the-cli.md),
+  [0033](0033-up-start-and-stop-options.md)):
+  - in the foreground, it opens the browser on a 0600 redirect file in
+    the runtime directory, except in CI or with `--no-browser`;
+    `--no-redirect-file` opens the link itself. If the page hasn't traded
+    the link within 5 seconds, `up` prints it and says why. With no
+    browser to open, it prints the link at once. Enter in its terminal
+    prints a fresh one-time link;
+  - detached, the background process serves the UI, logs the link, and
+    leaves a redirect file whose path it records in the lab state; the
+    `up` that started it opens the browser on it, under the same rules;
+  - the UI stops, and the redirect file goes, when the lab does.
 
 ## Why
 

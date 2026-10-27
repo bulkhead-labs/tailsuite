@@ -13,6 +13,7 @@ import (
 
 	"github.com/bulkhead-labs/tailsuite/internal/sandbox"
 	"github.com/bulkhead-labs/tailsuite/internal/sandbox/docker"
+	"github.com/bulkhead-labs/tailsuite/internal/ui"
 )
 
 // holderFlag marks the background process `up --detach` starts (#81).
@@ -44,7 +45,7 @@ func removeOldLogs(dir string) {
 // spawnHolder starts tailsuite up again, as a background process in a
 // session of its own, and returns once it holds a ready lab, with what it
 // printed. If it stops first, its log says why.
-func spawnHolder(ctx context.Context, dir, abs, profile, engineName string, stdout, stderr io.Writer) int {
+func spawnHolder(ctx context.Context, dir, abs, profile, engineName string, openBrowser bool, stdout, stderr io.Writer) int {
 	exe, err := os.Executable()
 	if err != nil {
 		return fail(stderr, err)
@@ -104,6 +105,11 @@ func spawnHolder(ctx context.Context, dir, abs, profile, engineName string, stdo
 			if st, ok, err := readState(dir); err == nil && ok && st.Token == token && st.Holder == pid && st.Ready {
 				out, _ := os.ReadFile(logFile) //nolint:gosec // G304: our holder's log
 				_, _ = stdout.Write(out)
+				if openBrowser && st.Redirect != "" {
+					if err := ui.OpenBrowser(context.WithoutCancel(ctx), st.Redirect); err == nil {
+						_, _ = fmt.Fprintln(stdout, "Opening the local UI in your browser.")
+					}
+				}
 				return wrote(fmt.Fprintf(stdout, "Held by pid %d; its log is %s.\n", pid, logFile))
 			}
 		}

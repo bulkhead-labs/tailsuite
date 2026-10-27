@@ -201,10 +201,15 @@ func readEvent(t *testing.T, r io.Reader) (string, string) {
 	var buf []byte
 	one := make([]byte, 1)
 	for !strings.HasSuffix(string(buf), "\n\n") {
-		if _, err := r.Read(one); err != nil {
+		// A body may return its last byte together with io.EOF.
+		n, err := r.Read(one)
+		if n == 1 {
+			buf = append(buf, one[0])
+			continue
+		}
+		if err != nil {
 			t.Fatalf("reading an event: %v (so far %q)", err, buf)
 		}
-		buf = append(buf, one[0])
 	}
 	var event, data string
 	for _, line := range strings.Split(strings.TrimSpace(string(buf)), "\n") {

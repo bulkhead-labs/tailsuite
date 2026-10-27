@@ -40,3 +40,4 @@ table in the same PR.
 | [0031](0031-the-local-ui-built.md) | The local UI, as built | Accepted 2026-10-26 |
 | [0032](0032-the-opentofu-module.md) | The OpenTofu module, the allow-list, and the run directory | Accepted 2026-10-26 |
 | [0033](0033-up-start-and-stop-options.md) | How `up` starts and stops: detach, clean, and lab.yaml's defaults | Accepted 2026-10-26 |
+| [0034](0034-token-economy.md) | Lean agent sessions: one per issue, short prompts and replies | Accepted 2026-10-26 |

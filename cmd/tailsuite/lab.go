@@ -6,11 +6,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -42,6 +44,40 @@ type labState struct {
 	// Devices are the plan the lab was started with. A node's user and
 	// tags are fixed when it joins, so a changed plan needs a new lab.
 	Devices []engine.PlanDevice `json:"devices"`
+	// Holder is the process holding the lab: up, in the foreground or
+	// detached. Ready is set once the lab is up.
+	Holder int  `json:"holder,omitempty"`
+	Ready  bool `json:"ready,omitempty"`
+	// Token is the random token a detaching up gave its holder, so it
+	// can't mistake an old state for its own (process IDs are reused).
+	Token string `json:"token,omitempty"`
+}
+
+// projectDir is a project folder's absolute path with symlinks resolved:
+// the one name for it in the lab state and its label, however it was
+// reached.
+func projectDir(dir string) (string, error) {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return "", err
+	}
+	if real, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = real
+	}
+	return abs, nil
+}
+
+// projectID is a project's label value: a hash of its folder's path, so
+// the label names no path.
+func projectID(abs string) string {
+	if real, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = real
+	}
+	if runtime.GOOS == "windows" {
+		abs = strings.ToLower(abs)
+	}
+	sum := sha256.Sum256([]byte(abs))
+	return hex.EncodeToString(sum[:8])
 }
 
 // build is what made a lab: this tailsuite, the images, and the agent.
@@ -153,11 +189,11 @@ func planNames(devices []engine.PlanDevice) []string {
 // newSandbox connects to Docker for a new run, with the node agent for the
 // Docker host's architecture (decision 0027). Without the agent nothing
 // is started.
-func newSandbox(ctx context.Context) (*docker.Sandbox, []byte, error) {
+func newSandbox(ctx context.Context, project string) (*docker.Sandbox, []byte, error) {
 	if len(agentbin.Embedded()) == 0 {
 		return nil, nil, agentbin.ErrNotEmbedded
 	}
-	sb, err := docker.New(ctx)
+	sb, err := docker.NewFor(ctx, project)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -190,6 +226,9 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	dir := fs.String("dir", ".", "the project")
 	prof := fs.String("profile", "", "the profile in lab.yaml whose engine runs the lab (default: default)")
 	eng := fs.String("engine", "", "the engine, over the profile's")
+	detach := fs.Bool("detach", false, "hold the lab in a background process; tailsuite down tears it down (default: lab.yaml's up.detach)")
+	clean := fs.Bool("clean", false, "first tear down this project's earlier labs (default: lab.yaml's up.clean)")
+	token := fs.String(holderFlag, "", "internal: the background process --detach starts, with its token")
 	if ok, code := parse(fs, args, 0); !ok {
 		return code
 	}
@@ -197,13 +236,29 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return fail(stderr, err)
 	}
+	*detach, *clean = upDefaults(fs, *detach, *clean, p.Lab.Up)
+	holder := *token != ""
 	// Refused before Docker is touched (0027).
 	if len(agentbin.Embedded()) == 0 {
 		return fail(stderr, agentbin.ErrNotEmbedded)
 	}
-	abs, err := filepath.Abs(*dir)
+	abs, err := projectDir(*dir)
 	if err != nil {
 		return fail(stderr, err)
+	}
+	e := headscale.New(headscale.Config{})
+	low, err := e.Lower(p.Tailnet)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	if err := low.Err(); err != nil {
+		return fail(stderr, err)
+	}
+	// After the policy's checks, so a bad policy leaves the lab that's up.
+	if *clean && !holder {
+		if err := cleanProject(ctx, *dir, abs, stderr); err != nil {
+			return fail(stderr, err)
+		}
 	}
 	if st, ok, err := readState(*dir); err != nil {
 		return fail(stderr, err)
@@ -216,26 +271,22 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		case alive && st.Dir != abs:
 			return fail(stderr, fmt.Errorf("%s holds the lab state of %s (run %s): if this folder is a copy, delete %s", stateDir, st.Dir, st.Run, statePath(*dir)))
 		case alive:
-			return fail(stderr, fmt.Errorf("this project's lab is already up (run %s): Ctrl-C in the terminal running tailsuite up tears it down, or tailsuite down", st.Run))
+			return fail(stderr, fmt.Errorf("this project's lab is already up (run %s): tailsuite down tears it down, or up --clean replaces it", st.Run))
 		}
 	}
-	e := headscale.New(headscale.Config{})
-	low, err := e.Lower(p.Tailnet)
-	if err != nil {
-		return fail(stderr, err)
+	if *detach && !holder {
+		return spawnHolder(ctx, *dir, abs, *prof, *eng, stdout, stderr)
 	}
-	if err := low.Err(); err != nil {
-		return fail(stderr, err)
-	}
-	sb, agent, err := newSandbox(ctx)
+	sb, agent, err := newSandbox(ctx, projectID(abs))
 	if err != nil {
 		return fail(stderr, err)
 	}
 	defer func() { _ = sb.Close() }()
 	plan := engine.PlanEveryDevice(p.Tailnet)
+	st := labState{Run: sb.RunID(), Dir: abs, Engine: o.Engine, Build: buildOf(agent), Devices: plan.Devices, Holder: os.Getpid(), Token: *token}
 	// Written first, so a crash while starting still leaves the run ID
 	// for down.
-	if err := writeState(*dir, labState{Run: sb.RunID(), Dir: abs, Engine: o.Engine, Build: buildOf(agent), Devices: plan.Devices}); err != nil {
+	if err := writeState(*dir, st); err != nil {
 		return fail(stderr, err)
 	}
 	_, _ = fmt.Fprintf(stderr, "Starting the lab on %s (run %s)...\n", e.Version(), sb.RunID())
@@ -258,15 +309,23 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	for _, c := range low.Changes {
 		fmt.Fprintf(&b, "Changed for %s: %s (%s)\n", e.Name(), c.Pointer, c.Reason)
 	}
-	b.WriteString("\nThe lab stays up until Ctrl-C, which tears it down. tailsuite test, in another terminal, runs the suite on it. The local UI comes with #11.\n")
+	if holder {
+		b.WriteString("\nThe lab is held in the background; tailsuite down tears it down. tailsuite test runs the suite on it. The local UI comes with #11.\n")
+	} else {
+		b.WriteString("\nThe lab stays up until Ctrl-C, which tears it down. tailsuite test, in another terminal, runs the suite on it. The local UI comes with #11.\n")
+	}
 	if code := wrote(io.WriteString(stdout, b.String())); code != exitOK {
 		return teardownUp(ctx, *dir, sb, stderr, code)
 	}
-	// The maintainer's choice (2026-10-26): up holds the lab in the
-	// foreground, and Ctrl-C (or SIGTERM) tears it down.
-	// A down from another terminal ends the lab too; then there's
-	// nothing left to hold.
-	tick := time.NewTicker(5 * time.Second)
+	st.Ready = true
+	if err := writeState(*dir, st); err != nil {
+		_, _ = fmt.Fprintf(stderr, "tailsuite: %v\n", err)
+		return teardownUp(ctx, *dir, sb, stderr, exitCouldNotRun)
+	}
+	// The maintainer's choice (2026-10-26): up holds the lab, and Ctrl-C
+	// (or SIGTERM, SIGHUP) tears it down. A down from elsewhere ends the
+	// lab too; then there's nothing left to hold.
+	tick := time.NewTicker(holdPoll)
 	defer tick.Stop()
 	for {
 		select {
@@ -301,8 +360,15 @@ func cmdDown(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs := flags("down", stderr)
 	dir := fs.String("dir", ".", "the project")
 	runID := fs.String("run", "", "tear down this run instead, by its ID, as after a crash")
+	all := fs.Bool("all", false, "tear down every tailsuite run on the Docker Engine, any project's")
 	if ok, code := parse(fs, args, 0); !ok {
 		return code
+	}
+	if *all {
+		if *runID != "" {
+			return fail(stderr, errors.New("down: --all and --run together"))
+		}
+		return downAll(ctx, *dir, stdout, stderr)
 	}
 	st, ok, err := readState(*dir)
 	if err != nil && *runID == "" {
@@ -313,7 +379,7 @@ func cmdDown(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		if !ok {
 			return downNothing(ctx, stdout, stderr)
 		}
-		if abs, err := filepath.Abs(*dir); err != nil || abs != st.Dir {
+		if abs, err := projectDir(*dir); err != nil || abs != st.Dir {
 			return fail(stderr, fmt.Errorf("%s holds the lab state of %s (run %s): if this folder is a copy, delete %s; to tear that lab down anyway, tailsuite down --run %s", stateDir, st.Dir, st.Run, statePath(*dir), st.Run))
 		}
 		target = st.Run
@@ -351,4 +417,54 @@ func downNothing(ctx context.Context, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintf(stderr, "tailsuite: couldn't list other runs: %v\n", err)
 	}
 	return wrote(io.WriteString(stdout, msg))
+}
+
+// downAll tears down every tailsuite run on the Docker Engine (#81).
+// Holders whose labs go notice and exit.
+func downAll(ctx context.Context, dir string, stdout, stderr io.Writer) int {
+	cli, err := docker.Connect(ctx)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	defer func() { _ = cli.Close() }()
+	runs, err := docker.Runs(ctx, cli)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	tctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), sandbox.TeardownTimeout)
+	defer cancel()
+	var errs []error
+	down := map[string]bool{}
+	for _, r := range runs {
+		if err := docker.TeardownRun(tctx, cli, r); err != nil {
+			errs = append(errs, fmt.Errorf("run %s: %w", r, err))
+			continue
+		}
+		down[r] = true
+		_, _ = fmt.Fprintf(stdout, "Run %s is torn down.\n", r)
+	}
+	if st, ok, err := readState(dir); err == nil && ok && (down[st.Run] || !slices.Contains(runs, st.Run)) {
+		_ = removeState(dir, st.Run)
+	}
+	if err := errors.Join(errs...); err != nil {
+		return fail(stderr, err)
+	}
+	if len(runs) == 0 {
+		return wrote(io.WriteString(stdout, "No tailsuite runs on this Docker Engine.\n"))
+	}
+	return exitOK
+}
+
+// upDefaults applies lab.yaml's up: section to the flags not given (#81):
+// a flag, true or false, always wins.
+func upDefaults(fs *flag.FlagSet, detach, clean bool, lab project.Up) (bool, bool) {
+	set := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
+	if !set["detach"] {
+		detach = lab.Detach
+	}
+	if !set["clean"] {
+		clean = lab.Clean
+	}
+	return detach, clean
 }

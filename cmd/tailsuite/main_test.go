@@ -10,6 +10,17 @@ import (
 	"testing"
 )
 
+// asMain makes this test binary run as tailsuite itself, as up --detach
+// re-runs its own binary for the background process.
+const asMain = "TAILSUITE_TEST_AS_MAIN"
+
+func TestMain(m *testing.M) {
+	if os.Getenv(asMain) == "1" {
+		main()
+	}
+	os.Exit(m.Run())
+}
+
 func TestRun(t *testing.T) {
 	tests := []struct {
 		name       string

@@ -153,6 +153,8 @@ func TestLoadChecks(t *testing.T) {
 			map[string]string{TFVarsFile: `devices = { server = { tags = ["tag:a b"] }, db = { tags = ["tag:db"] } }`}, `"tag:a b" isn't a tag`},
 		"a tag twice": {
 			map[string]string{TFVarsFile: `devices = { server = { tags = ["tag:prod", "tag:prod"] }, db = { tags = ["tag:db"] } }`}, "tag:prod twice"},
+		"an up key lab.yaml doesn't have": {
+			map[string]string{LabFile: "version: 1\ndevices: {}\nup: { detached: true }\n", TFVarsFile: ""}, "detached"},
 		"no policy": {
 			map[string]string{PolicyFile: ""}, "policy.hujson"},
 		"a policy that isn't HuJSON": {
@@ -241,5 +243,15 @@ func TestModelJSONKeepsNumbers(t *testing.T) {
 	}
 	if !strings.Contains(string(b), "9007199254740993") {
 		t.Error("model.json changed a large number")
+	}
+}
+
+func TestLabUpDefaults(t *testing.T) {
+	lab, err := ReadLab(strings.NewReader("version: 1\ndevices: {}\nup: { detach: true, clean: true }\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !lab.Up.Detach || !lab.Up.Clean {
+		t.Errorf("up = %+v", lab.Up)
 	}
 }

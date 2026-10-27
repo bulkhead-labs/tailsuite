@@ -30,9 +30,10 @@ import (
 
 // Sandbox is a sandbox.Sandbox on a Docker Engine.
 type Sandbox struct {
-	cli   *client.Client
-	runID string
-	arch  string
+	cli     *client.Client
+	runID   string
+	arch    string
+	project string // the LabelProject value, or ""
 
 	mu       sync.Mutex
 	networks map[string]sandbox.Network
@@ -43,7 +44,11 @@ var _ sandbox.Sandbox = (*Sandbox)(nil)
 
 // New connects to the Docker Engine named by the environment (DOCKER_HOST,
 // or the default socket) and returns a sandbox for a new run.
-func New(ctx context.Context) (*Sandbox, error) {
+func New(ctx context.Context) (*Sandbox, error) { return NewFor(ctx, "") }
+
+// NewFor is New for a project: everything the run creates also carries
+// the project's label, so RunsOf finds it.
+func NewFor(ctx context.Context, project string) (*Sandbox, error) {
 	runID, err := sandbox.NewRunID()
 	if err != nil {
 		return nil, err
@@ -61,6 +66,7 @@ func New(ctx context.Context) (*Sandbox, error) {
 		cli:      cli,
 		runID:    runID,
 		arch:     v.Arch,
+		project:  project,
 		networks: map[string]sandbox.Network{},
 		nodes:    map[string]sandbox.Node{},
 	}, nil
@@ -229,7 +235,7 @@ func (s *Sandbox) CreateNetwork(ctx context.Context, spec sandbox.NetworkSpec) (
 	res, err := s.cli.NetworkCreate(ctx, sandbox.ResourceName(s.runID, spec.Name), client.NetworkCreateOptions{
 		Driver:   "bridge",
 		Internal: !spec.Internet,
-		Labels:   labels(s.runID, spec.Name, ""),
+		Labels:   s.withProject(labels(s.runID, spec.Name, "")),
 	})
 	if err != nil {
 		return sandbox.Network{}, fmt.Errorf("creating network %s: %w", spec.Name, err)
@@ -268,7 +274,9 @@ func (s *Sandbox) StartNode(ctx context.Context, spec sandbox.NodeSpec) (sandbox
 	if err := s.ensureImage(ctx, spec.Image); err != nil {
 		return sandbox.Node{}, err
 	}
-	created, err := s.cli.ContainerCreate(ctx, createOptions(s.runID, spec))
+	opts := createOptions(s.runID, spec)
+	opts.Config.Labels = s.withProject(opts.Config.Labels)
+	created, err := s.cli.ContainerCreate(ctx, opts)
 	if err != nil {
 		return sandbox.Node{}, fmt.Errorf("creating node %s: %w", spec.Name, err)
 	}
@@ -487,7 +495,19 @@ func teardownPass(ctx context.Context, cli *client.Client, runID string) (int, e
 
 // Runs lists the IDs of runs that still have containers or networks.
 func Runs(ctx context.Context, cli *client.Client) ([]string, error) {
-	filter := client.Filters{}.Add("label", sandbox.LabelRun)
+	return runs(ctx, cli, client.Filters{}.Add("label", sandbox.LabelRun))
+}
+
+// RunsOf lists the runs of one project that still have containers or
+// networks.
+func RunsOf(ctx context.Context, cli *client.Client, project string) ([]string, error) {
+	if project == "" {
+		return nil, errors.New("docker: RunsOf needs a project")
+	}
+	return runs(ctx, cli, client.Filters{}.Add("label", sandbox.LabelRun).Add("label", sandbox.LabelProject+"="+project))
+}
+
+func runs(ctx context.Context, cli *client.Client, filter client.Filters) ([]string, error) {
 	seen := map[string]bool{}
 	containers, err := cli.ContainerList(ctx, client.ContainerListOptions{All: true, Filters: filter})
 	if err != nil {
@@ -515,6 +535,14 @@ func Runs(ctx context.Context, cli *client.Client) ([]string, error) {
 // being removed.
 func gone(err error) bool {
 	return cerrdefs.IsNotFound(err) || (cerrdefs.IsConflict(err) && strings.Contains(err.Error(), "already in progress"))
+}
+
+// withProject adds the project's label, if the sandbox has one.
+func (s *Sandbox) withProject(l map[string]string) map[string]string {
+	if s.project != "" {
+		l[sandbox.LabelProject] = s.project
+	}
+	return l
 }
 
 func labels(runID, name string, role sandbox.Role) map[string]string {

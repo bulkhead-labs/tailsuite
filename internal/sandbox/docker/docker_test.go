@@ -163,3 +163,13 @@ func TestCheckEngineSkipsPodman(t *testing.T) {
 		t.Error("Docker 24.0.7 was accepted")
 	}
 }
+
+func TestProjectLabel(t *testing.T) {
+	s := &Sandbox{runID: "0a1b2c3d", project: "0123456789abcdef"}
+	if l := s.withProject(labels(s.runID, "db", sandbox.RoleTailnetNode)); l[sandbox.LabelProject] != "0123456789abcdef" || l[sandbox.LabelRun] != "0a1b2c3d" {
+		t.Errorf("labels = %v", l)
+	}
+	if l := (&Sandbox{runID: "0a1b2c3d"}).withProject(labels("0a1b2c3d", "db", "")); len(l) != 2 {
+		t.Errorf("a sandbox with no project labelled one: %v", l)
+	}
+}

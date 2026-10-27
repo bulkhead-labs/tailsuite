@@ -28,6 +28,9 @@ const (
 	LabelRun  = "com.bulkheadlabs.tailsuite.run"
 	LabelName = "com.bulkheadlabs.tailsuite.name"
 	LabelRole = "com.bulkheadlabs.tailsuite.role"
+	// LabelProject, when set, names the project folder a run belongs to,
+	// by a hash of its path, so `up --clean` finds its leftovers.
+	LabelProject = "com.bulkheadlabs.tailsuite.project"
 )
 
 // DefaultNodeMemory caps each node's memory when its spec doesn't. tailscaled

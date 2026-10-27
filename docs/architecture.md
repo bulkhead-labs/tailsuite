@@ -99,7 +99,7 @@ my-tailnet/
   lab.yaml               # never deployed: the devices as the lab rebuilds them, what listens, profiles
   tests/*.yaml           # tailsuite's tests
   flake.nix              # only with --nix: pins tailsuite and OpenTofu
-  .tailsuite/            # gitignored: the lab that's up (lab.json), the last results
+  .tailsuite/            # gitignored: the lab that's up (lab.json), a detached up's log, the last results
 ```
 
 The project alone rebuilds the lab, with no access to production. On
@@ -113,10 +113,10 @@ the project in the current folder, or `--dir`:
 | Command | Does |
 |---|---|
 | `tailsuite init --template <name> [--nix] [dir]` | Writes a project from a template embedded in the binary, never over an existing one. `--nix` adds a flake pinning this release and OpenTofu |
-| `tailsuite up [--profile <name>] [--engine <name>]` | Starts the lab, with the embedded node agent, and holds it until Ctrl-C, which tears it down. From #11, it also serves the local UI and opens it in the browser (not in CI, or with `--no-browser`); localhost only, behind a one-time link ([0017](decisions/0017-local-ui.md)) |
+| `tailsuite up [--profile <name>] [--engine <name>] [--detach] [--clean]` | Starts the lab, with the embedded node agent, and holds it until Ctrl-C, which tears it down. `--detach` holds it in a background process instead, until `down`; `--clean` first tears down this project's earlier labs; `lab.yaml`'s `up:` sets both defaults ([0033](decisions/0033-up-start-and-stop-options.md)). From #11, it also serves the local UI and opens it in the browser (not in CI, or with `--no-browser`); localhost only, behind a one-time link ([0017](decisions/0017-local-ui.md)) |
 | `tailsuite test [--profile <name>] [--engine <name>] [--only <label>] [--skip <label>] [--run <regex>] [--strict] [--json] [--junit <file>]` | Runs the suite on the lab `up` holds, after applying the current policy, or on a lab of its own. The profile picks the engine, the tests and the strictness, and flags override it. Exit codes: 0 fine, 1 a FAIL, 2 nothing proven or unproven under strict, 3 couldn't run ([0015](decisions/0015-test-file-labels-profiles.md)) |
 | `tailsuite capabilities [--json]` | Prints what each engine does natively, after a rewrite, or refuses ([0016](decisions/0016-engine-interface-capabilities.md)) |
-| `tailsuite down [--run <id>]` | Tears down a lab whose `up` was killed, or any run by its ID |
+| `tailsuite down [--run <id> \| --all]` | Tears down the project's lab (ending a detached `up`), a run by its ID, or every run |
 
 Planned:
 

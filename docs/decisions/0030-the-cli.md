@@ -1,6 +1,6 @@
 # 0030: The CLI, and how its commands share a lab
 
-Status: **accepted** (2026-10-26). Settles #12. Amends
+Status: **accepted** (2026-10-26); amended by [0033](0033-up-start-and-stop-options.md). Settles #12. Amends
 [0019](0019-docker-sandbox.md) and [0020](0020-node-agent.md): the lab
 outlives `test`, not `up`, which holds it until Ctrl-C. Names the commands
 [0014](0014-tailnet-model-and-project-layout.md) and

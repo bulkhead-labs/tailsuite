@@ -86,8 +86,8 @@ Never change behaviour in this PR.
 
 ## 6. The review page
 
-If the PR had a review page (the `review-artifact` skill), update it to
-the outcome, as that skill's "Keep it current" says: an outcome box at the
+If the PR's group had a review page (the `review-artifact` skill), update
+it to the outcome once the group's last PR has merged, as that skill's "Keep it current" says: an outcome box at the
 top, and its links repointed from the branch to the merge commit.
 
 ## 7. Report

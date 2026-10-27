@@ -1,6 +1,6 @@
 ---
 name: review-artifact
-description: Build a review page for the maintainer covering one pull request or a group of them. It says what changed, how it maps to the issue's scope, what it delivers, what it sets up, and what it changes in the plan. Use when asked for a "review artifact", a "review page", "something to review in the morning", a "PR summary page", or when one or more PRs are ready and the maintainer will review them later.
+description: Build a review page for the maintainer covering a group of pull requests that deliver one piece of the product, once every PR in it is ready. It says what changed, how it maps to the issue's scope, what it delivers, what it sets up, and what it changes in the plan. Use when asked for a "review artifact", a "review page", "something to review in the morning", a "PR summary page", or when one or more PRs are ready and the maintainer will review them later.
 ---
 
 # review-artifact
@@ -10,9 +10,19 @@ later. The PR body is written for the merge. This page is written for the
 person deciding whether to merge: it answers "what did we get, is it what
 we asked for, and what does it change" without reading the diff first.
 
-One page covers one PR or a group (a stack, or PRs that deliver one piece
-together). Group PRs when the maintainer would merge them in one sitting
-or one decision; otherwise make one page per PR.
+**One page per group, never per PR** (the maintainer, 2026-10-26: "1
+per grouping when its ready so I can easily see the changes as a whole").
+A group is the PRs that deliver one piece users would notice together,
+such as "the first usable version" or "the Tailscale engine". The page
+is built only when every PR in it is ready; a draft or a lone PR in
+progress gets none. Lead with the whole (what a user can now do, before
+and after), and put the PRs and their review trails underneath. A small
+PR outside any group (a docs fix, a pin) needs no page: the report names
+it.
+
+Every report to the maintainer opens with what needs them: each page's
+link, the PRs it covers, the head SHAs it was checked at, and whether
+they're ready.
 
 The page is a claude.ai artifact: private to the maintainer, outside the
 repo. **Don't link it from a PR, an issue or any file in this repo.**

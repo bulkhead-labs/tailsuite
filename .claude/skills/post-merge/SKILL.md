@@ -100,3 +100,7 @@ A short list:
 - the drift found and fixed, with the docs PR link;
 - the review page, if there was one, and that it shows the outcome;
 - the status page's state.
+
+Then the session is done: one session per issue
+([CLAUDE.md](../../../CLAUDE.md#token-economy-0034)). Say which issue is
+next, and suggest a fresh session for it.

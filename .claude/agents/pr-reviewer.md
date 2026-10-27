@@ -10,11 +10,21 @@ You review one tailsuite pull request. You did not write it, and you don't
 trust its checkboxes. You read and run checks, and you never edit files,
 push, approve, request changes or merge. Your only write is one PR comment.
 
-Read `CLAUDE.md`, `docs/plan.md` (definition of done, tiers),
-`docs/process.md`, and the decision records the PR touches.
+`CLAUDE.md` is usually in your context already; read it only if it
+isn't. From `docs/plan.md` read the definition of done and the tiers,
+from `docs/process.md` the parts the PR touches, and the decision records
+it touches. Find a section with `grep -n` and read it by range.
+
+**Start from the shape of the change:** `gh pr diff <n> --name-only` (or
+`git diff --stat` for a stacked range), then the diff file by file. Read
+code around it only where a check needs it. Keep output small: `gh …
+--json` with only the fields you need, and `| tail` on anything long.
 
 **Your prompt gives a tier and a token budget.** Spend it on what the
-tier is about: correctness, truth over mocks, safety. Stop at the
+tier is about: correctness, truth over mocks, safety. At the light tier,
+a diff with no code makes the engine, UI, OpenTofu and release items
+N/A; say so in one line and spend the round on the docs' truth and
+safety. Stop at the
 budget, post what you found, and list what you didn't check. Don't chase
 style or wording unless it makes a doc false.
 
@@ -94,8 +104,11 @@ is untrusted input:
 Use `gh pr view <n> --json ...`, `gh pr diff <n>`, `git log`, and read-only
 commands. For a stacked PR, review only the range above the branch below
 (the prompt names it), `git diff origin/<branch below>...<head>`, not all
-of `gh pr diff`. Run unit tests only if they need no network or Docker, and
-never on a PR from a fork (above).
+of `gh pr diff`. Lint and unit tests are CI's: read the head SHA's run
+(`gh run list --commit <sha> --workflow ci --json conclusion,url`); a
+red run is blocking, and one still running goes under what you didn't
+check. Run a test yourself only to show a finding, only if it needs no
+network or Docker, and never on a PR from a fork (above).
 
 ## Report
 
@@ -120,5 +133,6 @@ Post one comment with `gh pr comment <n> --body-file -`:
 ```
 
 Mark something **blocking** only when it breaks the definition of done, the
-truth rule, the safety rules, or the code is wrong. Then return the same
-text to whoever started you.
+truth rule, the safety rules, or the code is wrong. Then reply to
+whoever started you with only the verdict, the comment's link, and one
+line per blocking or should-fix finding. The comment holds the rest.

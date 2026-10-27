@@ -1,7 +1,9 @@
 # 0031: The local UI, as built
 
 Status: **accepted** (2026-10-26). Builds [0017](0017-local-ui.md) for
-#11. Records the implementation choices 0017 left open.
+#11, and amends its "It always prints the link": the foreground `up`
+prints it only when the browser can't be used or hasn't traded it.
+Records the implementation choices 0017 left open.
 
 ## Context
 
@@ -71,9 +73,14 @@ Status: **accepted** (2026-10-26). Builds [0017](0017-local-ui.md) for
     the link within 5 seconds, `up` prints it and says why. With no
     browser to open, it prints the link at once. Enter in its terminal
     prints a fresh one-time link;
-  - detached, the background process serves the UI, logs the link, and
-    leaves a redirect file whose path it records in the lab state; the
-    `up` that started it opens the browser on it, under the same rules;
+  - detached, the background process serves the UI and logs the link,
+    which the `up` that started it prints at once. Unless in CI or with
+    `--no-browser`, that `up` opens the browser: on a redirect file the
+    holder writes for it and records in the lab state, or on the link
+    with `--no-redirect-file`. It can't see the trade, so there's no
+    grace period; it says so if no browser opens;
+  - the browser's opener runs in a session of its own, so the Ctrl-C
+    that ends a lab doesn't close the browser it opened;
   - the UI stops, and the redirect file goes, when the lab does.
 
 ## Why
@@ -85,6 +92,11 @@ Status: **accepted** (2026-10-26). Builds [0017](0017-local-ui.md) for
 - **Python Playwright in a pinned image** keeps the toolchain Go-only.
 
 ## Given up
+
+- **A detached lab has no fresh link** once its first is used or has
+  expired; `down` and `up` give one. #87 adds a command for it.
+- **On Windows, `down` kills a detached holder**, so its redirect file's
+  folder stays in the runtime directory.
 
 - **Results don't stream test by test**, so a long run shows nothing
   until it ends.

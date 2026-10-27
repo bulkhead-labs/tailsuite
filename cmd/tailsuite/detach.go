@@ -8,13 +8,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"time"
 
 	"github.com/bulkhead-labs/tailsuite/internal/sandbox"
 	"github.com/bulkhead-labs/tailsuite/internal/sandbox/docker"
-	"github.com/bulkhead-labs/tailsuite/internal/ui"
 )
+
+// uiLink finds the local UI's one-time link in a holder's log.
+var uiLink = regexp.MustCompile(`http://127\.0\.0\.1:[0-9]+/#[A-Za-z0-9_-]+`)
 
 // holderFlag marks the background process `up --detach` starts (#81).
 const holderFlag = "detached-holder"
@@ -45,7 +48,7 @@ func removeOldLogs(dir string) {
 // spawnHolder starts tailsuite up again, as a background process in a
 // session of its own, and returns once it holds a ready lab, with what it
 // printed. If it stops first, its log says why.
-func spawnHolder(ctx context.Context, dir, abs, profile, engineName string, openBrowser bool, stdout, stderr io.Writer) int {
+func spawnHolder(ctx context.Context, dir, abs, profile, engineName string, browser, noRedirect bool, stdout, stderr io.Writer) int {
 	exe, err := os.Executable()
 	if err != nil {
 		return fail(stderr, err)
@@ -70,6 +73,13 @@ func spawnHolder(ctx context.Context, dir, abs, profile, engineName string, open
 	}
 	if engineName != "" {
 		args = append(args, "--engine", engineName)
+	}
+	// The holder writes a redirect file only when this up will open one.
+	if !browser {
+		args = append(args, "--no-browser")
+	}
+	if noRedirect {
+		args = append(args, "--no-redirect-file")
 	}
 	cmd := exec.Command(exe, args...) //nolint:gosec,noctx // G204: this binary, re-run; it must outlive ctx
 	cmd.Stdout, cmd.Stderr = log, log
@@ -105,8 +115,14 @@ func spawnHolder(ctx context.Context, dir, abs, profile, engineName string, open
 			if st, ok, err := readState(dir); err == nil && ok && st.Token == token && st.Holder == pid && st.Ready {
 				out, _ := os.ReadFile(logFile) //nolint:gosec // G304: our holder's log
 				_, _ = stdout.Write(out)
-				if openBrowser && st.Redirect != "" {
-					if err := ui.OpenBrowser(context.WithoutCancel(ctx), st.Redirect); err == nil {
+				if browser {
+					target := st.Redirect
+					if noRedirect {
+						target = uiLink.FindString(string(out))
+					}
+					if err := openBrowser(context.WithoutCancel(ctx), target); err != nil {
+						_, _ = fmt.Fprintf(stdout, "Couldn't open a browser (%v); the link above opens the local UI.\n", err)
+					} else {
 						_, _ = fmt.Fprintln(stdout, "Opening the local UI in your browser.")
 					}
 				}

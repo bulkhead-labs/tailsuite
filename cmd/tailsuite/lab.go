@@ -280,7 +280,7 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if *detach && !holder {
-		return spawnHolder(ctx, *dir, abs, *prof, *eng, browserAllowed(*noBrowser), stdout, stderr)
+		return spawnHolder(ctx, *dir, abs, *prof, *eng, browserAllowed(*noBrowser), *noRedirect, stdout, stderr)
 	}
 	sb, agent, err := newSandbox(ctx, projectID(abs))
 	if err != nil {
@@ -324,7 +324,7 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	}
 	// The local UI, served while this process holds the lab (0017, #11).
 	var stdin io.Reader
-	if !holder {
+	if !holder && isTerminal(os.Stdin) {
 		stdin = os.Stdin
 	}
 	u, err := startUI(ctx, *dir, p, holder, browserAllowed(*noBrowser), *noRedirect, stdin, stdout)
@@ -347,10 +347,12 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	for {
 		select {
 		case <-ctx.Done():
+			u.close() // the UI goes before the lab it shows
 			_, _ = fmt.Fprintf(stderr, "Tearing down run %s...\n", sb.RunID())
 			return teardownUp(ctx, *dir, sb, stderr, exitOK)
 		case <-tick.C:
 			if alive, err := runAlive(ctx, sb.RunID()); err == nil && !alive {
+				u.close()
 				_, _ = fmt.Fprintf(stderr, "Run %s was torn down from elsewhere.\n", sb.RunID())
 				return teardownUp(ctx, *dir, sb, stderr, exitOK)
 			}

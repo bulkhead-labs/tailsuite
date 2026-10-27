@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -250,7 +249,11 @@ func TestDetachAndClean(t *testing.T) {
 		t.Fatal(agentbin.ErrNotEmbedded)
 	}
 	t.Setenv(asMain, "1") // the background process is this binary
-	t.Setenv("CI", "1")   // never open a browser from a test
+	t.Setenv("CI", "")    // a browser is allowed, and faked: this up runs in-process
+	var opened []string
+	old := openBrowser
+	openBrowser = func(_ context.Context, target string) error { opened = append(opened, target); return nil }
+	t.Cleanup(func() { openBrowser = old })
 	ctx := context.Background()
 	dir := initProject(t)
 	abs, _ := projectDir(dir)
@@ -300,6 +303,9 @@ func TestDetachAndClean(t *testing.T) {
 	if fi, err := os.Stat(st.Redirect); err != nil || fi.Mode().Perm() != 0o600 {
 		t.Errorf("the holder's redirect file to the UI: %v %v", fi, err)
 	}
+	if len(opened) != 1 || opened[0] != st.Redirect {
+		t.Errorf("up --detach opened %q, want the holder's redirect file %s", opened, st.Redirect)
+	}
 	if !uiLink.MatchString(out) {
 		t.Errorf("up --detach printed no link to the local UI:\n%s", out)
 	}
@@ -340,10 +346,14 @@ func TestDetachAndClean(t *testing.T) {
 	if err := os.WriteFile(lab, append(b, []byte("up: { detach: true }\n")...), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if code, out, errOut := runCmd(t, "up", "--dir", dir); code != 0 || !strings.Contains(out, "Held by pid") {
+	// ...and --no-redirect-file opens the link itself, with no redirect file.
+	if code, out, errOut := runCmd(t, "up", "--dir", dir, "--no-redirect-file"); code != 0 || !strings.Contains(out, "Held by pid") {
 		t.Fatalf("up with up.detach in lab.yaml: exit %d\n%s\n%s", code, out, errOut)
 	}
 	st2, _, _ := readState(dir)
+	if last := opened[len(opened)-1]; !uiLink.MatchString(last) || st2.Redirect != "" {
+		t.Errorf("detached --no-redirect-file: opened %q, redirect %q", last, st2.Redirect)
+	}
 	if code, _, errOut := runCmd(t, "down", "--dir", dir); code != 0 {
 		t.Fatalf("down: exit %d: %s", code, errOut)
 	}
@@ -362,8 +372,6 @@ func waitExit(t *testing.T, pid int) {
 		time.Sleep(200 * time.Millisecond)
 	}
 }
-
-var uiLink = regexp.MustCompile(`http://127\.0\.0\.1:[0-9]+/#[A-Za-z0-9_-]+`)
 
 // checkUI trades up's one-time link for a session, as the page does, and
 // reads the stream: the map of the lab, then the last run's results.

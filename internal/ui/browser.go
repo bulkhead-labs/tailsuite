@@ -51,8 +51,10 @@ func WriteRedirect(link string) (path string, remove func(), err error) {
 var ErrNoBrowser = errors.New("no browser to open")
 
 // OpenBrowser opens target, a file path or a URL, in the user's browser,
-// without waiting for it.
-func OpenBrowser(ctx context.Context, target string) error {
+// without waiting for it. The opener runs in a session of its own and
+// outlives ctx, so the Ctrl-C that ends a lab doesn't close the browser
+// it opened.
+func OpenBrowser(_ context.Context, target string) error {
 	var name string
 	var args []string
 	switch runtime.GOOS {
@@ -66,7 +68,8 @@ func OpenBrowser(ctx context.Context, target string) error {
 	if _, err := exec.LookPath(name); err != nil {
 		return ErrNoBrowser
 	}
-	cmd := exec.CommandContext(ctx, name, append(args, target)...) //nolint:gosec // G204: the system's opener, with our own file or link
+	cmd := exec.Command(name, append(args, target)...) //nolint:gosec,noctx // G204: the system's opener, with our own file or link; it must outlive up
+	cmd.SysProcAttr = detached()
 	if err := cmd.Start(); err != nil {
 		return err
 	}

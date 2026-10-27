@@ -97,3 +97,32 @@ are in [`docs/decisions/`](docs/decisions/README.md).
 - **The status page** is `docs/index.html` with `docs/assets/`, served by
   GitHub Pages from `docs/` on `main`. It renders the docs beside it and
   reads milestones live from GitHub. Don't copy plan text into it.
+
+## Token economy ([0034](docs/decisions/0034-token-economy.md))
+
+Every call re-reads the whole session, so cost grows with how long a
+context is carried, not with how hard the model thinks. Keep it lean, and
+never drop a check, a review round or a read the work needs to save
+tokens.
+
+- **One session per issue.** A session takes one issue to a ready PR
+  (and its post-merge), then ends. The handoff lives where the work
+  does: the PR body (state, review trail, what's left) and a comment on
+  the issue when work stops part-way, both written to the public-repo
+  rules. Then tell the maintainer to start a fresh session for the next
+  issue. Past about 300k of context, write the handoff and say so.
+- **Don't resume a big session after a long break.** Its cache has gone
+  cold; a fresh session reading the handoff costs less.
+- **Edit, don't rewrite.** Write a whole file only when it's new or
+  restructured.
+- **Short commands, small output.**
+  - Absolute paths from the worktree, not `cd` chains; load the token in
+    the same command as `gh`, as one line.
+  - Quiet flags: `git -q`, `gh … --json` with only the fields needed,
+    `--jq` to trim, `| tail` on `go test`, `nix` and `docker`. Rerun
+    loudly only when a step fails.
+  - Read files by range, or `grep -n` for the heading first, when only
+    part is needed.
+- **Subagents for bulky, separable work**, and only when it would add
+  more than about 50k here, since each one starts at about 60k. Ask for
+  a short reply; the details go in the PR or the issue.

@@ -52,7 +52,13 @@ and the PR body ([0028](../../../docs/decisions/0028-review-tiers.md)).
     the commits that claim to fix them, so it checks each fix and looks
     for what the fixes broke.
 
-  It doesn't get your opinion of the PR.
+  It doesn't get your opinion of the PR. **Keep the prompt to those
+  facts**, about 15 lines: no diff, no issue text, no summary of the
+  change, no copy of `pr-reviewer.md`'s checklist. The reviewer fetches
+  what it needs; anything pasted is read twice and can steer it.
+- **Ask for a short reply**: the verdict, the comment link, and one line
+  per blocking or should-fix finding. The full review is the PR comment;
+  read that only for a finding you're acting on.
 - **A PR from a fork** (`gh pr view <n> --json isCrossRepository`):
   - start the reviewer from a session whose checkout is `main` or a
     branch of ours, never the fork's worktree. Claude Code loads

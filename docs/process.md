@@ -15,6 +15,9 @@ the design questions.
   becomes a decision record in [`decisions/`](decisions/README.md), and the
   issue closes with a link to it.
 - **Research and measurements**, dated, go in [`research/`](research/).
+- **One agent session per issue**: it ends with the PR ready, or merged
+  and post-merge done, and hands off through the PR body and the issue
+  ([0034](decisions/0034-token-economy.md)).
 
 ## The docs stay true
 

@@ -101,3 +101,7 @@ A short list:
 - the group's review page, if there was one: that it shows the outcome,
   or that the group still has PRs open;
 - the status page's state.
+
+Then the session is done: one session per issue
+([CLAUDE.md](../../../CLAUDE.md#token-economy-0034)). Say which issue is
+next, and suggest a fresh session for it.

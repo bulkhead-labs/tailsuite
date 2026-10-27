@@ -1,6 +1,6 @@
 ---
 name: review-artifact
-description: Build a review page for the maintainer covering one pull request or a group of them. It says what changed, how it maps to the issue's scope, what it delivers, what it sets up, and what it changes in the plan. Use when asked for a "review artifact", a "review page", "something to review in the morning", a "PR summary page", or when one or more PRs are ready and the maintainer will review them later.
+description: Build a review page for the maintainer covering a group of pull requests that deliver one piece of the product, once every PR in it is ready. It says what changed, how it maps to the issue's scope, what it delivers, what it sets up, and what it changes in the plan. Use when asked for a "review artifact", a "review page", "something to review in the morning", a "PR summary page", or when every PR in a group is ready.
 ---
 
 # review-artifact
@@ -10,9 +10,20 @@ later. The PR body is written for the merge. This page is written for the
 person deciding whether to merge: it answers "what did we get, is it what
 we asked for, and what does it change" without reading the diff first.
 
-One page covers one PR or a group (a stack, or PRs that deliver one piece
-together). Group PRs when the maintainer would merge them in one sitting
-or one decision; otherwise make one page per PR.
+**One page per group, never per PR** (the maintainer, 2026-10-26: "1
+per grouping when its ready so I can easily see the changes as a whole").
+A group is the PRs that deliver one piece users would notice together,
+such as "the first usable version" or "the Tailscale engine". The page
+is built only when every PR in it is ready; a draft or a lone PR in
+progress gets none. Lead with the whole (what a user can now do, before
+and after), and put the PRs and their review trails underneath. A small
+PR outside any group (a docs fix, a pin) needs no page: the report names
+it.
+
+Every report to the maintainer opens with what needs them: each page's
+link, the PRs it covers, the head SHAs it was checked at, and whether
+they're ready. If the maintainer asks for a page for a single PR, that
+request wins.
 
 The page is a claude.ai artifact: private to the maintainer, outside the
 repo. **Don't link it from a PR, an issue or any file in this repo.**
@@ -49,7 +60,7 @@ use `origin/pr-<n>`.
   `gh api 'repos/bulkhead-labs/tailsuite/issues?milestone=<number>&state=all&per_page=100' --jq '.[]|select(.pull_request|not)|[.number,.state,.title]|@tsv'`,
   `docs/plan.md`'s order for that milestone, and the maintainer
   prerequisites that block any of it.
-- For a group: the base of each PR, and the order they must merge in.
+- The base of each PR, and the order they must merge in.
 
 Every fact on the page must come from one of these. If a claim can't be
 traced to a file, a commit, a comment or an issue, leave it out.
@@ -158,8 +169,8 @@ nothing to say, say that in one line ("No plan changes.").
 - **Link everything checkable.** PRs, issues, review comments, decision
   records, and files at the PR's branch
   (`https://github.com/bulkhead-labs/tailsuite/blob/<branch>/<path>`).
-- **Date it.** The eyebrow carries the date and the head SHA the page was
-  checked at.
+- **Date it.** The eyebrow carries the date and each PR's head SHA the
+  page was checked at.
 - **Title**: two to four words naming the work, ending in "Review", such
   as "Tailnet Model Build Review". Keep it across updates; it's how a later
   session finds the page (the Artifact tool's `list`).
@@ -179,11 +190,13 @@ nothing to say, say that in one line ("No plan changes.").
 
 ## 4. Keep it current
 
-- **When the PR changes** (fixes, another review round), republish the same
-  page, with the new SHA in the eyebrow.
-- **After the merge**, as part of [`post-merge`](../post-merge/SKILL.md): add an outcome box at the
-  top ("Merged <date> as <SHA>", what changed in review, follow-ups
-  filed), and repoint branch links to the merge commit
+- **When any PR in the group changes** (fixes, another review round, a
+  merge of `main`), republish the same page, with the new SHAs in the
+  eyebrow.
+- **After the group's last PR merges**, as part of
+  [`post-merge`](../post-merge/SKILL.md): add an outcome box at the top
+  (one line per PR: "Merged <date> as <SHA>"; what changed in review;
+  follow-ups filed), and repoint branch links to the merge commit
   (`blob/<merge SHA>/<path>`), so the page keeps showing what merged.
 - **When the maintainer leaves comments or answers on the page**, record
   them in the repo (see Rules), act on them, then update the page to say

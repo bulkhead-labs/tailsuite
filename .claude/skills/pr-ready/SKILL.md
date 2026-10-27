@@ -49,7 +49,9 @@ the reason for the rest.
 
 ## 3. Make the docs true
 
-Read these against the diff, and edit them in this PR:
+Read these against the diff, and edit them in this PR. Find the parts
+the diff touches with `grep -n` and read those by range; read a doc
+whole only when the PR restructures it:
 
 - **`docs/plan.md`**: the milestone status, what ships, the tiers, and the
   "Last checked" date. Bump it to today when you checked.
@@ -99,6 +101,11 @@ reviews against the same checklist without seeing your conclusions. It
 runs another round only for a blocking finding, within the PR's tier,
 and links every round in the template's Review box. Don't mark the PR ready until a round finds
 nothing blocking.
+
+The reviewer's prompt is facts only (PR, head SHA, tier, budget,
+worktree, branch below, earlier rounds), and its reply is short
+([`pr-review`](../pr-review/SKILL.md), step 1). Don't pass on what you
+found in steps 2–4: it covers the same ground without your conclusions.
 
 ## 6. Mark ready
 

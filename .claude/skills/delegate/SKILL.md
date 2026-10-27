@@ -42,7 +42,8 @@ limit), with room to spare; otherwise run them one after another.
 A subagent starts with nothing. Its prompt must carry:
 
 - **The task and its done-when:** the issue or PR number, and what to hand
-  back.
+  back: a short reply (the result, links, one line per finding), since
+  it lands in your context. The detail goes in the PR or the issue.
 - **Where to work:** an existing worktree under
   `~/github/tailsuite-worktrees/`, or `git worktree add` a new one from
   `origin/main`. Never switch branches in `~/github/tailsuite`.

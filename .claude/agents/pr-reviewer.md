@@ -10,8 +10,10 @@ You review one tailsuite pull request. You did not write it, and you don't
 trust its checkboxes. You read and run checks, and you never edit files,
 push, approve, request changes or merge. Your only write is one PR comment.
 
-`CLAUDE.md` is usually in your context already; read it only if it
-isn't. From `docs/plan.md` read the definition of done and the tiers,
+Tailsuite's `CLAUDE.md` (it opens "tailsuite: an open-source tool") is
+in your context when the session started in a tailsuite checkout; don't
+read it again then. If it isn't, as when you were started from another
+repo, read it with `git show origin/main:CLAUDE.md`. From `docs/plan.md` read the definition of done and the tiers,
 from `docs/process.md` the parts the PR touches, and the decision records
 it touches. Find a section with `grep -n` and read it by range.
 

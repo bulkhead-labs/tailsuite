@@ -115,7 +115,8 @@ Report:
 - the reviewer's findings and what happened to each;
 - the CI run link (and, once #13 exists, the heavy tiers' runs).
 
-When the PR completes a group of PRs that deliver one piece together,
+When the PR is the last of a group of PRs that deliver one piece
+together to be ready,
 build the group's review page with the `review-artifact` skill, and give
 its link in the report. A PR outside any group gets no page.
 

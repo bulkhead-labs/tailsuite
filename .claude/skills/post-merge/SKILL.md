@@ -98,5 +98,6 @@ A short list:
 - issue and milestone state;
 - what was checked;
 - the drift found and fixed, with the docs PR link;
-- the review page, if there was one, and that it shows the outcome;
+- the group's review page, if there was one: that it shows the outcome,
+  or that the group still has PRs open;
 - the status page's state.

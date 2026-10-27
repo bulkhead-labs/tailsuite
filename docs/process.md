@@ -58,7 +58,7 @@ reviewer agent are those checks.
    ([0028](decisions/0028-review-tiers.md)).
 4. **Fix the findings, then mark it ready.** The integration and
    user-journey tiers run, and must pass.
-   When the maintainer will review later, the **`review-artifact` skill**
+   When the last PR of a group is ready, the **`review-artifact` skill**
    builds one review page for a group of PRs that deliver one piece
    together, once all are ready: the scope against the issues, what it
    sets up, and what it changes in the plan. The page is

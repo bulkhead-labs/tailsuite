@@ -42,6 +42,8 @@ Usage:
                  [--skip <label>] [--run <regex>] [--strict] [--json] [--junit <file>]
                                                     run the suite
   tailsuite down [--run <id> | --all]                tear down the lab, a run, or every run
+  tailsuite upgrade tofu [--force]                   put this release's tofu/tailsuite.tf in
+                                                    place, keeping tailnet.auto.tfvars
   tailsuite capabilities [--json]                    what each engine supports
   tailsuite version                                  print the version
 
@@ -83,6 +85,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return cmdTest(ctx, rest, stdout, stderr)
 	case "down":
 		return cmdDown(ctx, rest, stdout, stderr)
+	case "upgrade":
+		return cmdUpgrade(rest, stdout, stderr)
 	case "capabilities":
 		return cmdCapabilities(rest, stdout, stderr)
 	default:

@@ -241,6 +241,23 @@ func Execute(ctx context.Context, cfg Config, planned []suite.Planned) (*Run, er
 	return run, nil
 }
 
+// RefuseAll is a run in which nothing could be proven at all: every test
+// the options select is REFUSED, with the reason, and no lab is touched.
+// It's for a project the lab can't stand in for, such as one whose tofu/
+// applies more than tailsuite's module (0014).
+func RefuseAll(engine, version string, o suite.Options, planned []suite.Planned, reason string) *Run {
+	run := &Run{Engine: engine, Version: version, Profile: o.Profile, Strict: o.Strict}
+	for _, pt := range planned {
+		tr := TestResult{Name: pt.Name, Source: pt.Source, Where: pt.Where, Labels: pt.AllLabels, Expect: pt.Expect, Port: pt.Port, Skipped: pt.Skipped}
+		if pt.Skipped == "" {
+			tr.Result, tr.Reason = Refused, reason
+		}
+		run.Tests = append(run.Tests, tr)
+	}
+	run.Unprove(reason) // counts the summary and sets the exit; nothing is PASS or FAIL
+	return run
+}
+
 // Unprove turns every PASS and FAIL into UNKNOWN, with the reason, and
 // recomputes the summary and the exit code. It's for a run whose results
 // the lab can no longer vouch for, such as one whose policy changed under

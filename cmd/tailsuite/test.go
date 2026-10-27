@@ -18,6 +18,7 @@ import (
 	"github.com/bulkhead-labs/tailsuite/internal/sandbox"
 	"github.com/bulkhead-labs/tailsuite/internal/sandbox/docker"
 	"github.com/bulkhead-labs/tailsuite/internal/suite"
+	"github.com/bulkhead-labs/tailsuite/internal/tofu"
 )
 
 func cmdTest(ctx context.Context, args []string, stdout, stderr io.Writer) int {
@@ -55,6 +56,13 @@ func cmdTest(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return fail(stderr, err)
 	}
 
+	// A lab can stand in for production only if tofu/ applies nothing but
+	// tailsuite's module (0014, 0032): otherwise nothing here is proven.
+	if problems := tofu.CheckProject(filepath.Join(p.Dir, "tofu")); len(problems) > 0 {
+		r := runner.RefuseAll(headscale.Name, headscale.New(headscale.Config{}).Version(), o, planned, refusedTofu(problems))
+		r.Warnings = append(r.Warnings, warnings...)
+		return report(r, *dir, *asJSON, *junit, stdout, stderr)
+	}
 	r, err := runOnLab(ctx, *dir, p, o, low, planned, stderr)
 	if err != nil {
 		return fail(stderr, err)

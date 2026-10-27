@@ -242,3 +242,14 @@ func TestUnprove(t *testing.T) {
 		t.Error("a REFUSED result lost its reason")
 	}
 }
+
+func TestRefuseAll(t *testing.T) {
+	planned := []suite.Planned{{Test: suite.Test{Name: "a"}}, {Test: suite.Test{Name: "b"}, Skipped: "skip slow"}}
+	run := RefuseAll("headscale", "headscale 0.29.5", suite.Options{Profile: "default"}, planned, "tofu/ applies more")
+	if want := (Summary{Refused: 1, Skipped: 1}); run.Summary != want || run.Exit != 2 {
+		t.Errorf("summary %+v exit %d", run.Summary, run.Exit)
+	}
+	if run.Tests[0].Result != Refused || run.Tests[0].Reason != "tofu/ applies more" || run.Tests[1].Result != "" {
+		t.Errorf("tests = %+v", run.Tests)
+	}
+}

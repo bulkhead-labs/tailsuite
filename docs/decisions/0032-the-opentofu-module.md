@@ -14,9 +14,8 @@ target only the policy, and more sources are refused.
   would load.
 - The Tailscale engine (#6) is what runs `tofu apply`. Until it lands,
   the run directory can be built and validated, not applied.
-- The CLI (#12) is in review on #77. `init` writing `tailsuite.tf`, the
-  `upgrade tofu` command, and a lab run turning the allow-list's problems
-  into REFUSED are wired once it has merged.
+- The CLI (#12, [0030](0030-the-cli.md)) runs the lab; this record also
+  covers what it does with the module.
 
 ## Decision
 
@@ -98,6 +97,20 @@ shipped `tailsuite.tf` declares.
   file is the only one that counts, then `tofu apply -auto-approve`, both
   with `-no-color`. `lab.tf`'s strings are written with HCL's own
   escaping.
+
+### In the CLI
+
+- **`init`** writes this release's `tailsuite.tf` into `tofu/`.
+- **`tailsuite upgrade tofu`** writes this release's `tailsuite.tf`,
+  over a missing one or one an earlier release shipped, and leaves
+  `tailnet.auto.tfvars` alone. A copy no release shipped (an edited one)
+  is replaced only with `--force`.
+- **A project whose `tofu/` fails the check is refused** before any lab
+  is touched: `up` exits 3 with every reason; `test` reports every test
+  it would run as REFUSED with them, so the run proves nothing and exits
+  2 (0015), with JSON and JUnit like any other run. On headscale too,
+  where nothing runs tofu: a lab that differs from production proves
+  nothing about it.
 
 ### Editing the values
 

@@ -24,6 +24,7 @@ import (
 	"github.com/bulkhead-labs/tailsuite/internal/sandbox"
 	"github.com/bulkhead-labs/tailsuite/internal/sandbox/docker"
 	"github.com/bulkhead-labs/tailsuite/internal/suite"
+	"github.com/bulkhead-labs/tailsuite/internal/tofu"
 	"github.com/bulkhead-labs/tailsuite/internal/version"
 )
 
@@ -242,6 +243,9 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return fail(stderr, err)
 	}
 	*detach, *clean = upDefaults(fs, *detach, *clean, p.Lab.Up)
+	if problems := tofu.CheckProject(filepath.Join(p.Dir, "tofu")); len(problems) > 0 {
+		return fail(stderr, errors.New(refusedTofu(problems)))
+	}
 	holder := *token != ""
 	// Refused before Docker is touched (0027).
 	if len(agentbin.Embedded()) == 0 {

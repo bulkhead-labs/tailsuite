@@ -43,11 +43,14 @@ are in [`docs/decisions/`](docs/decisions/README.md).
      ([0024](docs/decisions/0024-merge-commits.md)). Every commit on the
      branch reaches `main`, so each one is signed off and written to be
      read;
-   - stacked on another PR, has its base on `main` and its branch built
-     on the one below, so it merges with no push once that one has.
-     Before it merges, after a fetch, `git log origin/main..origin/<branch>`
-     must list only its own commits: that proves the one below merged,
-     and that it brings nothing its review didn't see.
+   - is stacked on another PR only when the two would conflict
+     ([0029](docs/decisions/0029-stacked-prs-need-reapproval.md)). A
+     stacked PR has its base on `main` and its branch built on the one
+     below, and needs the maintainer's approval again once that one
+     merges. Before it merges, after a fetch,
+     `git log origin/main..origin/<branch>` must list only its own
+     commits: that proves the one below merged, and that it brings
+     nothing its review didn't see.
 
    **After every merge, run the `post-merge` skill.**
 

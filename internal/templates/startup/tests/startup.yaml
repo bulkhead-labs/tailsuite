@@ -1,0 +1,28 @@
+# Synthetic.
+version: 1
+tests:
+  - name: engineers reach the web tier
+    labels: [smoke]
+    from: group:eng
+    to: tag:prod
+    port: 80
+    expect: allow
+
+  - name: laptops can't reach the database
+    from: laptop
+    to: db
+    port: 5432
+    expect: deny
+
+  - name: the web tier reaches the database
+    labels: [slow]
+    from: server
+    to: db
+    port: 5432
+    expect: allow
+
+  - name: the web tier's admin port is closed to engineers
+    from: group:eng
+    to: server
+    port: 9000
+    expect: deny

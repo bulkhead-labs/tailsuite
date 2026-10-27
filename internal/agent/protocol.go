@@ -6,7 +6,7 @@
 // process opens its own, through the sandbox's exec channel (decision
 // 0019), so control traffic never crosses a lab network or the tailnet.
 // Listeners don't belong to any session, because `tailsuite up` and
-// `tailsuite test` are separate processes and the lab outlives both.
+// `tailsuite test` are separate processes and the lab outlives `test`.
 //
 // The protocol is newline-delimited JSON. Each request carries an ID, its
 // response carries the same ID, and requests run concurrently, so

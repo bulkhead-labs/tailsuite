@@ -104,7 +104,7 @@ this list, and the `pr-ready` skill checks it before review
 |---|---|---|
 | Lint and unit | Every push to a PR or to `main` | Go tests, linters, the docs link check, the workflow audit, the Nix build; also a plain `go build` without Nix |
 | Integration | Every push to a ready PR | The lab on headscale |
-| **User journey** | When a PR is marked ready, on every push to a ready PR, on demand for any branch | Installs the binary **from the built artifacts**, the way a user would: `init --template startup` → `up` headless → `test` → `import` from a recorded "prod" → `tofu plan` shows zero changes → a scripted policy change → `test` shows the blast-radius diff → `deploy` to a second headscale → re-import → zero changes → teardown. Plus a Playwright smoke test of the UI. Steps that land in later milestones are stubbed until then |
+| **User journey** | When a PR is marked ready, on every push to a ready PR, on demand for any branch | Installs the binary **from the built artifacts**, the way a user would: `init --template startup` → `up` headless, in the background → `test` → `import` from a recorded "prod" → `tofu plan` shows zero changes → a scripted policy change → `test` shows the blast-radius diff → `deploy` to a second headscale → re-import → zero changes → teardown. Plus a Playwright smoke test of the UI. Steps that land in later milestones are stubbed until then |
 | Real Tailscale | Nightly, and on demand: on a branch, through `branch-run`, with the maintainer's approval each run | The same journey with "prod" as a throwaway Tailscale tailnet and import over the real API. It re-records the API fixtures the per-PR run uses |
 | Upstream canary | Nightly | Latest headscale and Tailscale client images |
 | Release | On a tag | All tiers, then install from the **published** channels (Homebrew, script, container) on Linux and macOS runners, with signatures verified |
@@ -172,10 +172,13 @@ ready starts the heavy tiers. Any branch can run them by hand
    - #52, the node agent inside the binary: done
      ([0027](decisions/0027-embedded-agent.md));
    - #8, the test runner: done ([0026](decisions/0026-test-runner.md));
-   - #12, the CLI;
-   - #11, the UI: its server and page are built
-     ([0031](decisions/0031-the-local-ui-built.md)); `tailsuite up`
-     serves it once #12 has merged;
+   - #12, the CLI: done ([0030](decisions/0030-the-cli.md)); `up`
+     serves the UI from #11;
+   - #81, how `up` starts and stops (`--detach`, `--clean`, `down --all`,
+     defaults in `lab.yaml`): done
+     ([0033](decisions/0033-up-start-and-stop-options.md));
+   - #11, the UI: done ([0031](decisions/0031-the-local-ui-built.md));
+     `up` serves it while it holds the lab;
    - #9, the OpenTofu module;
    - #10, the round trip.
 4. **#6**, the Tailscale engine, after #3. M1 needs only the minimal

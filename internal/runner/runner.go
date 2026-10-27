@@ -241,6 +241,38 @@ func Execute(ctx context.Context, cfg Config, planned []suite.Planned) (*Run, er
 	return run, nil
 }
 
+// Unprove turns every PASS and FAIL into UNKNOWN, with the reason, and
+// recomputes the summary and the exit code. It's for a run whose results
+// the lab can no longer vouch for, such as one whose policy changed under
+// it (0001).
+func (run *Run) Unprove(reason string) {
+	run.Summary = Summary{}
+	for i := range run.Tests {
+		t := &run.Tests[i]
+		if t.Result == Pass || t.Result == Fail {
+			t.Result, t.Reason = Unknown, reason
+			for j := range t.Pairs {
+				if p := &t.Pairs[j]; p.Result == Pass || p.Result == Fail {
+					p.Result, p.Reason = Unknown, reason
+				}
+			}
+		}
+		switch {
+		case t.Skipped != "":
+			run.Summary.Skipped++
+		case t.Result == Pass:
+			run.Summary.Pass++
+		case t.Result == Fail:
+			run.Summary.Fail++
+		case t.Result == Unknown:
+			run.Summary.Unknown++
+		case t.Result == Refused:
+			run.Summary.Refused++
+		}
+	}
+	run.Exit = exitCode(run.Summary, run.Strict)
+}
+
 // declare makes every node's listeners exactly lab.yaml's, on one session
 // per node that lasts the run, and records each set's generation.
 func (r *runner) declare(ctx context.Context) error {

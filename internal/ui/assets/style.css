@@ -1,0 +1,84 @@
+/* The tailsuite lab UI. Layout: a bar, then the map and the test list side
+   by side; one column at phone width. Colors come from tokens.css. */
+:root {
+  --ui-pass: var(--bh-ok);
+  --ui-fail: var(--bh-bad);
+  --ui-unproven: var(--bh-warn);
+  --ui-gap: 16px;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bh-bg);
+  color: var(--bh-text);
+  font: 15px/1.5 var(--bh-font-body);
+}
+#app { display: flex; flex-direction: column; min-height: 100%; }
+.bar {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px;
+  padding-block: 12px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  border-bottom: 2px solid var(--bh-rule);
+  background: var(--bh-surface);
+}
+.brand { font: 800 24px/1 var(--bh-font-head); letter-spacing: 0.02em; text-transform: uppercase; }
+.state { color: var(--bh-muted); font: 13px/1.4 var(--bh-font-mono); }
+.state b { color: var(--bh-text); font-weight: 600; }
+main {
+  flex: 1;
+  display: grid; gap: var(--ui-gap);
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  padding-block: var(--ui-gap);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+@media (max-width: 760px) { main { grid-template-columns: minmax(0, 1fr); } }
+.panel {
+  background: var(--bh-surface); border: 1px solid var(--bh-line); border-radius: 4px;
+  min-width: 0; display: flex; flex-direction: column;
+}
+.panel h2 {
+  margin: 0; padding: 10px 14px; border-bottom: 1px solid var(--bh-line);
+  font: 700 18px/1.2 var(--bh-font-head); letter-spacing: 0.04em; text-transform: uppercase;
+  text-wrap: balance;
+}
+.map { flex: 1; min-height: 360px; height: 60vh; }
+.legend {
+  display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 8px 14px;
+  border-top: 1px solid var(--bh-line); color: var(--bh-muted); font: 12px/1.4 var(--bh-font-mono);
+}
+.key { display: inline-flex; align-items: center; gap: 6px; }
+.key i { display: inline-block; width: 22px; border-top: 3px solid currentColor; }
+.key.unverified i { border-top-style: dashed; color: var(--bh-muted); }
+.key.pass i { color: var(--ui-pass); }
+.key.blocked i { color: var(--ui-pass); border-top-style: dotted; }
+.key.fail i { color: var(--ui-fail); }
+.key.unproven i { color: var(--ui-unproven); border-top-style: dotted; }
+.tests { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+.tests li {
+  display: grid; grid-template-columns: 6.5em minmax(0, 1fr); gap: 2px 10px;
+  padding: 10px 14px; border-bottom: 1px solid var(--bh-line);
+}
+.tests .why { grid-column: 2; color: var(--bh-muted); font-size: 13px; overflow-wrap: anywhere; }
+.result {
+  font: 600 12px/1.6 var(--bh-font-mono); letter-spacing: 0.06em; text-align: center;
+  border: 1px solid currentColor; border-radius: 3px; align-self: start;
+}
+.result.PASS { color: var(--ui-pass); }
+.result.FAIL { color: var(--ui-fail); background: var(--bh-bad-wash); }
+.result.UNKNOWN, .result.REFUSED { color: var(--ui-unproven); }
+.result.skipped, .result.waiting { color: var(--bh-muted); }
+.summary { padding: 10px 14px; font: 13px/1.5 var(--bh-font-mono); color: var(--bh-muted); border-bottom: 1px solid var(--bh-line); }
+.summary b { color: var(--bh-text); }
+.notice {
+  margin: var(--ui-gap); padding: 14px 16px; max-width: 70ch;
+  background: var(--bh-surface); border: 1px solid var(--bh-line); border-left: 4px solid var(--bh-accent);
+}
+.notes { margin: 0; padding: 8px 14px 12px 30px; color: var(--bh-muted); font-size: 13px; }
+code { font-family: var(--bh-font-mono); font-size: 0.92em; }
+:focus-visible { outline: 2px solid var(--bh-accent); outline-offset: 2px; }
+/* Cytoscape's own rule, here because the CSP refuses the style element
+   it would inject (index.html gives this sheet the id it looks for). */
+.__________cytoscape_container { position: relative; }

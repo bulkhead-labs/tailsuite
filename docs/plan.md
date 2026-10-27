@@ -172,12 +172,13 @@ ready starts the heavy tiers. Any branch can run them by hand
    - #52, the node agent inside the binary: done
      ([0027](decisions/0027-embedded-agent.md));
    - #8, the test runner: done ([0026](decisions/0026-test-runner.md));
-   - #12, the CLI: done ([0030](decisions/0030-the-cli.md)); `up` starts
-     the lab without the UI until #11;
+   - #12, the CLI: done ([0030](decisions/0030-the-cli.md)); `up`
+     serves the UI from #11;
    - #81, how `up` starts and stops (`--detach`, `--clean`, `down --all`,
      defaults in `lab.yaml`): done
      ([0033](decisions/0033-up-start-and-stop-options.md));
-   - #11, the UI;
+   - #11, the UI: done ([0031](decisions/0031-the-local-ui-built.md));
+     `up` serves it while it holds the lab;
    - #9, the OpenTofu module;
    - #10, the round trip.
 4. **#6**, the Tailscale engine, after #3. M1 needs only the minimal

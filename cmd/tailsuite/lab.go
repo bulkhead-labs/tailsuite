@@ -51,6 +51,9 @@ type labState struct {
 	// Token is the random token a detaching up gave its holder, so it
 	// can't mistake an old state for its own (process IDs are reused).
 	Token string `json:"token,omitempty"`
+	// Redirect is a detached holder's redirect file to the local UI, for
+	// the up that started it to open in a browser.
+	Redirect string `json:"redirect,omitempty"`
 }
 
 // projectDir is a project folder's absolute path with symlinks resolved:
@@ -229,6 +232,8 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	detach := fs.Bool("detach", false, "hold the lab in a background process; tailsuite down tears it down (default: lab.yaml's up.detach)")
 	clean := fs.Bool("clean", false, "first tear down this project's earlier labs (default: lab.yaml's up.clean)")
 	token := fs.String(holderFlag, "", "internal: the background process --detach starts, with its token")
+	noBrowser := fs.Bool("no-browser", false, "don't open the local UI in a browser (never opened in CI)")
+	noRedirect := fs.Bool("no-redirect-file", false, "open the browser on the link itself, not a redirect file")
 	if ok, code := parse(fs, args, 0); !ok {
 		return code
 	}
@@ -275,7 +280,7 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if *detach && !holder {
-		return spawnHolder(ctx, *dir, abs, *prof, *eng, stdout, stderr)
+		return spawnHolder(ctx, *dir, abs, *prof, *eng, browserAllowed(*noBrowser), *noRedirect, stdout, stderr)
 	}
 	sb, agent, err := newSandbox(ctx, projectID(abs))
 	if err != nil {
@@ -310,13 +315,25 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(&b, "Changed for %s: %s (%s)\n", e.Name(), c.Pointer, c.Reason)
 	}
 	if holder {
-		b.WriteString("\nThe lab is held in the background; tailsuite down tears it down. tailsuite test runs the suite on it. The local UI comes with #11.\n")
+		b.WriteString("\nThe lab is held in the background; tailsuite down tears it down. tailsuite test runs the suite on it, and the local UI shows the results.\n")
 	} else {
-		b.WriteString("\nThe lab stays up until Ctrl-C, which tears it down. tailsuite test, in another terminal, runs the suite on it. The local UI comes with #11.\n")
+		b.WriteString("\nThe lab stays up until Ctrl-C, which tears it down. tailsuite test, in another terminal, runs the suite on it, and the local UI shows the results.\n")
 	}
 	if code := wrote(io.WriteString(stdout, b.String())); code != exitOK {
 		return teardownUp(ctx, *dir, sb, stderr, code)
 	}
+	// The local UI, served while this process holds the lab (0017, #11).
+	var stdin io.Reader
+	if !holder && isTerminal(os.Stdin) {
+		stdin = os.Stdin
+	}
+	u, err := startUI(ctx, *dir, p, holder, browserAllowed(*noBrowser), *noRedirect, stdin, stdout)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "tailsuite: the local UI: %v\n", err)
+		return teardownUp(ctx, *dir, sb, stderr, exitCouldNotRun)
+	}
+	defer u.close()
+	st.Redirect = u.redirect
 	st.Ready = true
 	if err := writeState(*dir, st); err != nil {
 		_, _ = fmt.Fprintf(stderr, "tailsuite: %v\n", err)
@@ -330,10 +347,12 @@ func cmdUp(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	for {
 		select {
 		case <-ctx.Done():
+			u.close() // the UI goes before the lab it shows
 			_, _ = fmt.Fprintf(stderr, "Tearing down run %s...\n", sb.RunID())
 			return teardownUp(ctx, *dir, sb, stderr, exitOK)
 		case <-tick.C:
 			if alive, err := runAlive(ctx, sb.RunID()); err == nil && !alive {
+				u.close()
 				_, _ = fmt.Fprintf(stderr, "Run %s was torn down from elsewhere.\n", sb.RunID())
 				return teardownUp(ctx, *dir, sb, stderr, exitOK)
 			}

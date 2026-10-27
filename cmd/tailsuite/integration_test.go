@@ -3,9 +3,11 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,7 +52,7 @@ func TestInitUpTestDown(t *testing.T) {
 		t.Error("test's own lab left a lab state")
 	}
 
-	stop := startUp(t, dir)
+	stop, upOut := startUp(t, dir)
 	st, ok, err := readState(dir)
 	if !ok || err != nil {
 		t.Fatalf("up left no lab state: %v", err)
@@ -67,6 +69,8 @@ func TestInitUpTestDown(t *testing.T) {
 	if strings.Contains(errOut, "starting one") {
 		t.Fatalf("test started its own lab with up's running: %s", errOut)
 	}
+	// up serves the local UI: the map, then that run's results (#11).
+	checkUI(t, upOut.String())
 	if got := results(t, out); got.Summary != own.Summary {
 		t.Errorf("on the lab that's up: %+v; on its own lab: %+v", got.Summary, own.Summary)
 	}
@@ -209,12 +213,13 @@ func (s *syncBuf) String() string              { s.mu.Lock(); defer s.mu.Unlock(
 
 // startUp runs up in the background until its lab is up, and returns what
 // stops it, as Ctrl-C does, with up's exit code.
-func startUp(t *testing.T, dir string) (stop func() int) {
+func startUp(t *testing.T, dir string) (stop func() int, out *syncBuf) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
-	var out, errOut syncBuf
+	out = &syncBuf{}
+	var errOut syncBuf
 	done := make(chan int, 1)
-	go func() { done <- run(ctx, []string{"up", "--dir", dir}, &out, &errOut) }()
+	go func() { done <- run(ctx, []string{"up", "--dir", dir, "--no-browser"}, out, &errOut) }()
 	code, stopped := 0, false
 	stop = func() int {
 		if !stopped {
@@ -235,7 +240,7 @@ func startUp(t *testing.T, dir string) (stop func() int) {
 		case <-time.After(200 * time.Millisecond):
 		}
 	}
-	return stop
+	return stop, out
 }
 
 // up --detach and --clean, and down ending a detached lab (#81).
@@ -244,6 +249,11 @@ func TestDetachAndClean(t *testing.T) {
 		t.Fatal(agentbin.ErrNotEmbedded)
 	}
 	t.Setenv(asMain, "1") // the background process is this binary
+	t.Setenv("CI", "")    // a browser is allowed, and faked: this up runs in-process
+	var opened []string
+	old := openBrowser
+	openBrowser = func(_ context.Context, target string) error { opened = append(opened, target); return nil }
+	t.Cleanup(func() { openBrowser = old })
 	ctx := context.Background()
 	dir := initProject(t)
 	abs, _ := projectDir(dir)
@@ -290,6 +300,15 @@ func TestDetachAndClean(t *testing.T) {
 	if err := syscall.Kill(st.Holder, 0); err != nil {
 		t.Fatalf("the holder (pid %d) isn't running: %v", st.Holder, err)
 	}
+	if fi, err := os.Stat(st.Redirect); err != nil || fi.Mode().Perm() != 0o600 {
+		t.Errorf("the holder's redirect file to the UI: %v %v", fi, err)
+	}
+	if len(opened) != 1 || opened[0] != st.Redirect {
+		t.Errorf("up --detach opened %q, want the holder's redirect file %s", opened, st.Redirect)
+	}
+	if !uiLink.MatchString(out) {
+		t.Errorf("up --detach printed no link to the local UI:\n%s", out)
+	}
 
 	// test uses the detached lab.
 	code, _, errOut = runCmd(t, "test", "--dir", dir, "--run", "the web tier reaches the database")
@@ -327,10 +346,14 @@ func TestDetachAndClean(t *testing.T) {
 	if err := os.WriteFile(lab, append(b, []byte("up: { detach: true }\n")...), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if code, out, errOut := runCmd(t, "up", "--dir", dir); code != 0 || !strings.Contains(out, "Held by pid") {
+	// ...and --no-redirect-file opens the link itself, with no redirect file.
+	if code, out, errOut := runCmd(t, "up", "--dir", dir, "--no-redirect-file"); code != 0 || !strings.Contains(out, "Held by pid") {
 		t.Fatalf("up with up.detach in lab.yaml: exit %d\n%s\n%s", code, out, errOut)
 	}
 	st2, _, _ := readState(dir)
+	if last := opened[len(opened)-1]; !uiLink.MatchString(last) || st2.Redirect != "" {
+		t.Errorf("detached --no-redirect-file: opened %q, redirect %q", last, st2.Redirect)
+	}
 	if code, _, errOut := runCmd(t, "down", "--dir", dir); code != 0 {
 		t.Fatalf("down: exit %d: %s", code, errOut)
 	}
@@ -347,5 +370,55 @@ func waitExit(t *testing.T, pid int) {
 			t.Fatalf("the holder (pid %d) didn't exit after down", pid)
 		}
 		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// checkUI trades up's one-time link for a session, as the page does, and
+// reads the stream: the map of the lab, then the last run's results.
+func checkUI(t *testing.T, upOut string) {
+	t.Helper()
+	link := uiLink.FindString(upOut)
+	if link == "" {
+		t.Fatalf("up printed no link to the local UI:\n%s", upOut)
+	}
+	base, secret, _ := strings.Cut(link, "/#")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, base+"/api/session", nil)
+	req.Header.Set("Origin", base)
+	req.Header.Set("X-Tailsuite-Link", secret)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sess struct{ Session string }
+	_ = json.NewDecoder(res.Body).Decode(&sess)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusOK || sess.Session == "" {
+		t.Fatalf("trading up's link: %d", res.StatusCode)
+	}
+	req, _ = http.NewRequestWithContext(ctx, http.MethodGet, base+"/api/events", nil)
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	req.Header.Set("X-Tailsuite-Session", sess.Session)
+	res, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	sc := bufio.NewScanner(res.Body)
+	sc.Buffer(make([]byte, 1<<20), 1<<20)
+	var event string
+	seen := map[string]string{}
+	for sc.Scan() && len(seen) < 2 {
+		line := sc.Text()
+		if e, ok := strings.CutPrefix(line, "event: "); ok {
+			event = e
+		}
+		if d, ok := strings.CutPrefix(line, "data: "); ok {
+			seen[event] = d
+		}
+	}
+	if !strings.Contains(seen["view"], `"laptop"`) || !strings.Contains(seen["results"], `"summary"`) {
+		t.Errorf("the UI's stream: view %.80q, results %.80q", seen["view"], seen["results"])
 	}
 }

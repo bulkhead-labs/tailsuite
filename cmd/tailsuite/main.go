@@ -34,8 +34,10 @@ Usage:
 
   tailsuite init --template startup [--nix] [dir]   write a project folder
   tailsuite up [--profile <name>] [--engine <name>] [--detach] [--clean]
-                                                    start the lab; Ctrl-C (or down, if
-                                                    detached) tears it down
+               [--no-browser] [--no-redirect-file]
+                                                    start the lab and the local UI;
+                                                    Ctrl-C (or down, if detached)
+                                                    tears it down
   tailsuite test [--profile <name>] [--engine <name>] [--only <label>]
                  [--skip <label>] [--run <regex>] [--strict] [--json] [--junit <file>]
                                                     run the suite

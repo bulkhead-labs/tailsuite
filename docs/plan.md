@@ -1,6 +1,6 @@
 # Plan
 
-**Last checked against the repo: 2026-10-26.** Current milestone: **M1, in
+**Last checked against the repo: 2026-10-28.** Current milestone: **M1, in
 progress.**
 
 This file is the plan of record. It changes in the same pull request as the
@@ -182,6 +182,10 @@ ready starts the heavy tiers. Any branch can run them by hand
    - #9, the OpenTofu module: done
      ([0032](decisions/0032-the-opentofu-module.md)); its run directory
      is applied with #6;
+   - #89, the UI says what each result and each path means, from the
+     maintainer's first try of it;
+   - #90, running the tests from the page: a decision amending 0017 and
+     0031 first, then the build;
    - #10, the round trip.
 4. **#6**, the Tailscale engine, after #3. M1 needs only the minimal
    rewrite (one user becomes one tag, and the rewrite is recorded); the

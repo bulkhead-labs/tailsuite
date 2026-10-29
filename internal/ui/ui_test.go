@@ -86,7 +86,7 @@ func trade(t *testing.T, s *Server, secret string) (int, string) {
 
 func TestTheShellNeedsNoSecretAndCarriesTheCSP(t *testing.T) {
 	s, _, _ := start(t)
-	for _, p := range []string{"/", "/app.mjs", "/vendor/preact.mjs", "/style.css", "/fonts/fonts.css"} {
+	for _, p := range []string{"/", "/app.mjs", "/explain.mjs", "/vendor/preact.mjs", "/style.css", "/fonts/fonts.css"} {
 		res := do(t, s, "GET", p, nil)
 		if res.StatusCode != http.StatusOK {
 			t.Errorf("GET %s = %d", p, res.StatusCode)

@@ -51,7 +51,7 @@
           # The hash of the Go dependencies. Every change to go.sum changes
           # it: set it to the hash `nix build` reports. CI fails until it
           # matches.
-          vendorHash = "sha256-EWFY55SkDPh42FN3ZdhMUnFxe+nMJC2L3PW+YLWEkFY=";
+          vendorHash = "sha256-cLoNPEtTpuTXWXoEjlzqxhAK/Wm8I/bIGsoDHkUpS2M=";
           subPackages = [ "cmd/tailsuite" ];
           # The node agent for both Linux architectures, embedded (#52). It
           # uses only the standard library, so it builds offline here.

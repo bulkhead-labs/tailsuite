@@ -6,6 +6,7 @@ import (
 	"regexp"
 
 	"github.com/bulkhead-labs/tailsuite/internal/templates"
+	"github.com/bulkhead-labs/tailsuite/internal/tofu"
 	"github.com/bulkhead-labs/tailsuite/internal/version"
 )
 
@@ -24,6 +25,8 @@ func cmdInit(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return fail(stderr, err)
 	}
+	// tailsuite's module, as this release ships it (0032).
+	files["tofu/"+tofu.ModuleFile] = tofu.Current().Module
 	if *nix {
 		flake, err := flakeFor(version.String())
 		if err != nil {

@@ -20,7 +20,14 @@
   [0033](decisions/0033-up-start-and-stop-options.md));
 - the local UI, `internal/ui`
   ([0031](decisions/0031-the-local-ui-built.md)), which `tailsuite up`
-  serves while it holds the lab.
+  serves while it holds the lab;
+- tailsuite's OpenTofu module, the allow-list over `tofu/`, the
+  Tailscale engine's run directory, and editing the values,
+  `internal/tofu` and `internal/project`
+  ([0032](decisions/0032-the-opentofu-module.md)). `init` writes the
+  module, `upgrade tofu` replaces it, and a lab whose `tofu/` applies
+  anything else is refused. The run directory is applied once the
+  Tailscale engine lands (#6).
 
 The rest describes the intended design, and the open questions are linked
 where they apply. Update it in the same pull request as any change to it.
@@ -120,14 +127,14 @@ the project in the current folder, or `--dir`:
 | `tailsuite test [--profile <name>] [--engine <name>] [--only <label>] [--skip <label>] [--run <regex>] [--strict] [--json] [--junit <file>]` | Runs the suite on the lab `up` holds, after applying the current policy, or on a lab of its own. The profile picks the engine, the tests and the strictness, and flags override it. Exit codes: 0 fine, 1 a FAIL, 2 nothing proven or unproven under strict, 3 couldn't run ([0015](decisions/0015-test-file-labels-profiles.md)) |
 | `tailsuite capabilities [--json]` | Prints what each engine does natively, after a rewrite, or refuses ([0016](decisions/0016-engine-interface-capabilities.md)) |
 | `tailsuite down [--run <id> \| --all]` | Tears down the project's lab (ending a detached `up`), a run by its ID, or every run |
+| `tailsuite upgrade tofu [--force]` | Writes this release's `tofu/tailsuite.tf`, leaving the values alone; an edited copy only with `--force` ([0032](decisions/0032-the-opentofu-module.md)) |
 
 Planned:
 
 | Command | Does |
 |---|---|
 | `tailsuite export tests` | Copies the tests that fit Tailscale's format into the policy's `tests` and `sshTests`, after showing the diff ([0015](decisions/0015-test-file-labels-profiles.md)) |
-| `tailsuite upgrade tofu` | Replaces `tofu/tailsuite.tf` with this release's copy, leaving the values alone (#9, [0014](decisions/0014-tailnet-model-and-project-layout.md)) |
-| `tailsuite export tofu` | Writes `tofu/` (tailsuite's module and the values) from the current model, once; `import` uses it, and so will `init` once the module exists (#9). The user owns the result |
+| `tailsuite export tofu` | Writes `tofu/` (tailsuite's module and the values) from the current model, once; `import` uses it. `init` and `upgrade tofu` write only the module ([0032](decisions/0032-the-opentofu-module.md)). The user owns the result |
 | `tailsuite import tailscale` | Reads a real tailnet read-only into a project, with OpenTofu import blocks |
 | `tailsuite deploy` | Lab tests → `tofu plan` against production → blast-radius diff → apply, behind the gates in [0007](decisions/0007-read-only-by-default.md) |
 

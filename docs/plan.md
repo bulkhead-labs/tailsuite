@@ -179,7 +179,9 @@ ready starts the heavy tiers. Any branch can run them by hand
      ([0033](decisions/0033-up-start-and-stop-options.md));
    - #11, the UI: done ([0031](decisions/0031-the-local-ui-built.md));
      `up` serves it while it holds the lab;
-   - #9, the OpenTofu module;
+   - #9, the OpenTofu module: done
+     ([0032](decisions/0032-the-opentofu-module.md)); its run directory
+     is applied with #6;
    - #10, the round trip.
 4. **#6**, the Tailscale engine, after #3. M1 needs only the minimal
    rewrite (one user becomes one tag, and the rewrite is recorded); the

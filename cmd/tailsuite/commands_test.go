@@ -18,6 +18,7 @@ import (
 	"github.com/bulkhead-labs/tailsuite/internal/project"
 	"github.com/bulkhead-labs/tailsuite/internal/runner"
 	"github.com/bulkhead-labs/tailsuite/internal/suite"
+	"github.com/bulkhead-labs/tailsuite/internal/tofu"
 )
 
 func runCmd(t *testing.T, args ...string) (code int, stdout, stderr string) {
@@ -39,7 +40,7 @@ func initProject(t *testing.T) string {
 
 func TestInitWritesAProjectThatLoadsAndPlans(t *testing.T) {
 	dir := initProject(t)
-	for _, f := range []string{"policy.hujson", "lab.yaml", "tests/startup.yaml", "tofu/tailnet.auto.tfvars", ".gitignore"} {
+	for _, f := range []string{"policy.hujson", "lab.yaml", "tests/startup.yaml", "tofu/tailnet.auto.tfvars", "tofu/tailsuite.tf", ".gitignore"} {
 		if _, err := os.Stat(filepath.Join(dir, f)); err != nil {
 			t.Errorf("init didn't write %s: %v", f, err)
 		}
@@ -393,5 +394,78 @@ func TestProjectID(t *testing.T) {
 func TestDownAllAndRunTogether(t *testing.T) {
 	if code, _, errOut := runCmd(t, "down", "--all", "--run", "0123abcd"); code != exitCouldNotRun || !strings.Contains(errOut, "together") {
 		t.Errorf("down --all --run: exit %d, %q", code, errOut)
+	}
+}
+
+func TestUpgradeTofu(t *testing.T) {
+	dir := initProject(t)
+	mod := filepath.Join(dir, "tofu", tofu.ModuleFile)
+	vals := filepath.Join(dir, "tofu", tofu.ValuesFile)
+	before, _ := os.ReadFile(vals)
+	if code, out, _ := runCmd(t, "upgrade", "tofu", "--dir", dir); code != 0 || !strings.Contains(out, "already this release's") {
+		t.Errorf("upgrade on a current module: exit %d, %q", code, out)
+	}
+	if err := os.WriteFile(mod, append(tofu.Current().Module, "\n# mine\n"...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, errOut := runCmd(t, "upgrade", "tofu", "--dir", dir); code != exitCouldNotRun || !strings.Contains(errOut, "--force") {
+		t.Errorf("upgrade over an edited module: exit %d, %q", code, errOut)
+	}
+	if code, _, _ := runCmd(t, "upgrade", "tofu", "--dir", dir, "--force"); code != 0 {
+		t.Errorf("upgrade --force: exit %d", code)
+	}
+	if b, _ := os.ReadFile(mod); !bytes.Equal(b, tofu.Current().Module) {
+		t.Error("upgrade --force didn't write this release's module")
+	}
+	if err := os.Remove(mod); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, _ := runCmd(t, "upgrade", "tofu", "--dir", dir); code != 0 {
+		t.Errorf("upgrade with no module: exit %d", code)
+	}
+	if after, _ := os.ReadFile(vals); !bytes.Equal(before, after) {
+		t.Error("upgrade changed tailnet.auto.tfvars")
+	}
+	if code, _, _ := runCmd(t, "upgrade"); code != exitCouldNotRun {
+		t.Errorf("upgrade with nothing named: exit %d", code)
+	}
+	empty := t.TempDir()
+	if code, _, errOut := runCmd(t, "upgrade", "tofu", "--dir", empty); code != exitCouldNotRun || !strings.Contains(errOut, "isn't a tailsuite project") {
+		t.Errorf("upgrade outside a project: exit %d, %q", code, errOut)
+	}
+	if _, err := os.Stat(filepath.Join(empty, "tofu")); err == nil {
+		t.Error("upgrade outside a project wrote tofu/")
+	}
+}
+
+// A project whose tofu/ applies more than tailsuite's module is refused,
+// before any lab is touched: up couldn't run, and test proves nothing.
+func TestAProjectThatAppliesMoreIsRefused(t *testing.T) {
+	dir := initProject(t)
+	extra := filepath.Join(dir, "tofu", "extra.tf")
+	if err := os.WriteFile(extra, []byte(`resource "tailscale_dns_nameservers" "x" { nameservers = ["192.0.2.1"] }`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	code, out, errOut := runCmd(t, "test", "--dir", dir, "--json")
+	if code != 2 {
+		t.Fatalf("test: exit %d, want 2 (nothing proven)\n%s", code, errOut)
+	}
+	var r runner.Run
+	if err := json.Unmarshal([]byte(out), &r); err != nil {
+		t.Fatal(err)
+	}
+	if r.Summary.Pass+r.Summary.Fail+r.Summary.Unknown != 0 || r.Summary.Refused == 0 {
+		t.Errorf("summary %+v: everything run must be REFUSED", r.Summary)
+	}
+	for _, tr := range r.Tests {
+		if tr.Skipped == "" && (tr.Result != runner.Refused || !strings.Contains(tr.Reason, "resource block")) {
+			t.Errorf("%s: %s %q", tr.Name, tr.Result, tr.Reason)
+		}
+	}
+	if strings.Contains(errOut, "starting one") {
+		t.Error("test started a lab for a refused project")
+	}
+	if code, _, errOut := runCmd(t, "up", "--dir", dir); code != exitCouldNotRun || !strings.Contains(errOut, "resource block") {
+		t.Errorf("up: exit %d, %q", code, errOut)
 	}
 }

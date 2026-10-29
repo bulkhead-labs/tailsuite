@@ -197,12 +197,15 @@ function Outcome({ kind }) {
 // Proves is what the selection proves, in plain English.
 function Proves({ view, run, sel, onSelect }) {
   let title, lines;
+  const t = sel && sel.test && ((run && run.tests) || []).find((x) => x.name === sel.test);
   if (!sel) {
     title = "What a line proves";
     lines = [{ text: "Select a line on the map, a path below, or a test, to see what it proves." }];
-  } else if (sel.test) {
-    const t = ((run && run.tests) || []).find((x) => x.name === sel.test);
-    if (!t) return null;
+  } else if (sel.test && !t) {
+    // A new run can drop the selected test.
+    title = sel.test;
+    lines = [{ text: "This test isn't in the latest run." }];
+  } else if (t) {
     title = t.name;
     const kind = t.skipped ? "skipped" : t.result;
     lines = t.skipped || !(t.pairs || []).length

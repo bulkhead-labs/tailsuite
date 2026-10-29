@@ -86,16 +86,18 @@ type Summary struct {
 
 // TestResult is one test's result.
 type TestResult struct {
-	Name    string       `json:"name"`
-	Source  string       `json:"source"`
-	Where   string       `json:"where"`
-	Labels  []string     `json:"labels"`
-	Expect  string       `json:"expect"`
-	Port    int          `json:"port,omitempty"`
-	Result  Result       `json:"result,omitempty"`
-	Reason  string       `json:"reason,omitempty"`
-	Skipped string       `json:"skipped,omitempty"`
-	Pairs   []PairResult `json:"pairs,omitempty"`
+	Name   string   `json:"name"`
+	Source string   `json:"source"`
+	Where  string   `json:"where"`
+	Labels []string `json:"labels"`
+	Expect string   `json:"expect"`
+	Port   int      `json:"port,omitempty"`
+	// Protocols are what the test asserts on the port, "tcp" and "udp".
+	Protocols []string     `json:"protocols,omitempty"`
+	Result    Result       `json:"result,omitempty"`
+	Reason    string       `json:"reason,omitempty"`
+	Skipped   string       `json:"skipped,omitempty"`
+	Pairs     []PairResult `json:"pairs,omitempty"`
 }
 
 // PairResult is one device pair's result.
@@ -175,7 +177,7 @@ func Execute(ctx context.Context, cfg Config, planned []suite.Planned) (*Run, er
 	type job struct{ ti, pi int }
 	var jobs []job
 	for ti, pt := range planned {
-		results[ti] = TestResult{Name: pt.Name, Source: pt.Source, Where: pt.Where, Labels: pt.AllLabels, Expect: pt.Expect, Port: pt.Port, Skipped: pt.Skipped}
+		results[ti] = TestResult{Name: pt.Name, Source: pt.Source, Where: pt.Where, Labels: pt.AllLabels, Expect: pt.Expect, Port: pt.Port, Protocols: pt.Protocols, Skipped: pt.Skipped}
 		if pt.Skipped != "" || pt.Unknown != "" {
 			continue
 		}
@@ -248,7 +250,7 @@ func Execute(ctx context.Context, cfg Config, planned []suite.Planned) (*Run, er
 func RefuseAll(engine, version string, o suite.Options, planned []suite.Planned, reason string) *Run {
 	run := &Run{Engine: engine, Version: version, Profile: o.Profile, Strict: o.Strict}
 	for _, pt := range planned {
-		tr := TestResult{Name: pt.Name, Source: pt.Source, Where: pt.Where, Labels: pt.AllLabels, Expect: pt.Expect, Port: pt.Port, Skipped: pt.Skipped}
+		tr := TestResult{Name: pt.Name, Source: pt.Source, Where: pt.Where, Labels: pt.AllLabels, Expect: pt.Expect, Port: pt.Port, Protocols: pt.Protocols, Skipped: pt.Skipped}
 		if pt.Skipped == "" {
 			tr.Result, tr.Reason = Refused, reason
 		}

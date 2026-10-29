@@ -11,28 +11,38 @@ export const MEANING = {
 };
 
 // portLabel says a policy port in words: "tcp:80" is TCP 80, a bare
-// port is any protocol on it, "*" every port.
-export function portLabel(p) {
+// port is any protocol on it, "*" every port. An open port whose TCP or
+// UDP was proven (see untested) is the protocols other than those.
+export function portLabel(o) {
+  const p = o.port;
   if (p === "app") return "an app capability";
   if (p === "*") return "all ports";
   const i = p.indexOf(":");
-  if (i < 0) return "any protocol " + p;
+  if (i < 0) return o.except ? `protocols other than ${o.except.map((x) => x.toUpperCase()).join(" and ")} on ${p}` : "any protocol on " + p;
   const proto = p.slice(0, i).toUpperCase(), port = p.slice(i + 1);
   return proto + " " + (port === "*" ? "all ports" : port);
 }
 
 // shortPort is portLabel for a line on the map, where space is short.
-export function shortPort(p) {
+export function shortPort(o) {
+  const p = o.port;
   if (p === "*") return "all";
   const i = p.indexOf(":");
-  if (i < 0) return p === "app" ? p : "any " + p;
+  if (i < 0) return p === "app" ? p : (o.except ? "other " : "any ") + p;
   return p.slice(0, i).toUpperCase() + " " + (p.slice(i + 1) === "*" ? "all" : p.slice(i + 1));
 }
 
-// probeLabel is what a test sent: its probe and port, as "TCP 5432".
+// protocols is what a test asserts: its own list, or TCP.
+function protocols(t) {
+  return t.protocols && t.protocols.length > 0 ? t.protocols : ["tcp"];
+}
+
+// probeLabel is what a test asserts, as "TCP 5432" or "UDP 53"; an HTTP
+// probe of TCP says HTTP.
 export function probeLabel(t, p) {
-  const probe = (p.probe || "tcp").toUpperCase();
-  return t.port ? probe + " " + t.port : probe;
+  const ps = protocols(t);
+  const proto = p.probe === "http" && ps.length === 1 && ps[0] === "tcp" ? "HTTP" : ps.map((x) => x.toUpperCase()).join("+");
+  return t.port ? proto + " " + t.port : proto;
 }
 
 // control is a blocked pair's positive control, in words, or "".
@@ -65,7 +75,7 @@ export function provesPair(t, p) {
 }
 
 // provesPath is everything the run says about one path, from → to: a
-// line per test that probed it, then the policy's ports no test probed.
+// line per test on it, then the policy's ports no result has proven.
 export function provesPath(from, to, view, run) {
   const lines = [];
   for (const t of (run && run.tests) || []) {
@@ -77,27 +87,39 @@ export function provesPath(from, to, view, run) {
   const path = (view.paths || []).find((p) => p.from === from && p.to === to);
   const open = path ? untested(path.ports || [], probed(from, to, run)) : [];
   if (open.length > 0) {
-    lines.push({ result: "unverified", text: `The policy lets ${from} reach ${to} on ${open.map(portLabel).join(", ")}, but no test has sent traffic there, so nothing has proven it yet.` });
+    lines.push({ result: "unverified", text: `The policy lets ${from} reach ${to} on ${open.map(portLabel).join(", ")}, but no test has proven it, so it's unverified.` });
   }
   if (lines.length === 0) lines.push({ result: "unverified", text: `Nothing has proven a path from ${from} to ${to} yet.` });
   return lines;
 }
 
-// probed is the ports the run's tests sent traffic to, from → to.
+// probed is what the run proved, from → to, as "tcp:5432": only a PASS
+// or a FAIL proves anything, for each protocol its test asserts.
 export function probed(from, to, run) {
-  const ports = new Set();
+  const seen = new Set();
   for (const t of (run && run.tests) || []) {
     if (t.skipped) continue;
-    if ((t.pairs || []).some((p) => p.from === from && p.to === to)) ports.add(t.port);
+    if (!(t.pairs || []).some((p) => p.from === from && p.to === to && (p.result === "PASS" || p.result === "FAIL"))) continue;
+    for (const proto of protocols(t)) seen.add(proto + ":" + t.port);
   }
-  return ports;
+  return seen;
 }
 
-// untested is a policy path's ports that no test probed: a test on one
-// port proves nothing about the others, which stay unverified.
+// untested is a policy path's ports nothing proved, as {port, except}: a
+// result on one port and protocol proves nothing about the others. A
+// bare port is every protocol, so proving its TCP or UDP leaves the rest.
 export function untested(ports, seen) {
-  return ports.filter((p) => {
-    const n = p.replace(/^tcp:/, "");
-    return !/^\d+$/.test(n) || !seen.has(Number(n));
-  });
+  const out = [];
+  for (const p of ports) {
+    const i = p.indexOf(":");
+    const n = i < 0 ? p : p.slice(i + 1);
+    if (!/^\d+$/.test(n)) { out.push({ port: p }); continue; }
+    if (i >= 0) {
+      if (!seen.has(p.slice(0, i).toLowerCase() + ":" + n)) out.push({ port: p });
+      continue;
+    }
+    const done = ["tcp", "udp"].filter((x) => seen.has(x + ":" + n));
+    out.push(done.length > 0 ? { port: p, except: done } : { port: p });
+  }
+  return out;
 }

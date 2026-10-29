@@ -57,7 +57,7 @@ main {
 .key.blocked i { color: var(--ui-pass); border-top-style: dotted; }
 .key.fail i { color: var(--ui-fail); }
 .key.unproven i { color: var(--ui-unproven); border-top-style: dotted; }
-.tests { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+.tests { list-style: none; margin: 0; padding: 0; }
 .tests li {
   display: grid; grid-template-columns: 6.5em minmax(0, 1fr); gap: 2px 10px;
   padding: 10px 14px; border-bottom: 1px solid var(--bh-line);

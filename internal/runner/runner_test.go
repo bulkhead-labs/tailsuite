@@ -244,12 +244,16 @@ func TestUnprove(t *testing.T) {
 }
 
 func TestRefuseAll(t *testing.T) {
-	planned := []suite.Planned{{Test: suite.Test{Name: "a"}}, {Test: suite.Test{Name: "b"}, Skipped: "skip slow"}}
+	planned := []suite.Planned{{Test: suite.Test{Name: "a", Port: 53, Protocols: []string{"udp"}}}, {Test: suite.Test{Name: "b"}, Skipped: "skip slow"}}
 	run := RefuseAll("headscale", "headscale 0.29.5", suite.Options{Profile: "default"}, planned, "tofu/ applies more")
 	if want := (Summary{Refused: 1, Skipped: 1}); run.Summary != want || run.Exit != 2 {
 		t.Errorf("summary %+v exit %d", run.Summary, run.Exit)
 	}
 	if run.Tests[0].Result != Refused || run.Tests[0].Reason != "tofu/ applies more" || run.Tests[1].Result != "" {
 		t.Errorf("tests = %+v", run.Tests)
+	}
+	// The UI labels a line by what the test asserts, even with no traffic.
+	if p := run.Tests[0].Protocols; len(p) != 1 || p[0] != "udp" {
+		t.Errorf("protocols = %v", p)
 	}
 }
